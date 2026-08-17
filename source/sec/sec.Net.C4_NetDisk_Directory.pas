@@ -36,7 +36,7 @@ uses
   sec.FPC.GenericList,
 {$ENDIF FPC}
   sec.Core, sec.PascalStrings, sec.UPascalStrings, sec.Status, sec.UnicodeMixedLib, sec.ListEngine,
-  sec.Geometry2D, sec.DFE, sec.Json, sec.Expression, sec.OpCode,
+  sec.Geometry2D, sec.Int128, sec.DFE, sec.Json, sec.Expression, sec.OpCode,
   sec.Notify, sec.Cipher, sec.MemoryStream,
   sec.FragmentBuffer, // solve for discontinuous space
   sec.ZDB2, sec.ZDB2.ObjectDataManager, sec.ZDB2.DFE,

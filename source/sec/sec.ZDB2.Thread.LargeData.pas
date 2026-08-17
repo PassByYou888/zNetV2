@@ -160,7 +160,7 @@ uses DateUtils, SysUtils,
   sec.PascalStrings, sec.UPascalStrings, sec.UnicodeMixedLib,
   sec.MemoryStream,
   sec.Status, sec.Cipher, sec.ZDB2, sec.ListEngine, sec.TextDataEngine, sec.IOThread,
-  sec.HashList.Templet, sec.DFE, sec.Geometry2D,
+  sec.HashList.Templet, sec.DFE, sec.Geometry2D, sec.Int128,
   sec.Notify, sec.ZDB2.Thread.Queue, sec.ZDB2.Thread;
 
 type

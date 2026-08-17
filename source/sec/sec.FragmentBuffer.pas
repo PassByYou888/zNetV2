@@ -546,7 +546,7 @@ type
 
 implementation
 
-uses sec.Geometry2D, sec.UnicodeMixedLib, sec.Status;
+uses sec.Int128, sec.UnicodeMixedLib, sec.Status;
 
 constructor TPart_Data.Create;
 begin

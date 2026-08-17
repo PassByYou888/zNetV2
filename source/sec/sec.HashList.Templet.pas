@@ -36,7 +36,7 @@ uses
   sec.FPC.GenericList,
 {$ENDIF FPC}
   sec.Core,
-  sec.Status, sec.PascalStrings, sec.UPascalStrings, sec.UnicodeMixedLib, sec.ListEngine, sec.Geometry2D;
+  sec.Status, sec.PascalStrings, sec.UPascalStrings, sec.UnicodeMixedLib, sec.ListEngine, sec.Int128;
 
 function IsEqual__(const Val1, Val2, Epsilon_: Single): Boolean; overload;
 function IsEqual__(const Val1, Val2, Epsilon_: Double): Boolean; overload;
