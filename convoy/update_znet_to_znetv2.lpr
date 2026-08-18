@@ -12,8 +12,10 @@ program update_znet_to_znetv2;
             https://github.com/PassByYou888/zNetV2 (新版)
 -----------------------------------------------------------------------------}
 
-{$DEFINE FPC_DELPHI_MODE}
-{$I ..\..\Z.Define.inc}
+{$MODE delphi}
+{$MODESWITCH NestedProcVars}
+{$MODESWITCH NESTEDCOMMENTS}
+{$CODEPAGE UTF8}
 
 uses
   SysUtils,                     // 系统核心单元，提供文件、日期、命令行等基础功能
