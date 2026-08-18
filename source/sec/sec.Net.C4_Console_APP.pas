@@ -226,17 +226,10 @@ uses
   sec.ListEngine, sec.HashList.Templet, sec.Expression, sec.OpCode, sec.Parsing, sec.DFE, sec.TextDataEngine,
   sec.Json, sec.Geometry2D, sec.Geometry3D, sec.Number,
   sec.MemoryStream,
-  sec.Net,
   sec.ZDB.ObjectData_LIB, sec.ZDB, sec.ZDB.Engine, sec.ZDB.LocalManager,
   sec.ZDB.FileIndexPackage_LIB, sec.ZDB.FilePackage_LIB, sec.ZDB.ItemStream_LIB, sec.ZDB.HashField_LIB, sec.ZDB.HashItem_LIB,
-  sec.ZDB2, sec.ZDB2.DFE, sec.ZDB2.HS, sec.ZDB2.HV, sec.ZDB2.Json, sec.ZDB2.MS64, sec.ZDB2.NM, sec.ZDB2.TE, sec.ZDB2.FileEncoder,
-  sec.Net.C4, sec.Net.C4_UserDB, sec.Net.C4_Var, sec.Net.C4_FS, sec.Net.C4_RandSeed, sec.Net.C4_Log_DB, sec.Net.C4_XNAT, sec.Net.C4_Alias,
-  sec.Net.C4_FS2,
-  sec.Net.C4_NetDisk_Admin_Tool,
-  sec.Net.C4_TEKeyValue,
-  sec.Net.PhysicsIO, sec.Net.C4_NetDisk_Client, sec.Net.C4_NetDisk_Directory,
-  sec.Net.C4_FS3,
-  sec.Net.C4_NetDisk_Service;
+  sec.ZDB2, sec.ZDB2.FileEncoder,
+  sec.Net, sec.Net.C4, sec.Net.PhysicsIO;
 
 var
   { Array of command-line parameters extracted from the system command line. }
