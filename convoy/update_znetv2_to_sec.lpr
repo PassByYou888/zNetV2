@@ -15,8 +15,10 @@ program update_znetv2_to_sec;
             https://github.com/PassByYou888/zNetV2/tree/main/source/sec (副库)
 -----------------------------------------------------------------------------}
 
-{$DEFINE FPC_DELPHI_MODE}
-{$I ..\..\Z.Define.inc}
+{$MODE delphi}
+{$MODESWITCH NestedProcVars}
+{$MODESWITCH NESTEDCOMMENTS}
+{$CODEPAGE UTF8}
 
 uses
   SysUtils,                     // 系统核心单元，提供文件、日期、命令行等基础功能
