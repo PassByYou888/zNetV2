@@ -46,6 +46,7 @@ uses
 type
   TPascal_Keyword = (
     kUnit, kProgram, kLibrary, kInterface, kUses, kType, kSet, kClass, KArray, kOf, kFunction, kProcedure, kConst, kVar, kRecord, kPacked, kInline,
+    kExternal, kExternal_Name, kExternal_Index,
     kImplementation, kBegin, kEnd, kIn, kOut, kIf, kFor, kWhile, kRepeat, kUntil, kLabel, kContinue, kBreak, kCase,
     kForward, kEol,
     kInherited, kOverload, kVirtual, kOverride, kStdcall, kCdecl, kPascal, kSafeCall, kRegister,
@@ -163,6 +164,10 @@ const
     (key: kRecord; Decl: 'record'),
     (key: kPacked; Decl: 'packed'),
     (key: kInline; Decl: 'inline'),
+
+    (key: kExternal; Decl: 'external'),
+    (key: kExternal_Name; Decl: 'name'),
+    (key: kExternal_Index; Decl: 'index'),
 
     (key: kImplementation; Decl: 'implementation'),
     (key: kBegin; Decl: 'begin'),

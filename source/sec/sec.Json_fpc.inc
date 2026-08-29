@@ -16,7 +16,7 @@ begin
   FInstance.Add(v_);
 end;
 
-procedure TZ_JsonArray.Add(const v_: TPascalString);
+procedure TZ_JsonArray.Add(const v_: TZ_JsonString);
 begin
   FInstance.Add(v_.Text);
 end;
@@ -379,7 +379,7 @@ end;
 
 procedure TZ_JsonObject.SaveToStream(stream: TCore_Stream; Formated_: Boolean);
 var
-  s_: TPascalString;
+  s_: TZ_JsonString;
   buff: TBytes;
 begin
   if Formated_ then

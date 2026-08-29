@@ -323,29 +323,6 @@ procedure DoStatus(); overload; // Emits an empty line (calls CheckDoStatus).
 procedure Post_To_DoStatus_Queue(Th: TCore_Thread; Text_: SystemString; const ID: Integer);
 
 {
-  * Retrieves and removes the next message from the queue, delivers it,
-  * and returns the message text in the Status parameter.
-  *
-  * @param Status  (out) Receives the message text.
-  * @Return True if a message was available and delivered, False otherwise.
-  *
-  * @Example
-  *   var S: TPascalString;
-  *   while Pick_One_Status(S) do
-  *     WriteLn(S);
-}
-function Pick_One_Status(var Status: TPascalString): Boolean;
-
-{
-  * Extracts all pending status messages from the queue and appends them
-  * to the given string list.  If the destination already has more than
-  * 5000 items, it is cleared first to avoid excessive growth.
-  *
-  * @param dest  The TCore_Strings collection to receive the messages.
-}
-procedure Pick_State_To(dest: TCore_Strings);
-
-{
   * ConsoleWrite – Write a string to the console
 }
 procedure ConsoleWrite(const S: string);
@@ -980,51 +957,6 @@ end;
 procedure DoStatus();
 begin
   CheckDoStatus();
-end;
-
-{
-  * Pick_One_Status – Removes the first message from the queue, delivers it,
-  * and returns the message text.  Returns False if the queue was empty.
-  *
-  * @param Status  (out) Receives the message text.
-  * @Return True if a message was processed.
-}
-function Pick_One_Status(var Status: TPascalString): Boolean;
-var
-  ID: Integer;
-begin
-  Result := False;
-  Status_Critical__.Acquire;
-  try
-    if Text_Queue_Data_Pool__.Num > 0 then
-      begin
-        Status := Text_Queue_Data_Pool__.First^.Data^.S;
-        ID := Text_Queue_Data_Pool__.First^.Data^.ID;
-        Text_Queue_Data_Pool__.Next;
-        Result := True;
-      end;
-  finally
-      Status_Critical__.Release;
-  end;
-  if Result then
-      Do_Trigger_Event_Output_(Status, ID); // Deliver the message.
-end;
-
-{
-  * Pick_State_To – Drains all pending messages into the given string
-  * list.  If the destination is too large (>5000 items), it is cleared first
-  * to prevent memory bloat.
-  *
-  * @param dest  The list to receive the messages.
-}
-procedure Pick_State_To(dest: TCore_Strings);
-var
-  status_: TPascalString;
-begin
-  if dest.Count > 5000 then
-      dest.Clear;
-  while Pick_One_Status(status_) do
-      dest.Add(status_);
 end;
 
 { ------------------------------------------------------------------------------

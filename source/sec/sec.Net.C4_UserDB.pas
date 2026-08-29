@@ -865,7 +865,7 @@ begin
             break;
           end;
       if not found_ then
-          friend_arry.Add(DestFriendUserName_);
+          friend_arry.Add(DestFriendUserName_.Text);
 
       Json := UserIdentifierHash[DestFriendUserName_];
       friend_arry := Json.Data.A['friend'];
@@ -877,7 +877,7 @@ begin
             break;
           end;
       if not found_ then
-          friend_arry.Add(FromUserName_);
+          friend_arry.Add(FromUserName_.Text);
     end
   else
     begin
@@ -1094,7 +1094,7 @@ begin
 
   Json := JsonDatabase.NewData;
   arry := Json.Data.A['Identifier'];
-  arry.Add(UserName_);
+  arry.Add(UserName_.Text);
   Json.Data.S['PrimaryIdentifier'] := UserName_;
   Json.Data.S['Password'] := GenerateQuantumCryptographyPassword(passwd_.LowerText);
   Json.Data.D['RegTime'] := umlNow;
@@ -1236,7 +1236,7 @@ begin
     end;
 
   Json := UserIdentifierHash[UserName_];
-  Json.Data.A['Identifier'].Add(NewIdentifier_);
+  Json.Data.A['Identifier'].Add(NewIdentifier_.Text);
   UserIdentifierHash.Add(NewIdentifier_, Json);
   OutData.WriteBool(True);
   OutData.WriteString('new Identifier "%s" for user "%s"', [NewIdentifier_.Text, UserName_.Text]);

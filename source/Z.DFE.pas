@@ -1068,7 +1068,7 @@ end;
 
 procedure TDF_String.SaveToJson(jarry: TZ_JsonArray; index_: Integer);
 begin
-  jarry.Add(umlStringOf(Buffer));
+  jarry.Add(umlStringOf(Buffer).Text);
 end;
 
 function TDF_String.ComputeEncodeSize: Int64;
@@ -7138,4 +7138,5 @@ begin
 end;
 
 end.
+ 
  

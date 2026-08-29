@@ -33,27 +33,28 @@ unit Z.Json;
 interface
 
 uses SysUtils,
-{$IFDEF DELPHI}
+  {$IFDEF DELPHI}
   Z.Delphi.JsonDataObjects,
-{$ELSE DELPHI}
+  {$ELSE DELPHI}
   Z.FPC.GenericList,
   fpjson, jsonparser, jsonscanner,
-{$ENDIF DELPHI}
+  {$ENDIF DELPHI}
   Z.Core, Z.PascalStrings, Z.UPascalStrings, Z.Status,
   Z.UnicodeMixedLib,
   Z.MemoryStream,
   Z.Int128;
-
 type
   TZ_JsonObject = class;
 
-{$IFDEF DELPHI}
+  {$IFDEF DELPHI}
   TZ_Instance_JsonArray = TJsonArray;
   TZ_Instance_JsonObject = TJsonObject;
-{$ELSE DELPHI}
+  TZ_JsonString = TPascalString;
+  {$ELSE DELPHI}
   TZ_Instance_JsonArray = TJsonArray;
   TZ_Instance_JsonObject = TJsonObject;
-{$ENDIF DELPHI}
+  TZ_JsonString = TUPascalString;
+  {$ENDIF DELPHI}
 
   TZ_JsonBase = class(TCore_Object_Intermediate)
   protected
@@ -74,81 +75,81 @@ type
     destructor Destroy; override;
 
     procedure Clear;
-    procedure Delete(Index: Integer);
+    procedure Delete(Index: integer);
 
     procedure Add(const v_: string); overload;
-    procedure Add(const v_: TPascalString); overload;
-    procedure Add(const v_: Integer); overload;
-    procedure Add(const v_: Int64); overload;
-    procedure Add(const v_: UInt64); overload;
+    procedure Add(const v_: TZ_JsonString); overload;
+    procedure Add(const v_: integer); overload;
+    procedure Add(const v_: int64); overload;
+    procedure Add(const v_: uint64); overload;
     procedure Add(const v_: Int128); overload;
     procedure Add(const v_: UInt128); overload;
-    procedure AddF(const v_: Double); overload;
+    procedure AddF(const v_: double); overload;
     procedure Add(const v_: TDateTime); overload;
-    procedure Add(const v_: Boolean); overload;
+    procedure Add(const v_: boolean); overload;
     function AddArray: TZ_JsonArray;
     function AddObject: TZ_JsonObject; overload;
 
-    procedure Insert(Index: Integer; const v_: string); overload;
-    procedure Insert(Index: Integer; const v_: Integer); overload;
-    procedure Insert(Index: Integer; const v_: Int64); overload;
-    procedure Insert(Index: Integer; const v_: UInt64); overload;
-    procedure Insert(Index: Integer; const v_: Int128); overload;
-    procedure Insert(Index: Integer; const v_: UInt128); overload;
-    procedure Insert(Index: Integer; const v_: Double); overload;
-    procedure Insert(Index: Integer; const v_: TDateTime); overload;
-    procedure Insert(Index: Integer; const v_: Boolean); overload;
-    function InsertArray(Index: Integer): TZ_JsonArray;
-    function InsertObject(Index: Integer): TZ_JsonObject; overload;
+    procedure Insert(Index: integer; const v_: string); overload;
+    procedure Insert(Index: integer; const v_: integer); overload;
+    procedure Insert(Index: integer; const v_: int64); overload;
+    procedure Insert(Index: integer; const v_: uint64); overload;
+    procedure Insert(Index: integer; const v_: Int128); overload;
+    procedure Insert(Index: integer; const v_: UInt128); overload;
+    procedure Insert(Index: integer; const v_: double); overload;
+    procedure Insert(Index: integer; const v_: TDateTime); overload;
+    procedure Insert(Index: integer; const v_: boolean); overload;
+    function InsertArray(Index: integer): TZ_JsonArray;
+    function InsertObject(Index: integer): TZ_JsonObject; overload;
 
-    function GetString(Index: Integer): string;
-    procedure SetString(Index: Integer; const Value: string);
-    function GetInt(Index: Integer): Integer;
-    procedure SetInt(Index: Integer; const Value: Integer);
-    function GetLong(Index: Integer): Int64;
-    procedure SetLong(Index: Integer; const Value: Int64);
-    function GetULong(Index: Integer): UInt64;
-    procedure SetULong(Index: Integer; const Value: UInt64);
+    function GetString(Index: integer): string;
+    procedure SetString(Index: integer; const Value: string);
+    function GetInt(Index: integer): integer;
+    procedure SetInt(Index: integer; const Value: integer);
+    function GetLong(Index: integer): int64;
+    procedure SetLong(Index: integer; const Value: int64);
+    function GetULong(Index: integer): uint64;
+    procedure SetULong(Index: integer; const Value: uint64);
 
-    function GetInt128(Index: Integer): Int128;
-    procedure SetInt128(Index: Integer; const Value: Int128);
-    function GetUInt128(Index: Integer): UInt128;
-    procedure SetUInt128(Index: Integer; const Value: UInt128);
+    function GetInt128(Index: integer): Int128;
+    procedure SetInt128(Index: integer; const Value: Int128);
+    function GetUInt128(Index: integer): UInt128;
+    procedure SetUInt128(Index: integer; const Value: UInt128);
 
-    function GetFloat(Index: Integer): Double;
-    procedure SetFloat(Index: Integer; const Value: Double);
-    function GetDateTime(Index: Integer): TDateTime;
-    procedure SetDateTime(Index: Integer; const Value: TDateTime);
-    function GetBool(Index: Integer): Boolean;
-    procedure SetBool(Index: Integer; const Value: Boolean);
-    function GetArray(Index: Integer): TZ_JsonArray;
-    function GetObject(Index: Integer): TZ_JsonObject;
+    function GetFloat(Index: integer): double;
+    procedure SetFloat(Index: integer; const Value: double);
+    function GetDateTime(Index: integer): TDateTime;
+    procedure SetDateTime(Index: integer; const Value: TDateTime);
+    function GetBool(Index: integer): boolean;
+    procedure SetBool(Index: integer; const Value: boolean);
+    function GetArray(Index: integer): TZ_JsonArray;
+    function GetObject(Index: integer): TZ_JsonObject;
 
-    property S[Index: Integer]: string read GetString write SetString;
-    property I[Index: Integer]: Integer read GetInt write SetInt;
-    property I32[Index: Integer]: Integer read GetInt write SetInt;
-    property L[Index: Integer]: Int64 read GetLong write SetLong;
-    property I64[Index: Integer]: Int64 read GetLong write SetLong;
-    property I128[Index: Integer]: Int128 read GetInt128 write SetInt128;
-    property U[Index: Integer]: UInt64 read GetULong write SetULong;
-    property U64[Index: Integer]: UInt64 read GetULong write SetULong;
-    property U128[Index: Integer]: UInt128 read GetUInt128 write SetUInt128;
-    property F[Index: Integer]: Double read GetFloat write SetFloat;
-    property D[Index: Integer]: TDateTime read GetDateTime write SetDateTime;
-    property B[Index: Integer]: Boolean read GetBool write SetBool;
-    property A[Index: Integer]: TZ_JsonArray read GetArray;
-    property O[Index: Integer]: TZ_JsonObject read GetObject;
+    property S[Index: integer]: string read GetString write SetString;
+    property I[Index: integer]: integer read GetInt write SetInt;
+    property I32[Index: integer]: integer read GetInt write SetInt;
+    property L[Index: integer]: int64 read GetLong write SetLong;
+    property I64[Index: integer]: int64 read GetLong write SetLong;
+    property I128[Index: integer]: Int128 read GetInt128 write SetInt128;
+    property U[Index: integer]: uint64 read GetULong write SetULong;
+    property U64[Index: integer]: uint64 read GetULong write SetULong;
+    property U128[Index: integer]: UInt128 read GetUInt128 write SetUInt128;
+    property F[Index: integer]: double read GetFloat write SetFloat;
+    property D[Index: integer]: TDateTime read GetDateTime write SetDateTime;
+    property B[Index: integer]: boolean read GetBool write SetBool;
+    property A[Index: integer]: TZ_JsonArray read GetArray;
+    property O[Index: integer]: TZ_JsonObject read GetObject;
 
-    function GetCount: Integer;
-    property Count: Integer read GetCount;
+    function GetCount: integer;
+    property Count: integer read GetCount;
   end;
 
   TZ_JsonObject = class(TZ_JsonBase)
   private
     FInstance: TZ_Instance_JsonObject;
-    FTag: Integer;
+    FTag: integer;
   public
-    property Tag: Integer read FTag write FTag;
+    property Tag: integer read FTag write FTag;
     property Instance: TZ_Instance_JsonObject read FInstance;
 
     constructor Create(); overload;
@@ -160,8 +161,8 @@ type
     function Clone: TZ_JsonObject;
 
     procedure Clear;
-    function IndexOf(const Name: string): Integer;
-    function Exists(const Name: string): Boolean;
+    function IndexOf(const Name: string): integer;
+    function Exists(const Name: string): boolean;
 
     function GetInt128(const Name: string): Int128;
     procedure SetInt128(const Name: string; const Value: Int128);
@@ -169,40 +170,40 @@ type
     procedure SetUInt128(const Name: string; const Value: UInt128);
     function GetString(const Name: string): string;
     procedure SetString(const Name, Value: string);
-    function GetInt(const Name: string): Integer;
-    procedure SetInt(const Name: string; const Value: Integer);
-    function GetLong(const Name: string): Int64;
-    procedure SetLong(const Name: string; const Value: Int64);
-    function GetULong(const Name: string): UInt64;
-    procedure SetULong(const Name: string; const Value: UInt64);
-    function GetFloat(const Name: string): Double;
-    procedure SetFloat(const Name: string; const Value: Double);
+    function GetInt(const Name: string): integer;
+    procedure SetInt(const Name: string; const Value: integer);
+    function GetLong(const Name: string): int64;
+    procedure SetLong(const Name: string; const Value: int64);
+    function GetULong(const Name: string): uint64;
+    procedure SetULong(const Name: string; const Value: uint64);
+    function GetFloat(const Name: string): double;
+    procedure SetFloat(const Name: string; const Value: double);
     function GetDateTime(const Name: string): TDateTime;
     procedure SetDateTime(const Name: string; const Value: TDateTime);
-    function GetBool(const Name: string): Boolean;
-    procedure SetBool(const Name: string; const Value: Boolean);
+    function GetBool(const Name: string): boolean;
+    procedure SetBool(const Name: string; const Value: boolean);
     function GetArray(const Name: string): TZ_JsonArray;
     function GetObject(const Name: string): TZ_JsonObject;
 
     property S[const Name: string]: string read GetString write SetString;
-    property I[const Name: string]: Integer read GetInt write SetInt;
-    property I32[const Name: string]: Integer read GetInt write SetInt;
-    property L[const Name: string]: Int64 read GetLong write SetLong;
-    property I64[const Name: string]: Int64 read GetLong write SetLong;
+    property I[const Name: string]: integer read GetInt write SetInt;
+    property I32[const Name: string]: integer read GetInt write SetInt;
+    property L[const Name: string]: int64 read GetLong write SetLong;
+    property I64[const Name: string]: int64 read GetLong write SetLong;
     property I128[const Name: string]: Int128 read GetInt128 write SetInt128;
-    property U[const Name: string]: UInt64 read GetULong write SetULong;
-    property U64[const Name: string]: UInt64 read GetULong write SetULong;
+    property U[const Name: string]: uint64 read GetULong write SetULong;
+    property U64[const Name: string]: uint64 read GetULong write SetULong;
     property U128[const Name: string]: UInt128 read GetUInt128 write SetUInt128;
-    property F[const Name: string]: Double read GetFloat write SetFloat;
+    property F[const Name: string]: double read GetFloat write SetFloat;
     property D[const Name: string]: TDateTime read GetDateTime write SetDateTime;
-    property B[const Name: string]: Boolean read GetBool write SetBool;
+    property B[const Name: string]: boolean read GetBool write SetBool;
     property A[const Name: string]: TZ_JsonArray read GetArray;
     property O[const Name: string]: TZ_JsonObject read GetObject;
 
-    function GetName(Index: Integer): string;
-    property Names[Index: Integer]: string read GetName; default;
-    function GetCount: Integer;
-    property Count: Integer read GetCount;
+    function GetName(Index: integer): string;
+    property Names[Index: integer]: string read GetName; default;
+    function GetCount: integer;
+    property Count: integer read GetCount;
 
     function Get_Default_S(const Name, Value: string): string;
     procedure Set_Default_S(const Name, Value: string);
@@ -210,7 +211,7 @@ type
     function GetDefault_S(const Name, Value: string): string;
     procedure SetDefault_S(const Name, Value: string);
 
-    procedure SaveToStream(stream: TCore_Stream; Formated_: Boolean); overload;
+    procedure SaveToStream(stream: TCore_Stream; Formated_: boolean); overload;
     procedure SaveToStream(stream: TCore_Stream); overload;
     procedure LoadFromStream(stream: TCore_Stream);
 
@@ -218,16 +219,16 @@ type
     procedure LoadFromLines(L_: TCore_Strings);
     procedure SaveToFile(FileName: SystemString);
     procedure LoadFromFile(FileName: SystemString);
-    procedure LoadFromText(Text_: TPascalString);
+    procedure LoadFromText(Text_: TZ_JsonString);
 
     function GetMD5: TMD5;
     property MD5: TMD5 read GetMD5;
 
-    procedure ParseText(Text_: TPascalString);
+    procedure ParseText(Text_: TZ_JsonString);
 
-    function ToJSONString(Formated_: Boolean): TPascalString; overload;
-    function ToJSONString: TPascalString; overload;
-    property ToJson: TPascalString read ToJSONString;
+    function ToJSONString(Formated_: boolean): TZ_JsonString; overload;
+    function ToJSONString: TZ_JsonString; overload;
+    property ToJson: TZ_JsonString read ToJSONString;
     class procedure Test;
   end;
 
@@ -235,14 +236,14 @@ type
 
   TZ_JsonObject_List = class(TZ_JsonObject_List_Decl)
   public
-    AutoFreeObj: Boolean;
-    constructor Create(AutoFreeObj_: Boolean);
+    AutoFreeObj: boolean;
+    constructor Create(AutoFreeObj_: boolean);
     destructor Destroy; override;
-    function AddFromText(Text_: TPascalString): TZ_JsonObject;
+    function AddFromText(Text_: TZ_JsonString): TZ_JsonObject;
     function AddFromStream(stream: TCore_Stream): TZ_JsonObject;
     function AddFromFile(FileName: U_String): TZ_JsonObject;
     procedure Remove(obj: TZ_JsonObject);
-    procedure Delete(Index: Integer);
+    procedure Delete(Index: integer);
     procedure Clear;
     procedure Clean;
   end;
@@ -266,7 +267,7 @@ begin
   inherited Create;
   FParent := Parent_;
   if FParent <> nil then
-      FParent.FList.Add(self);
+    FParent.FList.Add(self);
 
   FList := TCore_ObjectList.Create;
   FList.AutoFreeObj := True;
@@ -290,40 +291,40 @@ end;
 
 procedure TZ_JsonArray.Add(const v_: Int128);
 begin
-  Add(v_.ToLString);
+  Add(v_.ToLString.Text);
 end;
 
 procedure TZ_JsonArray.Add(const v_: UInt128);
 begin
-  Add(v_.ToLString);
+  Add(v_.ToLString.Text);
 end;
 
-procedure TZ_JsonArray.Insert(Index: Integer; const v_: Int128);
+procedure TZ_JsonArray.Insert(Index: integer; const v_: Int128);
 begin
   Insert(Index, v_.ToLString.Text);
 end;
 
-procedure TZ_JsonArray.Insert(Index: Integer; const v_: UInt128);
+procedure TZ_JsonArray.Insert(Index: integer; const v_: UInt128);
 begin
   Insert(Index, v_.ToLString.Text);
 end;
 
-function TZ_JsonArray.GetInt128(Index: Integer): Int128;
+function TZ_JsonArray.GetInt128(Index: integer): Int128;
 begin
-  Result := Int128(TPascalString(GetString(index)));
+  Result := Int128(TZ_JsonString(GetString(Index)).Text);
 end;
 
-procedure TZ_JsonArray.SetInt128(Index: Integer; const Value: Int128);
+procedure TZ_JsonArray.SetInt128(Index: integer; const Value: Int128);
 begin
   SetString(Index, Value.ToLString.Text);
 end;
 
-function TZ_JsonArray.GetUInt128(Index: Integer): UInt128;
+function TZ_JsonArray.GetUInt128(Index: integer): UInt128;
 begin
-  Result := UInt128(TPascalString(GetString(index)));
+  Result := UInt128(TZ_JsonString(GetString(Index)).Text);
 end;
 
-procedure TZ_JsonArray.SetUInt128(Index: Integer; const Value: UInt128);
+procedure TZ_JsonArray.SetUInt128(Index: integer; const Value: UInt128);
 begin
   SetString(Index, Value.ToLString.Text);
 end;
@@ -338,13 +339,13 @@ begin
   inherited Create(Parent_);
   FTag := 0;
   if Parent = nil then
-      FInstance := TZ_Instance_JsonObject.Create;
+    FInstance := TZ_Instance_JsonObject.Create;
 end;
 
 destructor TZ_JsonObject.Destroy;
 begin
   if Parent = nil then
-      FInstance.Free;
+    FInstance.Free;
   inherited Destroy;
 end;
 
@@ -353,10 +354,10 @@ var
   bak_FParent: TZ_JsonBase;
   bak_FList: TCore_ObjectList;
   bak_FInstance: TZ_Instance_JsonObject;
-  bak_FTag: Integer;
+  bak_FTag: integer;
 begin
   if FParent <> nil then
-      raiseInfo('error.');
+    raiseInfo('error.');
   bak_FParent := FParent;
   bak_FList := FList;
   bak_FInstance := FInstance;
@@ -390,14 +391,14 @@ begin
   Result.Assign(self);
 end;
 
-function TZ_JsonObject.Exists(const Name: string): Boolean;
+function TZ_JsonObject.Exists(const Name: string): boolean;
 begin
   Result := IndexOf(Name) >= 0;
 end;
 
 function TZ_JsonObject.GetInt128(const Name: string): Int128;
 begin
-  Result := Int128(TPascalString(GetString(Name)));
+  Result := Int128(TZ_JsonString(GetString(Name)).Text);
 end;
 
 procedure TZ_JsonObject.SetInt128(const Name: string; const Value: Int128);
@@ -407,7 +408,7 @@ end;
 
 function TZ_JsonObject.GetUInt128(const Name: string): UInt128;
 begin
-  Result := UInt128(TPascalString(GetString(Name)));
+  Result := UInt128(TZ_JsonString(GetString(Name)).Text);
 end;
 
 procedure TZ_JsonObject.SetUInt128(const Name: string; const Value: UInt128);
@@ -417,28 +418,28 @@ end;
 
 function TZ_JsonObject.Get_Default_S(const Name, Value: string): string;
 begin
-  if Exists(name) then
-      Result := S[name]
+  if Exists(Name) then
+    Result := S[Name]
   else
-      Result := Value;
+    Result := Value;
 end;
 
 procedure TZ_JsonObject.Set_Default_S(const Name, Value: string);
 begin
-  S[name] := Value;
+  S[Name] := Value;
 end;
 
 function TZ_JsonObject.GetDefault_S(const Name, Value: string): string;
 begin
-  if Exists(name) then
-      Result := S[name]
+  if Exists(Name) then
+    Result := S[Name]
   else
-      Result := Value;
+    Result := Value;
 end;
 
 procedure TZ_JsonObject.SetDefault_S(const Name, Value: string);
 begin
-  S[name] := Value;
+  S[Name] := Value;
 end;
 
 procedure TZ_JsonObject.SaveToStream(stream: TCore_Stream);
@@ -453,27 +454,27 @@ begin
   m64 := TMS64.Create;
   SaveToStream(m64);
   m64.Position := 0;
-{$IFDEF FPC}
+  {$IFDEF FPC}
   L_.LoadFromStream(m64);
-{$ELSE}
+  {$ELSE}
   L_.LoadFromStream(m64, TEncoding.UTF8);
-{$ENDIF}
+  {$ENDIF}
   m64.Free;
 end;
 
 procedure TZ_JsonObject.LoadFromLines(L_: TCore_Strings);
 var
-  bak: Boolean;
+  bak: boolean;
   m64: TMS64;
 begin
   bak := L_.WriteBOM;
   L_.WriteBOM := False;
   m64 := TMS64.Create;
-{$IFDEF FPC}
+  {$IFDEF FPC}
   L_.SaveToStream(m64);
-{$ELSE}
+  {$ELSE}
   L_.SaveToStream(m64, TEncoding.UTF8);
-{$ENDIF}
+  {$ENDIF}
   L_.WriteBOM := bak;
   m64.Position := 0;
   LoadFromStream(m64);
@@ -489,7 +490,7 @@ begin
     SaveToStream(m64);
     m64.SaveToFile(FileName);
   finally
-      disposeObject(m64);
+    disposeObject(m64);
   end;
 end;
 
@@ -499,20 +500,20 @@ var
 begin
   m64 := TMS64.Create;
   try
-      m64.LoadFromFile(FileName);
+    m64.LoadFromFile(FileName);
   except
     disposeObject(m64);
     Exit;
   end;
 
   try
-      LoadFromStream(m64);
+    LoadFromStream(m64);
   finally
-      disposeObject(m64);
+    disposeObject(m64);
   end;
 end;
 
-procedure TZ_JsonObject.LoadFromText(Text_: TPascalString);
+procedure TZ_JsonObject.LoadFromText(Text_: TZ_JsonString);
 var
   buff: TBytes;
   m64: TMS64;
@@ -535,21 +536,35 @@ begin
   disposeObject(m64);
 end;
 
-procedure TZ_JsonObject.ParseText(Text_: TPascalString);
+procedure TZ_JsonObject.ParseText(Text_: TZ_JsonString);
 var
+  {$IFDEF FPC}
+  j: TJSONData;
+  {$ELSE FPC}
   buff: TBytes;
   m64: TMS64;
+  {$ENDIF FPC}
 begin
+  {$IFDEF FPC}
+  j:=GetJSON(Text_.Text, False);
+  if Assigned(j) and (j is TZ_Instance_JsonObject) then
+    FInstance := TZ_Instance_JsonObject(j)
+  else
+    FInstance := nil;
+  if FInstance = nil then
+    FInstance := TZ_Instance_JsonObject.Create;
+  {$ELSE FPC}
   buff := Text_.Bytes;
   m64 := TMS64.Create;
   if length(buff) > 0 then
-      m64.SetPointerWithProtectedMode(@buff[0], length(buff));
+    m64.SetPointerWithProtectedMode(@buff[0], length(buff));
   LoadFromStream(m64);
   m64.Free;
   SetLength(buff, 0);
+  {$ENDIF FPC}
 end;
 
-function TZ_JsonObject.ToJSONString(Formated_: Boolean): TPascalString;
+function TZ_JsonObject.ToJSONString(Formated_: boolean): TZ_JsonString;
 var
   m64: TMS64;
 begin
@@ -559,7 +574,7 @@ begin
   m64.Free;
 end;
 
-function TZ_JsonObject.ToJSONString: TPascalString;
+function TZ_JsonObject.ToJSONString: TZ_JsonString;
 var
   m64: TMS64;
 begin
@@ -572,7 +587,7 @@ end;
 class procedure TZ_JsonObject.Test;
 var
   js: TZ_JsonObject;
-  ii: Integer;
+  ii: integer;
   m64: TMS64;
 begin
   js := TZ_JsonObject.Create();
@@ -580,12 +595,12 @@ begin
   DoStatus(js.S['abc']);
 
   for ii := 1 to 3 do
-      js.A['arry'].Add(ii);
+    js.A['arry'].Add(ii);
 
   for ii := 0 to js.A['arry'].Count - 1 do
-    begin
-      DoStatus(js.A['arry'].I[ii]);
-    end;
+  begin
+    DoStatus(js.A['arry'].I[ii]);
+  end;
 
   js.A['arry'].AddObject.S['tt'] := 'inobj';
 
@@ -603,7 +618,7 @@ begin
   js.Free;
 end;
 
-constructor TZ_JsonObject_List.Create(AutoFreeObj_: Boolean);
+constructor TZ_JsonObject_List.Create(AutoFreeObj_: boolean);
 begin
   inherited Create;
   AutoFreeObj := AutoFreeObj_;
@@ -615,7 +630,7 @@ begin
   inherited Destroy;
 end;
 
-function TZ_JsonObject_List.AddFromText(Text_: TPascalString): TZ_JsonObject;
+function TZ_JsonObject_List.AddFromText(Text_: TZ_JsonString): TZ_JsonObject;
 begin
   Result := TZ_JsonObject.Create(nil);
   Result.ParseText(Text_);
@@ -639,36 +654,36 @@ end;
 procedure TZ_JsonObject_List.Remove(obj: TZ_JsonObject);
 begin
   if AutoFreeObj then
-      disposeObject(obj);
+    disposeObject(obj);
   inherited Remove(obj);
 end;
 
-procedure TZ_JsonObject_List.Delete(Index: Integer);
+procedure TZ_JsonObject_List.Delete(Index: integer);
 begin
-  if (index >= 0) and (index < Count) then
-    begin
-      if AutoFreeObj then
-          disposeObject(Items[index]);
-      inherited Delete(index);
-    end;
+  if (Index >= 0) and (Index < Count) then
+  begin
+    if AutoFreeObj then
+      disposeObject(Items[Index]);
+    inherited Delete(Index);
+  end;
 end;
 
 procedure TZ_JsonObject_List.Clear;
 var
-  I: Integer;
+  I: integer;
 begin
   if AutoFreeObj then
     for I := 0 to Count - 1 do
-        disposeObject(Items[I]);
+      disposeObject(Items[I]);
   inherited Clear;
 end;
 
 procedure TZ_JsonObject_List.Clean;
 var
-  I: Integer;
+  I: integer;
 begin
   for I := 0 to Count - 1 do
-      disposeObject(Items[I]);
+    disposeObject(Items[I]);
   inherited Clear;
 end;
 

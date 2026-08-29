@@ -1136,11 +1136,11 @@ begin
     p^.Data.Third := FQueue_Pool.Add(p);
     p^.Data.Fourth := Key_Hash_;
     L.L.MoveToFirst(p);
-    Result := p;
-    DoAdd(p^.Data.Primary, p^.Data.Second);
   finally
       FCritical__.UnLock;
   end;
+  Result := p;
+  DoAdd(p^.Data.Primary, p^.Data.Second);
 end;
 
 function TCritical_Big_Hash_Pair_Pool<TKey_, TValue_>.Get_Key_Value(const Key: TKey_): TValue_;
