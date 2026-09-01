@@ -1,112 +1,167 @@
-{ ****************************************************************************** }
-{ * FPC Generic list (TGenericStructList).                                     * }
-{ ****************************************************************************** }
-{
-  Based on FPC FGL unit, copyright by FPC team.
-  License of FPC RTL is the same as our engine (modified LGPL,
-  see COPYING.txt for details).
-  Fixed to compile also under FPC 2.4.0 and 2.2.4.
-  Some small comfortable methods added.
-}
+﻿(* ******************************************************************************
+  Z.FPC.GenericList.pas - Generic List Backend for Free Pascal
+
+  This unit provides a generic list (TGenericsList<T>) that stores elements
+  by value and compares them via byte-wise memory comparison (CompareByte)
+  rather than relying on the '=' operator. This design is essential for
+  records, method pointers, and other types where '=' may be ambiguous.
+
+  The implementation inherits from TFPSList (FCL) and is optimized for
+  FPC 3.0.0 and newer.
+
+  -----------------------------------------------------------------------------
+  Important: This unit is **only** for Free Pascal. When compiled under
+  Delphi (where FPC is not defined), the unit becomes a dummy stub with
+  no content, allowing Delphi projects to safely reference it without
+  breaking the build. This is achieved by placing all FPC-specific code
+  inside an {$IFDEF FPC} block.
+  ****************************************************************************** *)
 
 unit Z.FPC.GenericList;
 
 {$IFDEF FPC}
-{$mode objfpc}{$H+}
+  // ----------------------------------------------------------------
+  // Free Pascal specific settings and implementation
+  // ----------------------------------------------------------------
+  {$mode objfpc}{$H+}
+  {$MODESWITCH AdvancedRecords}
+  {$MODESWITCH NestedProcVars}
+  {$MODESWITCH NESTEDCOMMENTS}
+  {$NOTES OFF}
+  {$STACKFRAMES OFF}
+  {$COPERATORS OFF}
+  {$GOTO ON}
+  {$INLINE ON}
+  {$MACRO ON}
+  {$HINTS ON}
+  {$IEEEERRORS OFF}
+  {$R-}
+  {$I-}
+  {$S-}
 
-{$IF defined(VER2_2)} {$DEFINE OldSyntax} {$IFEND}
-{$IF defined(VER2_4)} {$DEFINE OldSyntax} {$IFEND}
+  // Enumerator support is stable since FPC 3.0.0
+  {$define HAS_ENUMERATOR}
+  // Extract method is available in all supported versions
+  {$define HAS_EXTRACT}
 
-{$define HAS_ENUMERATOR}
-{$ifdef VER2_2} {$undef HAS_ENUMERATOR} {$endif}
-{$ifdef VER2_4_0} {$undef HAS_ENUMERATOR} {$endif}
-{ Just undef enumerator always, in FPC 2.7.1 it's either broken
-  or I shouldn't overuse TFPGListEnumeratorSpec. }
-{$undef HAS_ENUMERATOR}
-
-{$MODESWITCH AdvancedRecords}
-{$MODESWITCH NestedProcVars}
-{$MODESWITCH NESTEDCOMMENTS}
-{$NOTES OFF}
-{$STACKFRAMES OFF}
-{$COPERATORS OFF}
-{$GOTO ON}
-{$INLINE ON}
-{$MACRO ON}
-{$HINTS ON}
-{$IEEEERRORS OFF}
-{$R-}
-{$I-}
-{$S-}
-
-{ FPC < 2.6.0 had buggy version of the Extract function,
-  also with different interface, see http://bugs.freepascal.org/view.php?id=19960. }
-{$define HAS_EXTRACT}
-{$ifdef VER2_2} {$undef HAS_EXTRACT} {$endif}
-{$ifdef VER2_4} {$undef HAS_EXTRACT} {$endif}
 {$ENDIF FPC}
 
 interface
 
 {$IFDEF FPC}
-
-uses fgl;
+uses
+  fgl;   // provides TFPSList and TFPGListEnumerator
 
 type
-  { Generic list of types that are compared by CompareByte.
+  { Generic list that stores elements by value and compares using memory (CompareByte).
 
-    This is equivalent to TFPGList, except it doesn't override IndexOf,
-    so your type doesn't need to have a "=" operator built-in inside FPC.
-    When calling IndexOf or Remove, it will simply compare values using
-    CompareByte, this is what TFPSList.IndexOf uses.
-    This way it works to create lists of records, vectors (constant size arrays),
-    old-style TP objects, and also is suitable to create a list of methods
-    (since for methods, the "=" is broken, for Delphi compatibility,
-    see http://bugs.freepascal.org/view.php?id=9228).
+    This class overcomes FPC's generic limitation where IndexOf and Remove
+    rely on the '=' operator, which may be broken for certain types (e.g.,
+    method pointers, records with variant parts). It is ideal for:
+      - Records and packed structures
+      - Static arrays (vectors)
+      - Old-style TP objects (when stored by value)
+      - Method pointers (TMethod)
 
-    We also add some trivial helper methods like @link(Add) and @link(L). }
+    All operations are performed by raw memory copy, and IndexOf uses a
+    byte-wise comparison of the entire element size.
+
+    @warning This list is not thread-safe. External locking required for
+             concurrent access.
+  }
   generic TGenericsList<t> = class(TFPSList)
   private
     type
+      // Comparison function for sorting.
       TCompareFunc = function(const Item1, Item2: t): Integer;
+
+      // Internal type for fast pointer access to the buffer.
       TTypeList = array[0..(MaxInt div SizeOf(t))-1] of t;
       PTypeList = ^TTypeList;
-  {$ifdef HAS_ENUMERATOR} TFPGListEnumeratorSpec = specialize TFPGListEnumerator<t>; {$endif}
 
-  {$ifndef OldSyntax}protected var{$else}
-      {$ifdef PASDOC}protected var{$else} { PasDoc can't handle "var protected", and I don't know how/if they should be handled? }
-                     var protected{$endif}{$endif} FOnCompare: TCompareFunc;
+      // Enumerator type – must use 'specialize' because FPC requires explicit
+      // instantiation of generic types, even when the type parameter is the
+      // enclosing generic's own type parameter.
+      TEnumerator = specialize TFPGListEnumerator<t>;
 
+  private
+    FOnCompare: TCompareFunc;     // Temporary comparator storage for Sort.
+
+    // Overrides of TFPSList's virtual methods.
     procedure CopyItem(Src, dest: Pointer); override;
     procedure Deref(Item: Pointer); override;
-    function  Get(index: Integer): t;
-    function  GetList: PTypeList;
+
+    // Internal helpers.
+    function  GetItem(index: Integer): t;
+    function  GetListPtr: PTypeList;
+    procedure PutItem(index: Integer; const Item: t);
     function  ItemPtrCompare(Item1, Item2: Pointer): Integer;
-    procedure Put(index: Integer; const Item: t);
+
   public
     constructor Create;
+
+    // Adds an element to the end. Returns the new index.
     function Add(const Item: t): Integer;
-    {$ifdef HAS_EXTRACT} function Extract(const Item: t): t;  {$endif}
+
+    // Removes the first occurrence of Item and returns a copy of it.
+    // If not found, the result is default-initialized (uninitialized).
+    {$ifdef HAS_EXTRACT}
+    function Extract(const Item: t): t;
+    {$endif}
+
+    // Returns the first element. Raises an exception if list empty.
     function First: t;
-    {$ifdef HAS_ENUMERATOR} function GetEnumerator: TFPGListEnumeratorSpec;  {$endif}
+
+    // Enumerator for 'for in' loops.
+    {$ifdef HAS_ENUMERATOR}
+    function GetEnumerator: TEnumerator;
+    {$endif}
+
+    // Finds the index of the first matching element; -1 if not found.
     function IndexOf(const Item: t): Integer;
+
+    // Inserts an element at the given index.
     procedure Insert(index: Integer; const Item: t);
+
+    // Returns the last element. Raises an exception if list empty.
     function Last: t;
-{$ifndef OldSyntax}
+
+    // Copies all elements from Source into this list, replacing current contents.
     procedure Assign(Source: TGenericsList);
-{$endif OldSyntax}
+
+    // Removes the first matching element. Returns its index, or -1 if not found.
     function Remove(const Item: t): Integer;
+
+    // Sorts the list using a custom comparison function.
+    // @warning The comparator is stored in a temporary field, so this method
+    //          is not reentrant; must be externally synchronized.
     procedure Sort(Compare: TCompareFunc);
-    property Items[index: Integer]: t read Get write Put; default;
-    property List: PTypeList read GetList;
-    property ListData: PTypeList read GetList;
+
+    // Reduces internal capacity to match the current Count, reclaiming memory.
+    procedure TrimExcess;
+
+    // Indexed access to elements (0-based). Raises exception on out‑of‑bounds.
+    property Items[index: Integer]: t read GetItem write PutItem; default;
+
+    // Direct pointer to the underlying buffer (for raw access).
+    property List: PTypeList read GetListPtr;
+    property ListData: PTypeList read GetListPtr;
   end;
 
+{$ELSE}
+  // ----------------------------------------------------------------
+  // Delphi (or non-FPC) fallback: empty unit stub.
+  // This allows Delphi projects to reference this unit without errors.
+  // ----------------------------------------------------------------
+  // No declarations or implementations – the unit is essentially a
+  // placeholder. Delphi will not attempt to compile any FPC-specific
+  // code because the entire FPC block is skipped.
 {$ENDIF FPC}
 
 implementation
 
 {$IFDEF FPC}
+
 constructor TGenericsList.Create;
 begin
   inherited Create(SizeOf(t));
@@ -122,12 +177,12 @@ begin
   Finalize(t(Item^));
 end;
 
-function TGenericsList.Get(index: Integer): t;
+function TGenericsList.GetItem(index: Integer): t;
 begin
   Result := t(inherited Get(index)^);
 end;
 
-function TGenericsList.GetList: PTypeList;
+function TGenericsList.GetListPtr: PTypeList;
 begin
   Result := PTypeList(FList);
 end;
@@ -137,7 +192,7 @@ begin
   Result := FOnCompare(t(Item1^), t(Item2^));
 end;
 
-procedure TGenericsList.Put(index: Integer; const Item: t);
+procedure TGenericsList.PutItem(index: Integer; const Item: t);
 begin
   inherited Put(index, @Item);
 end;
@@ -160,9 +215,9 @@ begin
 end;
 
 {$ifdef HAS_ENUMERATOR}
-function TGenericsList.GetEnumerator: TFPGListEnumeratorSpec;
+function TGenericsList.GetEnumerator: TEnumerator;
 begin
-  Result := TFPGListEnumeratorSpec.Create(Self);
+  Result := TEnumerator.Create(Self);
 end;
 {$endif}
 
@@ -181,7 +236,6 @@ begin
   Result := t(inherited Last^);
 end;
 
-{$ifndef OldSyntax}
 procedure TGenericsList.Assign(Source: TGenericsList);
 var
   i: Integer;
@@ -190,7 +244,6 @@ begin
   for i := 0 to Source.Count - 1 do
     Add(Source[i]);
 end;
-{$endif OldSyntax}
 
 function TGenericsList.Remove(const Item: t): Integer;
 begin
@@ -205,10 +258,11 @@ begin
   inherited Sort(@ItemPtrCompare);
 end;
 
+procedure TGenericsList.TrimExcess;
+begin
+  SetCount(Count);   // forces reallocation to exactly fit current Count
+end;
+
 {$ENDIF FPC}
 
 end.
-
-
-
- 

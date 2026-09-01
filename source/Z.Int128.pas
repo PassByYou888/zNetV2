@@ -83,9 +83,15 @@ unit Z.Int128;
 
 interface
 
-uses Z.Core, Z.PascalStrings;
+uses Z.Core, Z.PascalStrings, Z.UPascalStrings;
 
 type
+  {$IFDEF FPC}
+    TInt128_String = TUPascalString;
+  {$ELSE FPC}
+    TInt128_String = TPascalString;
+  {$ENDIF FPC}
+
   { 16-byte raw storage for a 128-bit unsigned integer. }
   TUInt128_Buffer = array [0 .. 15] of UInt8;
   PUInt128_Buffer = ^TUInt128_Buffer;
@@ -140,14 +146,14 @@ type
       * Returns the decimal string representation of this value (no leading zeros).
       * @Example: (12345).ToString -> '12345'
     }
-    function ToString: TPascalString;
+    function ToString: TInt128_String;
 
     {
       * Returns the decimal string representation prefixed with 'L'.
       * Useful for disambiguation in contexts where a plain number might be ambiguous.
       * @Example: (12345).ToLString -> 'L12345'
     }
-    function ToLString: TPascalString;
+    function ToLString: TInt128_String;
 
     { Extracts the low 64 bits as a UInt64 (truncates high bits). }
     function ToUInt64: UInt64;
@@ -197,11 +203,11 @@ type
       * Supports an optional leading 'L' (case-insensitive).
       * @Example: s := '18446744073709551615'; a := UInt128(s);
     }
-    class operator Implicit(a: TPascalString): UInt128;
+    class operator Implicit(a: TInt128_String): UInt128;
     class operator Implicit(a: SystemString): UInt128;
 
     { Implicitly converts this UInt128 to a decimal string. }
-    class operator Implicit(a: UInt128): TPascalString;
+    class operator Implicit(a: UInt128): TInt128_String;
     { Implicitly converts this UInt128 to a SystemString (AnsiString in FPC, UnicodeString in Delphi). }
     class operator Implicit(a: UInt128): SystemString;
 
@@ -364,10 +370,10 @@ type
     class procedure SetBit128(var a: Int128; numBit: integer); static;
 
     {
-      * Converts a TPascalString to Int128.
+      * Converts a TInt128_String to Int128.
       * Handles an optional leading '-' for negative numbers and optional 'L' prefix.
     }
-    class function StrToInt128(a: TPascalString): Int128; static; inline;
+    class function StrToInt128(a: TInt128_String): Int128; static; inline;
 
     {
       * Returns the bitwise NOT of this value (one's complement).
@@ -381,13 +387,13 @@ type
       * Negative values are prefixed with '-'.
       * @Example: (-12345).ToString -> '-12345'
     }
-    function ToString: TPascalString;
+    function ToString: TInt128_String;
 
     {
       * Returns the decimal string representation prefixed with 'L'.
       * Useful for disambiguation in contexts where a plain number might be ambiguous.
     }
-    function ToLString: TPascalString;
+    function ToLString: TInt128_String;
 
     { Extracts the low 64 bits as a UInt64 (truncates high bits, sign-extends from bit 63). }
     function ToUInt64: UInt64;
@@ -451,7 +457,7 @@ type
     class operator Implicit(a: Double): Int128;
 
     { Implicit conversion from this Int128 to a decimal string. }
-    class operator Implicit(a: Int128): TPascalString;
+    class operator Implicit(a: Int128): TInt128_String;
     { Implicit conversion from this Int128 to a SystemString. }
     class operator Implicit(a: Int128): SystemString;
 
@@ -460,7 +466,7 @@ type
       * Supports an optional leading '-' for negative numbers.
       * @Example: s := '-123'; a := Int128(s);
     }
-    class operator Implicit(a: TPascalString): Int128;
+    class operator Implicit(a: TInt128_String): Int128;
     class operator Implicit(a: SystemString): Int128;
 
     {
@@ -808,12 +814,12 @@ begin
   a.c[numBit shr 5] := a.c[numBit shr 5] or longword(1 shl (numBit and 31));
 end;
 
-function UInt128.ToString: TPascalString;
+function UInt128.ToString: TInt128_String;
 begin
   Result := Self;
 end;
 
-function UInt128.ToLString: TPascalString;
+function UInt128.ToLString: TInt128_String;
 begin
   Result := 'L' + ToString;
 end;
@@ -894,7 +900,7 @@ begin
   Result.dc1 := 0;
 end;
 
-class operator UInt128.Implicit(a: TPascalString): UInt128;
+class operator UInt128.Implicit(a: TInt128_String): UInt128;
 var
   i: integer;
 begin
@@ -917,10 +923,10 @@ end;
 
 class operator UInt128.Implicit(a: SystemString): UInt128;
 begin
-  Result := TPascalString(a);
+  Result := TInt128_String(a);
 end;
 
-class operator UInt128.Implicit(a: UInt128): TPascalString;
+class operator UInt128.Implicit(a: UInt128): TInt128_String;
 var
   digit: UInt128;
 begin
@@ -938,7 +944,7 @@ end;
 
 class operator UInt128.Implicit(a: UInt128): SystemString;
 begin
-  Result := TPascalString(a).Text;
+  Result := TInt128_String(a).Text;
 end;
 
 class operator UInt128.Explicit(a: UInt128): UInt64;
@@ -1385,7 +1391,7 @@ begin
   a.c[numBit shr 5] := a.c[numBit shr 5] or UInt32(1 shl (numBit and 31));
 end;
 
-class function Int128.StrToInt128(a: TPascalString): Int128;
+class function Int128.StrToInt128(a: TInt128_String): Int128;
 var
   IsNeg: Boolean;
   i: integer;
@@ -1434,12 +1440,12 @@ begin
   Result.dc1 := Self.dc1 xor High(Self.dc1);
 end;
 
-function Int128.ToString: TPascalString;
+function Int128.ToString: TInt128_String;
 begin
   Result := Self;
 end;
 
-function Int128.ToLString: TPascalString;
+function Int128.ToLString: TInt128_String;
 begin
   Result := 'L' + ToString;
 end;
@@ -1662,7 +1668,7 @@ begin
   FillPtr(@Result.dc[1], SizeOf(Result) - SizeOf(Result.dc[0]), Sign);
 end;
 
-class operator Int128.Implicit(a: Int128): TPascalString;
+class operator Int128.Implicit(a: Int128): TInt128_String;
 var
   digit, curValue, nextValue: Int128;
   neg: Boolean;
@@ -1694,10 +1700,10 @@ end;
 
 class operator Int128.Implicit(a: Int128): SystemString;
 begin
-  Result := TPascalString(a).Text;
+  Result := TInt128_String(a).Text;
 end;
 
-class operator Int128.Implicit(a: TPascalString): Int128;
+class operator Int128.Implicit(a: TInt128_String): Int128;
 begin
   Result := StrToInt128(a);
 end;
@@ -1719,7 +1725,7 @@ begin
   // if (a.c3 and $80000000) <> 0 then
   // RaiseInfo('Range Check Error');
 
-  Result := TPascalString(a);
+  Result := TInt128_String(a);
 end;
 
 class operator Int128.Explicit(a: UInt128): Int128;

@@ -1203,15 +1203,79 @@ type
     procedure For_C(OnFor: TBig_Hash_Pool_For_C); overload;      // Iterate with C-style callback (abortable)
     procedure For_M(OnFor: TBig_Hash_Pool_For_M); overload;      // Iterate with M-style callback
     procedure For_P(OnFor: TBig_Hash_Pool_For_P); overload;      // Iterate with P-style callback
-    // These two methods are intentionally NOT overloaded with the same name,
-    // because FPC's overload resolution rules differ from Delphi's and can
-    // cause ambiguous calls when both parameters are pointers (which they are
-    // here: PPair_Pool_Value__ and TPool_Queue_Ptr___ are both pointer types).
-    // Using distinct names ensures correct compilation under both compilers
-    // without relying on overload selection heuristics that may vary.
-    procedure Push_To_Recycle_Pool(p: PPair_Pool_Value__);       // Moves an entry to the recycle pool of its bucket list
-    procedure Push_To_Recycle_Pool2(p: TPool_Queue_Ptr___);      // Moves an entry to recycle pool by its queue node pointer
-    procedure Free_Recycle_Pool;                                 // Frees all recycled entries and removes empty buckets
+    {******************************************************************************
+      Recycle Pool Management for Hash Map Entries
+      --------------------------------------------
+      These methods manage the deferred destruction of hash map entries.
+      When an entry is removed from the hash table, its node is not freed
+      immediately; instead, it is pushed into a per-bucket recycle pool
+      (FRecycle_Pool__). This reduces memory allocation overhead during
+      high‑frequency add/delete operations.
+      IMPORTANT - Why two separate methods instead of overloaded versions?
+      -------------------------------------------------------------------
+      Both parameters are pointer types: PPair_Pool_Value__ (pointer to the
+      pair record stored in the bucket's linked list) and TPool_Queue_Ptr___
+      (pointer to the node in the global queue pool). In FPC, overload
+      resolution for pointer types is ambiguous when both arguments are
+      pointers, because the compiler may not distinguish them based on
+      type alone (they are both just Pointer at the low level). Delphi's
+      overload rules are stricter and can handle this, but FPC's are more
+      permissive, often resulting in "ambiguous overload" errors or
+      silently selecting the wrong method.
+      By giving them distinct names, we guarantee correct compilation
+      under both compilers without relying on fragile overload heuristics.
+      This is a deliberate design decision – not a limitation, but a
+      defensive measure.
+    ******************************************************************************}
+    {**
+      Moves an entry to the recycle pool by its bucket-list node pointer.
+      @param p  Pointer to the pair record (PPair_Pool_Value__) that was
+                obtained from the bucket's linked list (e.g., via iteration
+                over the hash bucket). This pointer references the actual
+                key-value pair stored in the hash map.
+      @note The entry will not be destroyed immediately; it will be kept
+            in the recycle pool until Free_Recycle_Pool is called, at which
+            point its memory is released (or reused for future insertions).
+            This method is typically called when you have a direct reference
+            to an entry from the bucket list (e.g., during a custom scan).
+      @warning The pointer must belong to the current hash table instance.
+               Passing a pointer from a different instance or an invalid
+               pointer will cause undefined behavior (memory corruption /
+               access violation).
+    }
+    procedure Push_To_Recycle_Pool(p: PPair_Pool_Value__);
+    {**
+      Moves an entry to the recycle pool by its global queue node pointer.
+      @param p  Pointer to the node (TPool_Queue_Ptr___) that holds the
+                same entry in the global iteration queue (FQueue_Pool).
+                This pointer is typically obtained when iterating over the
+                entire hash map using Repeat_(), For_C(), etc., where the
+                iterator yields queue nodes.
+      @note This method is functionally equivalent to the first one, but
+            it accepts the queue node pointer rather than the bucket node
+            pointer. Internally, it extracts the actual entry pointer from
+            the queue node and enqueues it for recycling. It is used when
+            you want to remove the current entry during iteration without
+            breaking the iterator's integrity.
+      @see Push_To_Recycle_Pool
+      @warning Same warning applies: the pointer must be valid and belong
+               to this hash table instance.
+    }
+    procedure Push_To_Recycle_Pool2(p: TPool_Queue_Ptr___);
+    {**
+      Frees all entries currently in the recycle pool and removes empty
+      bucket lists.
+      @note After this call, all recycled entries are destroyed (their
+            DoFree handler is invoked), and any bucket list that becomes
+            empty is freed to reduce memory footprint. This operation
+            is typically called periodically or during hash table cleanup.
+      @warning This method does NOT lock the hash table; the caller is
+               responsible for ensuring that no concurrent operations are
+               modifying the table while this method runs. For thread‑safe
+               usage, call it while holding the hash table's lock.
+    }
+    procedure Free_Recycle_Pool;
+
     procedure Sort_Key_C(OnSort: TOn_Sort_Key_C);                // Sorts the global queue by key (C comparator)
     procedure Sort_Key_M(OnSort: TOn_Sort_Key_M);                // Sorts by key (M comparator)
     procedure Sort_Key_P(OnSort: TOn_Sort_Key_P);                // Sorts by key (P comparator)
@@ -1331,10 +1395,80 @@ type
     procedure For_C(OnFor: TBig_Hash_Pool_For_C); overload;      // Iterate with C callback
     procedure For_M(OnFor: TBig_Hash_Pool_For_M); overload;      // Iterate with M callback
     procedure For_P(OnFor: TBig_Hash_Pool_For_P); overload;      // Iterate with P callback
-    // Same naming strategy as parent to avoid FPC overload ambiguity on pointer types
-    procedure Push_To_Recycle_Pool(p: PPair_Pool_Value__);       // Push entry to its bucket's recycle pool
-    procedure Push_To_Recycle_Pool2(p: TPool_Queue_Ptr___);      // Push entry using global queue node pointer
-    procedure Free_Recycle_Pool;                                 // Free all recycled entries and empty buckets
+
+    {******************************************************************************
+      Recycle Pool Management for Hash Map Entries
+      --------------------------------------------
+      These methods manage the deferred destruction of hash map entries.
+      When an entry is removed from the hash table, its node is not freed
+      immediately; instead, it is pushed into a per-bucket recycle pool
+      (FRecycle_Pool__). This reduces memory allocation overhead during
+      high‑frequency add/delete operations.
+      IMPORTANT - Why two separate methods instead of overloaded versions?
+      -------------------------------------------------------------------
+      Both parameters are pointer types: PPair_Pool_Value__ (pointer to the
+      pair record stored in the bucket's linked list) and TPool_Queue_Ptr___
+      (pointer to the node in the global queue pool). In FPC, overload
+      resolution for pointer types is ambiguous when both arguments are
+      pointers, because the compiler may not distinguish them based on
+      type alone (they are both just Pointer at the low level). Delphi's
+      overload rules are stricter and can handle this, but FPC's are more
+      permissive, often resulting in "ambiguous overload" errors or
+      silently selecting the wrong method.
+      By giving them distinct names, we guarantee correct compilation
+      under both compilers without relying on fragile overload heuristics.
+      This is a deliberate design decision – not a limitation, but a
+      defensive measure.
+    ******************************************************************************}
+    {**
+      Moves an entry to the recycle pool by its bucket-list node pointer.
+      @param p  Pointer to the pair record (PPair_Pool_Value__) that was
+                obtained from the bucket's linked list (e.g., via iteration
+                over the hash bucket). This pointer references the actual
+                key-value pair stored in the hash map.
+      @note The entry will not be destroyed immediately; it will be kept
+            in the recycle pool until Free_Recycle_Pool is called, at which
+            point its memory is released (or reused for future insertions).
+            This method is typically called when you have a direct reference
+            to an entry from the bucket list (e.g., during a custom scan).
+      @warning The pointer must belong to the current hash table instance.
+               Passing a pointer from a different instance or an invalid
+               pointer will cause undefined behavior (memory corruption /
+               access violation).
+    }
+    procedure Push_To_Recycle_Pool(p: PPair_Pool_Value__);
+    {**
+      Moves an entry to the recycle pool by its global queue node pointer.
+      @param p  Pointer to the node (TPool_Queue_Ptr___) that holds the
+                same entry in the global iteration queue (FQueue_Pool).
+                This pointer is typically obtained when iterating over the
+                entire hash map using Repeat_(), For_C(), etc., where the
+                iterator yields queue nodes.
+      @note This method is functionally equivalent to the first one, but
+            it accepts the queue node pointer rather than the bucket node
+            pointer. Internally, it extracts the actual entry pointer from
+            the queue node and enqueues it for recycling. It is used when
+            you want to remove the current entry during iteration without
+            breaking the iterator's integrity.
+      @see Push_To_Recycle_Pool
+      @warning Same warning applies: the pointer must be valid and belong
+               to this hash table instance.
+    }
+    procedure Push_To_Recycle_Pool2(p: TPool_Queue_Ptr___);
+    {**
+      Frees all entries currently in the recycle pool and removes empty
+      bucket lists.
+      @note After this call, all recycled entries are destroyed (their
+            DoFree handler is invoked), and any bucket list that becomes
+            empty is freed to reduce memory footprint. This operation
+            is typically called periodically or during hash table cleanup.
+      @warning This method does NOT lock the hash table; the caller is
+               responsible for ensuring that no concurrent operations are
+               modifying the table while this method runs. For thread‑safe
+               usage, call it while holding the hash table's lock.
+    }
+    procedure Free_Recycle_Pool;
+
     procedure Sort_Key_C(OnSort: TOn_Sort_Key_C);                // Sort global queue by key (C)
     procedure Sort_Key_M(OnSort: TOn_Sort_Key_M);                // Sort by key (M)
     procedure Sort_Key_P(OnSort: TOn_Sort_Key_P);                // Sort by key (P)
@@ -2728,54 +2862,56 @@ end;
 
 function Get_Compiler_Version: string;
 begin
-  Result :=
-  {$IFDEF FPC} 'FPC'
-    {$IFDEF VER2_6_4} + ' 2.6.4'{$ENDIF}
-    {$IFDEF VER3_0_0} + ' 3.0.0'{$ENDIF}
-    {$IFDEF VER3_0_1} + ' 3.0.1'{$ENDIF}
-    {$IFDEF VER3_0_2} + ' 3.0.2'{$ENDIF}
-    {$IFDEF VER3_1_1} + ' 3.1.1'{$ENDIF}
-    {$IFDEF VER3_2} + ' 3.2' {$ENDIF}
-    {$IFDEF VER3_3_1} + ' 3.3.1'{$ENDIF}
-  {$ELSE FPC}
-    {$IFDEF CONDITIONALEXPRESSIONS}  // Delphi 6 or newer
-      {$IF defined(KYLIX3)}'Kylix 3'
-      {$ELSEIF defined(VER140)}'Delphi 6'
-      {$ELSEIF defined(VER150)}'Delphi 7'
-      {$ELSEIF defined(VER160)}'Delphi 8'
-      {$ELSEIF defined(VER170)}'Delphi 2005'
-      {$ELSEIF defined(VER185)}'Delphi 2007'
-      {$ELSEIF defined(VER180)}'Delphi 2006'
-      {$ELSEIF defined(VER200)}'Delphi 2009'
-      {$ELSEIF defined(VER210)}'Delphi 2010'
-      {$ELSEIF defined(VER220)}'Delphi XE'
-      {$ELSEIF defined(VER230)}'Delphi XE2'
-      {$ELSEIF defined(VER240)}'Delphi XE3'
-      {$ELSEIF defined(VER250)}'Delphi XE4'
-      {$ELSEIF defined(VER260)}'Delphi XE5'
-      {$ELSEIF defined(VER265)}'AppMethod 1'
-      {$ELSEIF defined(VER270)}'Delphi XE6'
-      {$ELSEIF defined(VER280)}'Delphi XE7'
-      {$ELSEIF defined(VER290)}'Delphi XE8'
-      {$ELSEIF defined(VER300)}'Delphi 10 Seattle'
-      {$ELSEIF defined(VER310)}'Delphi 10.1 Berlin'
-      {$ELSEIF defined(VER320)}'Delphi 10.2 Tokyo'
-      {$ELSEIF defined(VER330)}'Delphi 10.3 Rio'
-      {$ELSEIF defined(VER340)}'Delphi 10.4'
-      {$ELSEIF defined(VER350)}'Delphi 11'
-      {$ELSEIF defined(VER360)}'Delphi 11.x or 12 last...'
-      {$ELSEIF defined(VER370)}'Delphi 12 or 13 last...'
-      {$ELSEIF defined(VER380)}'Delphi 12 last...'
-      {$ELSEIF defined(VER390)}'Delphi 13 last...'
-      {$ELSEIF defined(VER400)}'Delphi 14 last...'
-      {$ELSE}'Unknow Delphi Compiler'
+  {$IFDEF FPC}
+    // 使用 FPC 内置的版本常量，避免依赖不稳定的版本宏
+    Result := 'FPC ' + IntToStr(FPC_VERSION) + '.' + IntToStr(FPC_RELEASE) + '.' + IntToStr(FPC_PATCH);
+  {$ELSE}
+    // Delphi / Kylix 分支
+    {$IFDEF CONDITIONALEXPRESSIONS}  // Delphi 6 及以上支持条件编译
+      {$IF defined(KYLIX3)} Result := 'Kylix 3';
+      {$ELSEIF defined(VER140)} Result := 'Delphi 6';
+      {$ELSEIF defined(VER150)} Result := 'Delphi 7';
+      {$ELSEIF defined(VER160)} Result := 'Delphi 8';
+      {$ELSEIF defined(VER170)} Result := 'Delphi 2005';
+      {$ELSEIF defined(VER180)} Result := 'Delphi 2006';
+      {$ELSEIF defined(VER185)} Result := 'Delphi 2007';
+      {$ELSEIF defined(VER200)} Result := 'Delphi 2009';
+      {$ELSEIF defined(VER210)} Result := 'Delphi 2010';
+      {$ELSEIF defined(VER220)} Result := 'Delphi XE';
+      {$ELSEIF defined(VER230)} Result := 'Delphi XE2';
+      {$ELSEIF defined(VER240)} Result := 'Delphi XE3';
+      {$ELSEIF defined(VER250)} Result := 'Delphi XE4';
+      {$ELSEIF defined(VER260)} Result := 'Delphi XE5';
+      {$ELSEIF defined(VER265)} Result := 'AppMethod 1';
+      {$ELSEIF defined(VER270)} Result := 'Delphi XE6';
+      {$ELSEIF defined(VER280)} Result := 'Delphi XE7';
+      {$ELSEIF defined(VER290)} Result := 'Delphi XE8';
+      {$ELSEIF defined(VER300)} Result := 'Delphi 10 Seattle';
+      {$ELSEIF defined(VER310)} Result := 'Delphi 10.1 Berlin';
+      {$ELSEIF defined(VER320)} Result := 'Delphi 10.2 Tokyo';
+      {$ELSEIF defined(VER330)} Result := 'Delphi 10.3 Rio';
+      {$ELSEIF defined(VER340)} Result := 'Delphi 10.4';
+      {$ELSEIF defined(VER350)} Result := 'Delphi 11';
+      {$ELSEIF defined(VER360)} Result := 'Delphi 11.x or 12 last...';
+      {$ELSEIF defined(VER370)} Result := 'Delphi 12 or 13 last...';
+      {$ELSEIF defined(VER380)} Result := 'Delphi 12 last...';
+      {$ELSEIF defined(VER390)} Result := 'Delphi 13 last...';
+      {$ELSEIF defined(VER400)} Result := 'Delphi 14 last...';
+      {$ELSE} Result := 'Unknown Delphi Compiler';
       {$IFEND}
-    {$ENDIF CONDITIONALEXPRESSIONS}
-  {$ENDIF FPC}
-  {$IFDEF CPU64} + ' 64 bit' {$ELSE CPU64} + ' 32 bit' {$ENDIF CPU64};
+    {$ELSE}
+      Result := 'Delphi (pre-6)';
+    {$ENDIF}
+  {$ENDIF}
+  {$IFDEF CPU64}
+    Result := Result + ' 64 bit';
+  {$ELSE}
+    Result := Result + ' 32 bit';
+  {$ENDIF}
 end;
 
 initialization
+  {$IFDEF DEBUG} if IsConsole then Writeln('Compiler: ' + Get_Compiler_Version()); {$ENDIF DEBUG}
   // float exception
   SetExceptionMask([exInvalidOp, exDenormalized, exZeroDivide, exOverflow, exUnderflow, exPrecision]);
   // raise event

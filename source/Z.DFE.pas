@@ -4176,7 +4176,7 @@ begin
   else if Obj_ is TDF_UInt128 then
       Result := TDF_UInt128(Obj_).Buffer
   else if Obj_ is TDF_String then
-      Result := umlStringOf(TDF_String(Obj_).Buffer)
+      Result := umlStringOf(TDF_String(Obj_).Buffer).Text
   else if Obj_ is TDF_Int64 then
       Result := TDF_Int64(Obj_).Buffer
   else if Obj_ is TDF_UInt64 then
@@ -4209,7 +4209,7 @@ begin
   else if Obj_ is TDF_Int128 then
       Result := TDF_Int128(Obj_).Buffer
   else if Obj_ is TDF_String then
-      Result := umlStringOf(TDF_String(Obj_).Buffer)
+      Result := umlStringOf(TDF_String(Obj_).Buffer).Text
   else if Obj_ is TDF_Int64 then
       Result := TDF_Int64(Obj_).Buffer
   else if Obj_ is TDF_UInt64 then

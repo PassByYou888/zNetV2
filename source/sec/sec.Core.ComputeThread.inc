@@ -272,7 +272,9 @@ procedure TCore_Dispatch_Order_Thread.Execute;
                 exit;
               end
             else
+              begin
                 Core_Thread_Dispatch_Critical__.Release;
+              end;
           end;
 
         // Timeout – remove the task from the pending queue and fall back to
@@ -383,7 +385,7 @@ begin
   Core_Thread_Task_Runing__ := TAtomInt.Create(0);
   Core_Thread_Dispatch_Queue_Pool__ := TCompute_Dispatch_Queue_Pool.Create;
   Core_Thread_Wait_Sum__ := TAtomInt.Create(0);
-  Core_Thread_Life_Time_Tick__ := 200;
+  Core_Thread_Life_Time_Tick__ := 1000;
   Parallel_Granularity__ := Parallel_Granularity_;
   Core_Thread_Dispatch_Critical__ := TCritical.Create('Core_Thread_Dispatch_Critical__');
   Max_Activted_Parallel__ := 0;

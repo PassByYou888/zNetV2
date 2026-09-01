@@ -70,6 +70,11 @@ begin
   FInstance.Insert(index, v_);
 end;
 
+procedure TZ_JsonArray.Insert(Index: integer; const v_: TZ_JsonString);
+begin
+  FInstance.Insert(index, v_.Text);
+end;
+
 procedure TZ_JsonArray.Insert(Index: Integer; const v_: Integer);
 begin
   FInstance.Insert(index, v_);

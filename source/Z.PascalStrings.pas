@@ -470,7 +470,6 @@ type
     }
     function BuildAnsiChar(var siz: Integer): Pointer; overload;
     function BuildAnsiChar: Pointer; overload;
-    function BuildAnsiChar(autofree: Boolean): Pointer; overload;
 
     { * Fills the string from a null‑terminated ANSI buffer.
       * @param p pointer to the buffer.
@@ -501,7 +500,6 @@ type
     }
     function BuildWideChar(var siz: Integer): Pointer; overload;
     function BuildWideChar: Pointer; overload;
-    function BuildWideChar(autofree: Boolean): Pointer; overload;
 
     { * Fills the string from a null‑terminated WideChar buffer.
       * @param p pointer to the buffer.
@@ -525,7 +523,6 @@ type
 
     function BuildUTF8AnsiChar(var siz: Integer): Pointer; overload; // Allocates a null-terminated UTF‑8 buffer; returns pointer and sets siz to allocated size (caller must free unless autofree used).
     function BuildUTF8AnsiChar: Pointer; overload; // Allocates a null-terminated UTF‑8 buffer; returns pointer (caller must free unless autofree used).
-    function BuildUTF8AnsiChar(autofree: Boolean): Pointer; overload; // Allocates a null-terminated UTF‑8 buffer; if autofree=True, the buffer is automatically freed after 60 seconds via Z.Notify.
     procedure ReadUTF8AnsiChar(p: Pointer; MaxSiz: NativeInt); overload; // Reads a null-terminated UTF‑8 buffer up to MaxSiz bytes into the string; stops at null terminator or MaxSiz.
     procedure ReadUTF8AnsiChar(p: Pointer); overload; // Reads a null-terminated UTF‑8 buffer into the string; stops at null terminator.
     class function ReadUTF8AnsiCharTo(p: Pointer; MaxSiz: NativeInt): TPascalString; overload; static; // Creates a TPascalString from a null-terminated UTF‑8 buffer up to MaxSiz bytes.
@@ -747,7 +744,7 @@ const
 
 implementation
 
-uses SysUtils, Variants, Z.Notify;
+uses SysUtils, Variants;
 
 { *****************************************************************************
   * Internal helper routines for efficient concatenation of character arrays
@@ -2518,12 +2515,6 @@ begin
   Result := BuildAnsiChar(siz);
 end;
 
-function TPascalString.BuildAnsiChar(autofree: Boolean): Pointer;
-begin
-  Result := BuildAnsiChar();
-  Z.Notify.DelayFreeMemory(60.0, Result);
-end;
-
 procedure TPascalString.ReadAnsiChar(p: Pointer; MaxSiz: NativeInt);
 // Read null‑terminated ANSI buffer into string.
 var n: NativeInt; buff_: TBytes;
@@ -2593,12 +2584,6 @@ var
   siz: Integer;
 begin
   Result := BuildWideChar(siz);
-end;
-
-function TPascalString.BuildWideChar(autofree: Boolean): Pointer;
-begin
-  Result := BuildWideChar();
-  Z.Notify.DelayFreeMemory(60.0, Result);
 end;
 
 procedure TPascalString.ReadWideChar(p: Pointer; MaxSiz: NativeInt);
@@ -2672,12 +2657,6 @@ var
   siz: Integer;
 begin
   Result := BuildUTF8AnsiChar(siz);
-end;
-
-function TPascalString.BuildUTF8AnsiChar(autofree: Boolean): Pointer;
-begin
-  Result := BuildUTF8AnsiChar();
-  Z.Notify.DelayFreeMemory(60.0, Result);
 end;
 
 procedure TPascalString.ReadUTF8AnsiChar(p: Pointer; MaxSiz: NativeInt);

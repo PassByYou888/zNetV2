@@ -1054,7 +1054,6 @@ begin
       exit;
 
   Th := TCore_Thread.CurrentThread;
-
   Post_To_DoStatus_Queue(Th, Text_, ID);
 
   if Th = Main_Thread then

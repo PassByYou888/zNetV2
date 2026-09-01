@@ -91,6 +91,7 @@ type
     function AddObject: TZ_JsonObject; overload;
 
     procedure Insert(Index: integer; const v_: string); overload;
+    procedure Insert(Index: integer; const v_: TZ_JsonString); overload;
     procedure Insert(Index: integer; const v_: integer); overload;
     procedure Insert(Index: integer; const v_: int64); overload;
     procedure Insert(Index: integer; const v_: uint64); overload;

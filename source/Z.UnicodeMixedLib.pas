@@ -4438,7 +4438,7 @@ end;
 function umlStrToInt128(const V_: TPascalString; _Def: Int128): Int128;
 begin
   try
-      Result := Int128(V_);
+      Result := Int128(V_.Text);
   except
       Result := _Def;
   end;
