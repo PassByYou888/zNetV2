@@ -5790,7 +5790,7 @@ begin
   Init();
   try
     zj := TZJ.Create;
-    zj.LoadFromText(Data_);
+    zj.ParseText(Data_);
     prefix := zj.S['prefix'];
     user := zj.S['user'];
     passwd := zj.S['passwd'];
