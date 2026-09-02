@@ -445,6 +445,17 @@ type
       * @return new string with trimmed ends.
     }
     function TrimChar(const Chars: TPascalString): TPascalString;
+    { * Removes all leading characters that belong to the given set.
+      * @param Chars set of characters to trim from the beginning.
+      * @return new string with leading characters removed.
+    }
+    function TrimLeftChar(const Chars: TPascalString): TPascalString;
+
+    { * Removes all trailing characters that belong to the given set.
+      * @param Chars set of characters to trim from the end.
+      * @return new string with trailing characters removed.
+    }
+    function TrimRightChar(const Chars: TPascalString): TPascalString;
 
     { * Removes all characters that belong to a set (either explicit or category).
       * @param Chars characters to delete (as TPascalString or TOrdChars).
@@ -2399,7 +2410,7 @@ end;
 
 function TPascalString.TrimChar(const Chars: TPascalString): TPascalString;
 // Trim leading/trailing characters that are in Chars.
-var L_, bp, EP: Integer;
+var L_, bp, ep: Integer;
 begin
   Result := '';
   L_ := Len;
@@ -2418,18 +2429,54 @@ begin
           Result := ''
       else
         begin
-          EP := L_;
-          while CharIn(GetChars(EP), @Chars) do
+          ep := L_;
+          while CharIn(GetChars(ep), @Chars) do
             begin
-              dec(EP);
-              if (EP < 1) then
+              dec(ep);
+              if (ep < 1) then
                 begin
                   Result := ''; Exit;
                 end;
             end;
-          Result := GetString(bp, EP + 1);
+          Result := GetString(bp, ep + 1);
         end;
     end;
+end;
+
+function TPascalString.TrimLeftChar(const Chars: TPascalString): TPascalString;
+var
+  L_, bp: Integer;
+begin
+  L_ := Len;
+  if L_ = 0 then
+      Exit('');
+
+  bp := 1;
+  while (bp <= L_) and CharIn(GetChars(bp), @Chars) do
+      inc(bp);
+
+  if bp > L_ then
+      Result := ''
+  else
+      Result := GetString(bp, L_ + 1);
+end;
+
+function TPascalString.TrimRightChar(const Chars: TPascalString): TPascalString;
+var
+  L_, ep: Integer;
+begin
+  L_ := Len;
+  if L_ = 0 then
+      Exit('');
+
+  ep := L_;
+  while (ep >= 1) and CharIn(GetChars(ep), @Chars) do
+      dec(ep);
+
+  if ep < 1 then
+      Result := ''
+  else
+      Result := GetString(1, ep + 1);
 end;
 
 function TPascalString.DeleteChar(const Chars: TPascalString): TPascalString;

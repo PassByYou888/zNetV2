@@ -386,6 +386,17 @@ type
       * @return new string with trimmed ends.
     }
     function TrimChar(const Chars: TUPascalString): TUPascalString;
+    { * Removes all leading characters that belong to the given set.
+      * @param Chars set of characters to trim from the beginning.
+      * @return new string with leading characters removed.
+    }
+    function TrimLeftChar(const Chars: TUPascalString): TUPascalString;
+
+    { * Removes all trailing characters that belong to the given set.
+      * @param Chars set of characters to trim from the end.
+      * @return new string with trailing characters removed.
+    }
+    function TrimRightChar(const Chars: TUPascalString): TUPascalString;
 
     { * Removes all characters that belong to a set (explicit or category).
       * @param Chars set of characters to delete (as TUPascalString or TUOrdChars).
@@ -2408,6 +2419,42 @@ begin
           Result := GetString(bp, EP + 1);
         end;
     end;
+end;
+
+function TUPascalString.TrimLeftChar(const Chars: TUPascalString): TUPascalString;
+var
+  L_, bp: Integer;
+begin
+  L_ := Len;
+  if L_ = 0 then
+      Exit('');
+
+  bp := 1;
+  while (bp <= L_) and CharIn(GetChars(bp), @Chars) do
+      inc(bp);
+
+  if bp > L_ then
+      Result := ''
+  else
+      Result := GetString(bp, L_ + 1);
+end;
+
+function TUPascalString.TrimRightChar(const Chars: TUPascalString): TUPascalString;
+var
+  L_, EP: Integer;
+begin
+  L_ := Len;
+  if L_ = 0 then
+      Exit('');
+
+  EP := L_;
+  while (EP >= 1) and CharIn(GetChars(EP), @Chars) do
+      dec(EP);
+
+  if EP < 1 then
+      Result := ''
+  else
+      Result := GetString(1, EP + 1);
 end;
 
 function TUPascalString.DeleteChar(const Chars: TUPascalString): TUPascalString;

@@ -448,25 +448,173 @@ type
     function SniffingNextChar(cOffset: Integer; declChar: TP_String): Boolean; overload;
     function SniffingNextChar(cOffset: Integer; declChar: TP_String; out OutPos: Integer): Boolean; overload;
 
-    { ==========================================================================
-      Splitting text into a vector
-      ==========================================================================
-      SplitChar splits the text using single characters as delimiters.
-      SplitString uses multi‑character strings as delimiters.
-      Overloads allow specifying start offset, end delimiter, and whether to
-      include control characters.
-      The result is placed in the dynamic array SplitOutput, and the LastPos
-      parameter receives the position after the last processed character.
-      Returns the number of elements extracted.
-    }
+    { * =============================================================================
+      * Splitting text into vectors — semantic-aware tokenisation
+      *
+      * SplitChar and SplitString are the primary methods for breaking text into
+      * a list of fields (vectors). Unlike simple string splitting, these methods
+      * are *semantic-aware*: they automatically skip over comments and string
+      * literals, so that delimiters inside comments or quoted strings do not
+      * cause unintended splits. This makes them ideal for parsing source code,
+      * configuration files, and structured text where delimiters may appear
+      * inside quoted content.
+      *
+      * Usage:
+      *   – SplitChar splits by individual characters (e.g., ',', ';').
+      *   – SplitString splits by multi-character strings (e.g., 'and', 'or').
+      *
+      * All splits are performed on the current ParsingData.Text, honouring the
+      * TextStyle (Pascal, C, or plain text). Comments and string literals are
+      * treated as atomic units and are never entered as content in SplitOutput,
+      * nor do they affect delimiter recognition.
+      *
+      * The SplitOutput array is automatically resized and filled with extracted
+      * fields, each trimmed of leading/trailing spaces and null characters.
+      *
+      * Important notes and traps:
+      *   1. Delimiters inside comments or string literals are ignored.
+      *      This is the key difference from naive string splitting.
+      *   2. The end delimiter (Split_End_Token_Char / SplitEndTokenS) stops the
+      *      split but does NOT consume the end delimiter itself. The caller can
+      *      re-start from LastPos to continue parsing after the end delimiter.
+      *   3. When Include_C_0_to_32 is False (default), whitespace and control
+      *      characters (except those listed in Split_Token_Char) are treated as
+      *      part of the field content, not as delimiters. This affects parsing
+      *      of text where spaces are significant.
+      *   4. If Split_Token_Char is empty, no character-based splitting occurs;
+      *      the entire remaining text is returned as a single field (subject to
+      *      end delimiter handling).
+      *   5. SplitString uses the *literal* text of SplitTokenS for matching,
+      *      not a tokenised interpretation. This means it is not semantic-aware
+      *      for the delimiter itself; only the text being split is semantic-aware.
+      *      Therefore, ensure your delimiter strings are simple and do not appear
+      *      inside comments or strings unexpectedly.
+      *   6. The SplitOutput array is owned by the caller; the method overwrites
+      *      it on each call. If you need to accumulate results across calls,
+      *      copy the array before the next call.
+      *   7. Both methods return the number of extracted fields. This is equal to
+      *      Length(SplitOutput) after the call.
+      *
+      * Performance considerations:
+      *   – These methods use the precomputed token cache (CharToken) for O(1)
+      *     lookup of comment/string boundaries, making them very fast.
+      *   – Repeated calls with the same text and different delimiters will
+      *     benefit from the cached parsing data; no re-tokenisation occurs.
+      *   – If you modify the text, you must rebuild the cache (RebuildParsingCache)
+      *     before calling these methods again.
+      *
+      * =============================================================================
+      *
+      * SplitChar – split by single-character delimiters
+      *
+      * Overload 1 (full control):
+      *   cOffset           : 1‑based start position in the text.
+      *   LastPos           : (output) position after the last processed character.
+      *                       Can be used for chaining splits.
+      *   Include_C_0_to_32 : if True, characters 0‑32 (including space, tab, newline)
+      *                       are treated as delimiters; otherwise only Split_Token_Char.
+      *   Split_Token_Char  : set of single characters that act as delimiters.
+      *                       Each character is a separate delimiter (e.g., ',;').
+      *   Split_End_Token_Char : optional set of characters that stop the split.
+      *                       When encountered, the current field is finalised and
+      *                       the method returns, with LastPos pointing to this char.
+      *                       The ending char is NOT included in any field.
+      *   SplitOutput       : (output) dynamic array of TP_String fields.
+      *   Returns           : number of extracted fields (Length(SplitOutput)).
+      *
+      * Overload 2:
+      *   Same as overload 1, but Include_C_0_to_32 is fixed to False.
+      *   Only characters in Split_Token_Char are treated as delimiters.
+      *
+      * Overload 3:
+      *   Same as overload 2, but LastPos is not returned (internal use only).
+      *   The split runs from cOffset to the end of text or until end delimiter.
+      *
+      * Trap: If Split_End_Token_Char is specified and encountered, the method
+      * returns immediately; it does NOT consume the end delimiter. This allows
+      * you to detect the delimiter and decide how to proceed (e.g., skip it
+      * manually or parse it separately).
+      *
+      * Trap: If Include_C_0_to_32 is False, a comma inside a string (e.g., in
+      * `'a,b'`) will NOT be treated as a delimiter because string literals are
+      * skipped entirely. This is the intended semantic-aware behaviour.
+      *
+      * Example:
+      *   var Parser: TTextParsing;
+      *       Fields: TSymbolVector;
+      *       Last: Integer;
+      *   begin
+      *     Parser := TTextParsing.Create('a, b, // comment'#13#10'c, d; e', tsPascal);
+      *     // Split by comma, stop at semicolon
+      *     Parser.SplitChar(1, Last, False, ',', ';', Fields);
+      *     // Fields = ['a', 'b', 'c', 'd']; Last points to ';'
+      *     // Note: 'e' is not included because split stopped at ';'
+      *   end;
+      * ============================================================================= }
     function SplitChar(cOffset: Integer; var LastPos: Integer;
       Include_C_0_to_32: Boolean; Split_Token_Char, Split_End_Token_Char: TP_String;
       var SplitOutput: TSymbolVector): Integer; overload;
+
     function SplitChar(cOffset: Integer; var LastPos: Integer;
       Split_Token_Char, Split_End_Token_Char: TP_String;
       var SplitOutput: TSymbolVector): Integer; overload;
+
     function SplitChar(cOffset: Integer; Split_Token_Char, Split_End_Token_Char: TP_String;
       var SplitOutput: TSymbolVector): Integer; overload;
+
+    { * =============================================================================
+      * SplitString – split by multi‑character string delimiters
+      *
+      * Similar to SplitChar, but uses literal string(s) as delimiters rather
+      * than single characters. This is useful when the delimiter is a word or
+      * a multi-character sequence (e.g., 'and', 'or', 'then').
+      *
+      * Overload 1 (full control):
+      *   cOffset           : 1‑based start position.
+      *   LastPos           : (output) position after the last processed character.
+      *   SplitTokenS       : delimiter string (e.g., ';' or 'and').
+      *   SplitEndTokenS    : optional end delimiter string. When encountered,
+      *                       the split stops, and LastPos points to this delimiter.
+      *                       The delimiter is NOT consumed.
+      *   SplitOutput       : (output) array of fields.
+      *   Returns           : number of extracted fields.
+      *
+      * Overload 2:
+      *   Same as overload 1, but LastPos is not returned.
+      *
+      * Trap: SplitString matches the delimiter string *literally*, character by
+      * character. It does NOT use tokenisation for the delimiter itself. So if
+      * you use a delimiter like 'begin', it will split on the characters 'b','e','g','i','n'
+      * exactly as they appear. If the delimiter appears inside a comment or
+      * string literal, it is ignored (because the scanning skips comments/strings).
+      *
+      * Trap: If SplitEndTokenS is specified, the method stops at its first
+      * occurrence without consuming it. This means the end delimiter remains
+      * in the text for subsequent processing. This is by design, allowing
+      * nested or chained parsing.
+      *
+      * Trap: Multi-character delimiters are matched with a simple sliding window
+      * comparison. This is efficient but does not handle overlapping matches
+      * specially (e.g., 'and' in 'andand' – it will split at the first 'and',
+      * leaving 'and' for the next segment, which may be split again if you call
+      * again from the correct LastPos).
+      *
+      * Example:
+      *   var Parser: TTextParsing;
+      *       Fields: TSymbolVector;
+      *   begin
+      *     Parser := TTextParsing.Create('x = 42 and y = 100', tsPascal);
+      *     Parser.SplitString(1, ' and ', '', Fields);
+      *     // Fields = ['x = 42', 'y = 100']
+      *     // The delimiter ' and ' is consumed and not part of any field.
+      *   end;
+      *
+      * Comparison with SplitChar:
+      *   – SplitChar is faster for single-character delimiters.
+      *   – SplitString is more flexible for multi-character or word-based delimiters.
+      *   – Both are semantic-aware, skipping comments and strings.
+      * ============================================================================= }
+
     function SplitString(cOffset: Integer; var LastPos: Integer;
       SplitTokenS, SplitEndTokenS: TP_String; var SplitOutput: TSymbolVector): Integer; overload;
     function SplitString(cOffset: Integer; SplitTokenS, SplitEndTokenS: TP_String;
@@ -3105,115 +3253,143 @@ end;
 
 // Short aliases (ProbeL, LProbe, ProbeR, RProbe) simply forward to the above.
 function TTextParsing.ProbeL(startI: Integer; acceptT: TTokenTypes): PTokenData;
-begin Result := TokenProbeL(startI, acceptT);
+begin
+  Result := TokenProbeL(startI, acceptT);
 end;
 
 function TTextParsing.ProbeL(startI: Integer; t: TP_String): PTokenData;
-begin Result := TokenProbeL(startI, t);
+begin
+  Result := TokenProbeL(startI, t);
 end;
 
 function TTextParsing.ProbeL(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
-begin Result := TokenProbeL(startI, acceptT, t);
+begin
+  Result := TokenProbeL(startI, acceptT, t);
 end;
 
 function TTextParsing.ProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData;
-begin Result := TokenProbeL(startI, acceptT, t1, t2);
+begin
+  Result := TokenProbeL(startI, acceptT, t1, t2);
 end;
 
 function TTextParsing.ProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData;
-begin Result := TokenProbeL(startI, acceptT, t1, t2, t3);
+begin
+  Result := TokenProbeL(startI, acceptT, t1, t2, t3);
 end;
 
 function TTextParsing.ProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData;
-begin Result := TokenProbeL(startI, acceptT, t1, t2, t3, t4);
+begin
+  Result := TokenProbeL(startI, acceptT, t1, t2, t3, t4);
 end;
 
 function TTextParsing.ProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData;
-begin Result := TokenProbeL(startI, acceptT, t1, t2, t3, t4, t5);
+begin
+  Result := TokenProbeL(startI, acceptT, t1, t2, t3, t4, t5);
 end;
 
 function TTextParsing.LProbe(startI: Integer; acceptT: TTokenTypes): PTokenData;
-begin Result := TokenProbeL(startI, acceptT);
+begin
+  Result := TokenProbeL(startI, acceptT);
 end;
 
 function TTextParsing.LProbe(startI: Integer; t: TP_String): PTokenData;
-begin Result := TokenProbeL(startI, t);
+begin
+  Result := TokenProbeL(startI, t);
 end;
 
 function TTextParsing.LProbe(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
-begin Result := TokenProbeL(startI, acceptT, t);
+begin
+  Result := TokenProbeL(startI, acceptT, t);
 end;
 
 function TTextParsing.LProbe(startI: Integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData;
-begin Result := TokenProbeL(startI, acceptT, t1, t2);
+begin
+  Result := TokenProbeL(startI, acceptT, t1, t2);
 end;
 
 function TTextParsing.LProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData;
-begin Result := TokenProbeL(startI, acceptT, t1, t2, t3);
+begin
+  Result := TokenProbeL(startI, acceptT, t1, t2, t3);
 end;
 
 function TTextParsing.LProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData;
-begin Result := TokenProbeL(startI, acceptT, t1, t2, t3, t4);
+begin
+  Result := TokenProbeL(startI, acceptT, t1, t2, t3, t4);
 end;
 
 function TTextParsing.LProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData;
-begin Result := TokenProbeL(startI, acceptT, t1, t2, t3, t4, t5);
+begin
+  Result := TokenProbeL(startI, acceptT, t1, t2, t3, t4, t5);
 end;
 
 function TTextParsing.ProbeR(startI: Integer; acceptT: TTokenTypes): PTokenData;
-begin Result := TokenProbeR(startI, acceptT);
+begin
+  Result := TokenProbeR(startI, acceptT);
 end;
 
 function TTextParsing.ProbeR(startI: Integer; t: TP_String): PTokenData;
-begin Result := TokenProbeR(startI, t);
+begin
+  Result := TokenProbeR(startI, t);
 end;
 
 function TTextParsing.ProbeR(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
-begin Result := TokenProbeR(startI, acceptT, t);
+begin
+  Result := TokenProbeR(startI, acceptT, t);
 end;
 
 function TTextParsing.ProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData;
-begin Result := TokenProbeR(startI, acceptT, t1, t2);
+begin
+  Result := TokenProbeR(startI, acceptT, t1, t2);
 end;
 
 function TTextParsing.ProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData;
-begin Result := TokenProbeR(startI, acceptT, t1, t2, t3);
+begin
+  Result := TokenProbeR(startI, acceptT, t1, t2, t3);
 end;
 
 function TTextParsing.ProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData;
-begin Result := TokenProbeR(startI, acceptT, t1, t2, t3, t4);
+begin
+  Result := TokenProbeR(startI, acceptT, t1, t2, t3, t4);
 end;
 
 function TTextParsing.ProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData;
-begin Result := TokenProbeR(startI, acceptT, t1, t2, t3, t4, t5);
+begin
+  Result := TokenProbeR(startI, acceptT, t1, t2, t3, t4, t5);
 end;
 
 function TTextParsing.RProbe(startI: Integer; acceptT: TTokenTypes): PTokenData;
-begin Result := TokenProbeR(startI, acceptT);
+begin
+  Result := TokenProbeR(startI, acceptT);
 end;
 
 function TTextParsing.RProbe(startI: Integer; t: TP_String): PTokenData;
-begin Result := TokenProbeR(startI, t);
+begin
+  Result := TokenProbeR(startI, t);
 end;
 
 function TTextParsing.RProbe(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
-begin Result := TokenProbeR(startI, acceptT, t);
+begin
+  Result := TokenProbeR(startI, acceptT, t);
 end;
 
 function TTextParsing.RProbe(startI: Integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData;
-begin Result := TokenProbeR(startI, acceptT, t1, t2);
+begin
+  Result := TokenProbeR(startI, acceptT, t1, t2);
 end;
 
 function TTextParsing.RProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData;
-begin Result := TokenProbeR(startI, acceptT, t1, t2, t3);
+begin
+  Result := TokenProbeR(startI, acceptT, t1, t2, t3);
 end;
 
 function TTextParsing.RProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData;
-begin Result := TokenProbeR(startI, acceptT, t1, t2, t3, t4);
+begin
+  Result := TokenProbeR(startI, acceptT, t1, t2, t3, t4);
 end;
 
 function TTextParsing.RProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData;
-begin Result := TokenProbeR(startI, acceptT, t1, t2, t3, t4, t5);
+begin
+  Result := TokenProbeR(startI, acceptT, t1, t2, t3, t4, t5);
 end;
 
 { ============================================================================

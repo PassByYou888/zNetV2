@@ -1194,6 +1194,7 @@ type
     procedure Clear;
     function Count: Integer;
     function ExistsValue(Value: TPascalString): Integer;
+    function IndexOf(Value: TPascalString): Integer;
     procedure Exchange(const idx1, idx2: Integer);
     function ReplaceSum(Pattern: TPascalString; OnlyWord, IgnoreCase: Boolean; bPos, ePos: Integer): Integer;
     procedure Sort();
@@ -8873,6 +8874,11 @@ begin
         Result := i;
         Break;
       end;
+end;
+
+function TListPascalString.IndexOf(Value: TPascalString): Integer;
+begin
+  Result := ExistsValue(Value);
 end;
 
 procedure TListPascalString.Exchange(const idx1, idx2: Integer);

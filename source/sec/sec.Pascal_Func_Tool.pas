@@ -21,41 +21,38 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 *)
-{ ******************************************************************************
+(*
+  ******************************************************************************
   * Z.Pascal_Func_Tool
   *
-  * This unit implements a parser for extracting structural information from
-  * Pascal source files: unit name, interface/implementation sections,
-  * initialization/finalization blocks, and declarations of all functions
-  * and procedures (including parameters, return types, calling conventions,
-  * external linkage, and explicit name/index clauses).
+  * Extracts structural metadata from Pascal source files: unit name,
+  * interface/implementation sections, init/finalization blocks, and all
+  * function/procedure declarations including parameters, return types,
+  * calling conventions, external linkage, and explicit name/index clauses.
   *
-  * It is built on the Z.Parsing lexical analysis library, using token streams
-  * for efficient scanning without manual handling of comments or string
-  * literals. Parsing results are stored in tfunc_decl records, ready for
-  * subsequent code analysis or refactoring tools.
+  * Built on Z.Parsing token streams, it scans without manual lexing of
+  * comments or string literals. Results are stored in tfunc_decl records
+  * suitable for code analysis, documentation generation, or refactoring.
   *
-  * All keywords are obtained from Z.Pascal_Code_Tool to eliminate hard-coded
-  * strings, ensuring maintainability and consistency.
+  * Keywords are sourced from Z.Pascal_Code_Tool to avoid hard-coded strings.
   *
   * --------------------------------------------------------------------------
-  * Important changes:
-  *   - All exceptions (RaiseInfo) have been removed. The parser now uses
-  *     silent error handling: upon encountering invalid syntax, it logs a
-  *     debug message, sets ErrorOccurred, and safely exits the loop,
-  *     leaving ParseSuccess=False.
-  *   - Debug mode is controlled by the DebugMode constant (True by default).
-  *   - Added NestLevel field to tfunc_decl to store nesting depth of each
-  *     declaration (0 = top‑level, >0 = inside class/record etc.).
+  * Key features:
+  *   - Silent error handling: invalid syntax is logged, ErrorOccurred set,
+  *     ParseSuccess=False; no RaiseInfo exceptions.
+  *   - Debug logging controlled by Pascal_Func_Tool_Log_Enabled (default True).
+  *   - NestLevel field tracks declaration depth (0 = top-level, >0 inside
+  *     class/record/interface).
+  *   - Structured parameter extraction via tfunc_param_tool.
+  *   - JSON serialization/deserialization of the entire parsed result.
   *
   * --------------------------------------------------------------------------
-  * History and Acknowledgements:
-  *   This unit was originally written by qq600585 around 2012. Its core
-  *   design of token stream scanning and semantic probing was visionary.
-  *   With the advent of AI, we have preserved the original parsing workflow
-  *   while modernising naming, comments, and error handling to make it more
-  *   maintainable and accessible. Our sincere thanks go to the original author.
-  ****************************************************************************** }
+  * History:
+  *   Original author qq600585 (circa 2012). The token-stream scanning and
+  *   semantic probing design was pioneering. Modernised with AI assistance
+  *   for naming, comments, and error handling. Thanks to the original author.
+  ******************************************************************************
+*)
 unit sec.Pascal_Func_Tool;
 
 {$DEFINE FPC_DELPHI_MODE}
@@ -65,10 +62,9 @@ interface
 
 uses
   TypInfo,
-  {$IFDEF FPC}
-    { FPC-specific generic list support (backported from fgl) }
-    sec.FPC.GenericList, fgl,
-  {$ENDIF FPC}
+{$IFDEF FPC}
+  sec.FPC.GenericList, fgl,
+{$ENDIF FPC}
   sec.Core,
   sec.PascalStrings,
   sec.UPascalStrings,
@@ -76,88 +72,266 @@ uses
   sec.Status,
   sec.Parsing,
   sec.ListEngine,
-  sec.Pascal_Code_Tool; // Provides Pascal_Keyword function and TPascal_Keyword enum
+  sec.Pascal_Code_Tool,
+  sec.Json;
 
 type
-  { Pointer to a function/procedure declaration record }
   pfunc_decl = ^tfunc_decl;
 
-  {
-    tfunc_decl stores complete declaration information for a function or
-    procedure, including its location, name, parameters, return type,
-    calling convention, external linkage, and any preceding comment.
-    All fields are initialised to safe default values in the Init method.
-  }
-  tfunc_decl = record
-    Body: TP_String; // Full source text of the declaration
-    IsProc: Boolean; // True if it is a procedure, False if function
-    BPos, EPos: Integer; // Start and end character positions (1-based, exclusive)
-    Name: TP_String; // Routine name
-    IsFunction: Boolean; // True if it's a function, False if procedure
-    ParamDecl: TP_String; // Parameter list, e.g. '(a,b: Integer)'
-    ResultDecl: TP_String; // Return type (for functions), e.g. 'Integer'
-    CallConv: TP_String; // Calling convention, e.g. 'cdecl', 'stdcall'
-    IsExternal: Boolean; // True if 'external' keyword is present
-    ExternalLibrary: TP_String; // Library name for external, e.g. 'libname'
-    HasExplicitName: Boolean; // True if 'name' alias is specified
-    ExplicitName: TP_String; // Explicit export name, e.g. 'pu_xx'
-    HasExplicitIndex: Boolean; // True if 'index' ordinal is specified
-    ExplicitIndex: TP_String; // Explicit export index, e.g. '110'
-    Index: Integer; // Sequential index in the declaration list (0-based)
-    Comment: TP_String; // Preceding comment text (if any)
-    { +++ NEW FIELD +++ }
-    NestLevel: Integer; // Nesting depth: 0 = top‑level, >0 = inside class/record etc.
-    procedure Init; // Initialises all fields to default values
+  tfunc_param_decl = record
+    param_mod: TP_String;
+    param_name: TP_String;
+    param_typ: TP_String;
+    param_value: TP_String;
+    procedure reset;
   end;
 
-  tfunc_decl_list = TGenericsList<pfunc_decl>;
+  tfunc_param_arry = array of tfunc_param_decl;
 
-  {
-    tpascal_func_decl_tool is the main class for parsing Pascal units and
-    extracting function/procedure declarations. It uses Z.Parsing for lexical
-    analysis and locates keywords via probing methods, eliminating the need
-    for manual lexing.
-    Parsing results are stored in FuncList, and key token positions are
-    recorded for structural elements.
-  }
+  tfunc_param_tool = class(TBigList<tfunc_param_decl>)
+  public
+    procedure DoFree(var Data: tfunc_param_decl); override;
+    procedure fill_param(ParamDecl: TP_String);
+    function get_param_arry: tfunc_param_arry;
+    class function extract_param_to_arry(ParamDecl: TP_String): tfunc_param_arry;
+  end;
+
+  tfunc_decl = record
+    Body: TP_String;
+    IsProc: Boolean;
+    BPos, EPos: Integer;
+    Name: TP_String;
+    IsFunction: Boolean;
+    ParamDecl: TP_String;
+    param_arry: tfunc_param_arry;
+    ResultDecl: TP_String;
+    CallConv: TP_String;
+    IsExternal: Boolean;
+    ExternalLibrary: TP_String;
+    HasExplicitName: Boolean;
+    ExplicitName: TP_String;
+    HasExplicitIndex: Boolean;
+    ExplicitIndex: TP_String;
+    Index: Integer;
+    Comment: TP_String;
+    NestLevel: Integer;
+    procedure Init;
+    procedure Free;
+  end;
+
+  TFuncDeclList = class(TBigList<pfunc_decl>)
+  public
+    procedure DoFree(var Data: pfunc_decl); override;
+  end;
+
   tpascal_func_decl_tool = class(TCore_Object_Intermediate)
   public
-    Parser: TTextParsing; // Lexical analyser instance (token cache)
-    FuncList: tfunc_decl_list; // List of all parsed function/procedure declarations
-    UsesList: TPascalStringList; // Merged list of unit names from interface uses clause
-    UnitName: TP_String; // Name of the parsed unit
-    UnitToken: pfunc_decl; // Declaration item for the 'unit' keyword
-    InterfaceToken: pfunc_decl; // Declaration item for the 'interface' keyword
-    ImplementationToken: pfunc_decl; // Declaration item for the 'implementation' keyword
-    EndToken: pfunc_decl; // Declaration item for the 'end.' keyword
-    InitToken: pfunc_decl; // Declaration item for 'initialization' (if present)
-    FinalToken: pfunc_decl; // Declaration item for 'finalization' (if present)
-    ParseSuccess: Boolean; // Whether the unit structure was fully parsed
+    Parser: TTextParsing;
+    FuncList: TFuncDeclList;
+    UsesList: TPascalStringList;
+    UnitName: TP_String;
+    UnitToken: pfunc_decl;
+    InterfaceToken: pfunc_decl;
+    ImplementationToken: pfunc_decl;
+    EndToken: pfunc_decl;
+    InitToken: pfunc_decl;
+    FinalToken: pfunc_decl;
+    ParseSuccess: Boolean;
 
     constructor Create(AText: TP_String);
     destructor Destroy; override;
     class function CreateFromFile(const FileName: TP_String): tpascal_func_decl_tool;
 
-    { Execute parsing, populating all internal data structures }
     procedure Fill;
-
-    { Clear all parsed data and free memory }
     procedure Clear;
-
-    { Concatenate the bodies of declaration items in the given index range }
     function Combine(const BTokenIdx, ETokenIdx: Integer): TP_String;
+
+    // JSON serialization
+    function SaveToJson: string;
+    procedure LoadFromJson(const JsonStr: string);
   end;
 
-const
-  Pascal_Func_Tool_Log_Enabled: Boolean = False; // Debug switch; when True, detailed logs are emitted
+var
+  Pascal_Func_Tool_Log_Enabled: Boolean = False;
 
 implementation
 
-{ tfunc_decl.Init --------------------------------------------------------------
-  Resets all fields to empty/zero values, ensuring the record is in a
-  consistent safe state before use. BPos/EPos are set to -1 to distinguish
-  from valid positions (>=1), allowing callers to check whether the record
-  has been initialised. }
+uses
+  sec.MemoryStream;
+
+{ ------------------------------------------------------------------------------
+  tfunc_param_decl.reset
+  ------------------------------------------------------------------------------ }
+procedure tfunc_param_decl.reset;
+begin
+  param_mod := '';
+  param_name := '';
+  param_typ := '';
+  param_value := '';
+end;
+
+{ ------------------------------------------------------------------------------
+  tfunc_param_tool.DoFree
+  ------------------------------------------------------------------------------ }
+procedure tfunc_param_tool.DoFree(var Data: tfunc_param_decl);
+begin
+  Data.reset;
+  inherited;
+end;
+
+{ ------------------------------------------------------------------------------
+  tfunc_param_tool.fill_param
+  ------------------------------------------------------------------------------ }
+procedure tfunc_param_tool.fill_param(ParamDecl: TP_String);
+
+  procedure extract_typ_and_value(p: TP_String; var param_typ, param_value: TP_String);
+  var
+    tmp: TP_String;
+    tp: TTextParsing;
+    SplitOutput: TSymbolVector;
+    lPos, rNum: Integer;
+  begin
+    tmp := p.TrimChar(#32#9);
+    if tmp = '' then exit;
+    tp := TTextParsing.Create(tmp, tsPascal);
+    try
+      rNum := tp.SplitChar(1, lPos, '=', ';', SplitOutput);
+      if rNum > 0 then
+          param_typ := SplitOutput[0].TrimChar(#32#9);
+      if rNum > 1 then
+          param_value := SplitOutput[1].TrimChar(#32#9);
+    finally
+        disposeObject(tp);
+    end;
+    if Pascal_Func_Tool_Log_Enabled then
+        DoStatus('[tfunc_param_tool] extract_typ_and_value: typ="%s", value="%s"',
+        [param_typ.Text, param_value.Text]);
+  end;
+
+  procedure do_parsing_single_param(p: TP_String);
+  var
+    tmp: TP_String;
+    tp: TTextParsing;
+    SplitOutput: TSymbolVector;
+    lPos, rNum, i: Integer;
+    param_mod, param_name, param_typ, param_value: TP_String;
+  begin
+    tmp := p.TrimChar(#32#9);
+    if tmp = '' then exit;
+    param_mod := '';
+    param_name := '';
+    param_typ := '';
+    param_value := '';
+
+    tp := TTextParsing.Create(tmp, tsPascal);
+    try
+      rNum := tp.SplitChar(1, lPos, True, ',', ':', SplitOutput);
+
+      if (rNum = 0) and (tmp <> '') then
+        begin
+          SetLength(SplitOutput, 1);
+          SplitOutput[0] := tmp;
+          rNum := 1;
+        end;
+
+      if rNum > 0 then
+        begin
+          if (lPos + 1 < tp.Len) and (lPos > 0) then
+              extract_typ_and_value(tp.GetStr(lPos + 1, tp.Len), param_typ, param_value)
+          else if (lPos = 0) then
+              extract_typ_and_value(tmp, param_typ, param_value);
+
+          for i := 0 to Length(SplitOutput) - 1 do
+            begin
+              if (i = 0) and (Pascal_Keyword(SplitOutput[i]) in [kVar, kOut, kIn, kConst]) then
+                begin
+                  param_mod := SplitOutput[i];
+                  if Pascal_Func_Tool_Log_Enabled then
+                      DoStatus('[tfunc_param_tool] Modifier found: "%s"', [param_mod.Text]);
+                end
+              else
+                begin
+                  with Add_Null^ do
+                    begin
+                      Data.reset();
+                      Data.param_mod := param_mod;
+                      Data.param_name := SplitOutput[i];
+                      Data.param_typ := param_typ;
+                      Data.param_value := param_value;
+                    end;
+                  if Pascal_Func_Tool_Log_Enabled then
+                      DoStatus('[tfunc_param_tool] Added param: %s:%s = %s',
+                      [SplitOutput[i].Text, param_typ.Text, param_value.Text]);
+                end;
+            end;
+        end
+      else
+        begin
+          if Pascal_Func_Tool_Log_Enabled then
+              DoStatus('[tfunc_param_tool] No tokens found in group: "%s"', [tmp.Text]);
+        end;
+    finally
+        disposeObject(tp);
+    end;
+  end;
+
+var
+  tmp: TP_String;
+  tp: TTextParsing;
+  lPos: Integer;
+  SplitOutput: TSymbolVector;
+  i: Integer;
+begin
+  tmp := ParamDecl.TrimChar('()'#32#9);
+  if tmp = '' then
+    begin
+      if Pascal_Func_Tool_Log_Enabled then
+          DoStatus('[tfunc_param_tool] fill_param: empty or only parentheses');
+      exit;
+    end;
+
+  if Pascal_Func_Tool_Log_Enabled then
+      DoStatus('[tfunc_param_tool] fill_param: parsing "%s"', [tmp.Text]);
+
+  tp := TTextParsing.Create(tmp, tsPascal);
+  try
+    tp.SplitChar(1, lPos, ';', '', SplitOutput);
+    for i := 0 to Length(SplitOutput) - 1 do
+        do_parsing_single_param(SplitOutput[i]);
+  finally
+      disposeObject(tp);
+  end;
+end;
+
+{ ------------------------------------------------------------------------------
+  tfunc_param_tool.get_param_arry
+  ------------------------------------------------------------------------------ }
+function tfunc_param_tool.get_param_arry: tfunc_param_arry;
+begin
+  SetLength(Result, Num);
+  if Num > 0 then
+    with repeat_ do
+      repeat
+          Result[I__] := queue^.Data;
+      until not Next;
+end;
+
+{ ------------------------------------------------------------------------------
+  tfunc_param_tool.extract_param_to_arry
+  ------------------------------------------------------------------------------ }
+class function tfunc_param_tool.extract_param_to_arry(ParamDecl: TP_String): tfunc_param_arry;
+begin
+  with tfunc_param_tool.Create do
+    begin
+      fill_param(ParamDecl);
+      Result := get_param_arry();
+      Free;
+    end;
+end;
+
+{ ------------------------------------------------------------------------------
+  tfunc_decl.Init
+  ------------------------------------------------------------------------------ }
 procedure tfunc_decl.Init;
 begin
   Body := '';
@@ -167,6 +341,7 @@ begin
   Name := '';
   IsFunction := False;
   ParamDecl := '';
+  SetLength(param_arry, 0);
   ResultDecl := '';
   CallConv := '';
   IsExternal := False;
@@ -177,20 +352,62 @@ begin
   ExplicitIndex := '';
   Index := 0;
   Comment := '';
-  { +++ INIT NEW FIELD +++ }
   NestLevel := 0;
 end;
 
-{ tpascal_func_decl_tool.Create ----------------------------------------------------
-  Constructs the parser with the given Pascal source text and immediately
-  executes Fill. All internal containers and state variables are initialised;
-  even if Fill fails, the object can be safely destroyed.
-  Debug mode is enabled by default (True) to assist with troubleshooting. }
+{ ------------------------------------------------------------------------------
+  tfunc_decl.Free
+  ------------------------------------------------------------------------------ }
+procedure tfunc_decl.Free;
+var
+  i: Integer;
+begin
+  Body := '';
+  IsProc := False;
+  BPos := -1;
+  EPos := -1;
+  Name := '';
+  IsFunction := False;
+  ParamDecl := '';
+  for i := 0 to Length(param_arry) - 1 do param_arry[i].reset;
+  SetLength(param_arry, 0);
+  ResultDecl := '';
+  CallConv := '';
+  IsExternal := False;
+  ExternalLibrary := '';
+  HasExplicitName := False;
+  ExplicitName := '';
+  HasExplicitIndex := False;
+  ExplicitIndex := '';
+  Index := 0;
+  Comment := '';
+  NestLevel := 0;
+end;
+
+{ ------------------------------------------------------------------------------
+  TFuncDeclList.DoFree
+  ------------------------------------------------------------------------------ }
+procedure TFuncDeclList.DoFree(var Data: pfunc_decl);
+begin
+  if Data <> nil then
+    begin
+      Data^.Free;
+      Dispose(Data);
+      Data := nil;
+    end;
+  inherited;
+end;
+
+{ ------------------------------------------------------------------------------
+  tpascal_func_decl_tool.Create
+  ------------------------------------------------------------------------------ }
 constructor tpascal_func_decl_tool.Create(AText: TP_String);
 begin
   inherited Create;
-  Parser := TTextParsing.Create(AText, tsPascal); // Pascal-style lexical analyser
-  FuncList := tfunc_decl_list.Create;
+  if Pascal_Func_Tool_Log_Enabled then
+      DoStatus('[tpascal_func_decl_tool.Create] Starting parsing...');
+  Parser := TTextParsing.Create(AText, tsPascal);
+  FuncList := TFuncDeclList.Create;
   UsesList := TPascalStringList.Create;
   UnitName := '';
   UnitToken := nil;
@@ -200,17 +417,25 @@ begin
   InitToken := nil;
   FinalToken := nil;
   ParseSuccess := False;
-  Fill; // Run the parser immediately
+  Fill;
 end;
 
+{ ------------------------------------------------------------------------------
+  tpascal_func_decl_tool.Destroy
+  ------------------------------------------------------------------------------ }
 destructor tpascal_func_decl_tool.Destroy;
 begin
   Clear;
-  DisposeObject(FuncList);
-  DisposeObject(UsesList);
+  disposeObject(FuncList);
+  disposeObject(UsesList);
   inherited Destroy;
+  if Pascal_Func_Tool_Log_Enabled then
+      DoStatus('[tpascal_func_decl_tool.Destroy] Destroyed.');
 end;
 
+{ ------------------------------------------------------------------------------
+  tpascal_func_decl_tool.CreateFromFile
+  ------------------------------------------------------------------------------ }
 class function tpascal_func_decl_tool.CreateFromFile(const FileName: TP_String): tpascal_func_decl_tool;
 var
   Strings: TPascalStringList;
@@ -218,60 +443,13 @@ begin
   Strings := TPascalStringList.Create;
   Strings.LoadFromFile(FileName);
   Result := tpascal_func_decl_tool.Create(Strings.AsText);
-  DisposeObject(Strings);
+  disposeObject(Strings);
 end;
 
-{ * tpascal_func_decl_tool.Fill ------------------------------------------------------
-  * Core parsing routine. It scans all tokens, recognises unit structure,
-  * and extracts function/procedure declarations.
-  *
-  * ============================================================================
-  * Parsing principle (based on Z.Parsing token stream and probing):
-  * Z.Parsing converts source code into a flat list of tokens, each with a type
-  * (ttAscii, ttSymbol, ttComment, etc.) and positional information. This method
-  * sequentially scans the token list, using a state machine (Sections) and a
-  * nesting depth counter (NestedLevel) to distinguish top-level declarations
-  * from those inside nested structures (classes, records, interfaces, etc.).
-  *
-  * Key concepts:
-  * - Token Stream: Provided by TTextParsing as a linear sequence accessible
-  *   via the Tokens property or by using ProbeL/ProbeR for fast searching.
-  * - Probe: ProbeR searches to the right from a given index for a token
-  *   matching certain criteria; ProbeL searches to the left. This method
-  *   extensively uses ProbeR to locate subsequent symbols like semicolons
-  *   and parentheses.
-  * - Token Types: ttAscii represents identifiers (including keywords),
-  *   ttSymbol represents single-character symbols, ttComment represents
-  *   comments, ttUnknow represents whitespace or unrecognised characters.
-  * - State Machine (Sections): Tracks the current logical region (unit,
-  *   interface, implementation, etc.) because keywords have different meanings
-  *   in different contexts (e.g., 'end' in a record vs. unit termination).
-  *
-  * Parsing strategy:
-  * 1. Use the Sections state machine to track whether we are in unit,
-  *    interface, implementation, etc.
-  * 2. Use NestedLevel to track nesting depth of classes, records, interfaces
-  *    to avoid misinterpreting inner declarations as top-level.
-  * 3. All keyword comparisons are done via Pascal_Keyword, converting to
-  *    an enumeration to eliminate hard-coded strings.
-  * 4. In the interface section, locate 'uses' clauses, extract the unit names,
-  *    and then identify function/procedure declarations.
-  * 5. In the implementation section, only mark initialization, finalization,
-  *    and end. keywords.
-  * 6. Every token is added to FuncList, but only those with IsProc=True
-  *    are true function/procedure declarations (used for final counting).
-  *
-  * Note: Method declarations inside classes are not extracted separately
-  * because when NestedLevel > 0, the top-level processing block is not
-  * triggered. This is by design, focusing on unit-level interface declarations.
-  *
-  * Silent error handling: On syntax errors, the parser does not raise an
-  * exception. Instead, it sets ErrorOccurred=True, breaks the loop, and
-  * ultimately ParseSuccess=False.
-}
+{ ------------------------------------------------------------------------------
+  tpascal_func_decl_tool.Fill
+  ------------------------------------------------------------------------------ }
 procedure tpascal_func_decl_tool.Fill;
-
-{ Debug logging helper – outputs only when Pascal_Func_Tool_Log_Enabled is True }
   procedure DebugLog(const Msg: string; const Args: array of const); overload;
   begin
     if Pascal_Func_Tool_Log_Enabled then
@@ -284,29 +462,12 @@ procedure tpascal_func_decl_tool.Fill;
         DoStatus('[parser_structor] ' + Msg);
   end;
 
-(*
-  * Extracts consecutive comments immediately preceding a function/procedure
-  * keyword at the given index. It scans backwards from Idx-1, skipping
-  * whitespace tokens (ttUnknow with empty Trim), then gathers all consecutive
-  * ttComment tokens.
-  * Returns the concatenated comment text in source order (i.e., the order
-  * they appear in the source code), or an empty string if no comment found.
-  *
-  * Design considerations:
-  * - Whitespace (newlines, spaces, tabs) is treated as non-substantive and
-  *   skipped, so that comments separated by newlines or spaces are still captured.
-  * - Stop scanning at the first non-comment token (e.g., 'type', 'var', '='),
-  *   ensuring only comments directly adjacent to the declaration are bound.
-  * - Multiple comment blocks (e.g., a '//' line followed by a '{ }' block)
-  *   are merged in order, separated by line breaks.
-*)
   function ExtractPrecedingComments(Idx: Integer): TP_String;
   var
     CommentTokens: array of TP_String;
     Temp: TP_String;
     i, Count: Integer;
     Token: PTokenData;
-    TokenTypeName: string;
   begin
     Count := 0;
     SetLength(CommentTokens, 0);
@@ -314,26 +475,22 @@ procedure tpascal_func_decl_tool.Fill;
 
     DebugLog('Begin extracting comments before index %d', [Idx]);
 
-    // Skip whitespace tokens (ttUnknow and text is empty after trimming)
     while i >= 0 do
       begin
         Token := Parser.Tokens[i];
-        TokenTypeName := GetEnumName(TypeInfo(TTokenType), Ord(Token^.TokenType));
         if (Token^.TokenType = ttUnknow) and (Token^.Text.TrimChar(#32#9#13#10) = '') then
           begin
-            // (We do not log skipped whitespace to reduce noise, but it is skipped.)
+            DebugLog('  Skipping whitespace token at index %d', [i]);
             Dec(i);
           end
         else
             Break;
       end;
 
-    // Now i may point to a comment or to a non-whitespace non-comment token.
     while i >= 0 do
       begin
         Token := Parser.Tokens[i];
-        TokenTypeName := GetEnumName(TypeInfo(TTokenType), Ord(Token^.TokenType));
-        DebugLog('  Checking Token[%d]: type=%s, text="%s"', [i, TokenTypeName, Token^.Text.Text]);
+        DebugLog('  Checking Token[%d]: type=%s, text="%s"', [i, GetEnumName(TypeInfo(TTokenType), Ord(Token^.TokenType)), Token^.Text.Text]);
 
         if Token^.TokenType = ttComment then
           begin
@@ -352,7 +509,6 @@ procedure tpascal_func_decl_tool.Fill;
     Result := '';
     if Count > 0 then
       begin
-        // Reverse order because we scanned backwards
         for i := Count - 1 downto 0 do
           begin
             Temp := CommentTokens[i];
@@ -366,37 +522,11 @@ procedure tpascal_func_decl_tool.Fill;
     else
         DebugLog('No consecutive comments found');
 
-    // Cleanup temporary array
     for i := 0 to Count - 1 do
         CommentTokens[i] := '';
     SetLength(CommentTokens, 0);
   end;
 
-{
-  * Processes external declaration part (cdecl; external 'lib' name '...' etc.)
-  * and fills the Output record. Input Idx is the token index (usually points
-  * to the ';' or 'external' after the declaration). Returns the next index
-  * to process, or -1 on error.
-  *
-  * Parsing logic (fixed):
-  * 1. Use ProbeR to find the first identifier after the current token.
-  * 2. Determine if it is a calling convention (cdecl, stdcall, etc.) or 'external'.
-  * 3. If it is a calling convention, record it, skip it, and continue to find
-  *    the following 'external'. If there is no following identifier, then the
-  *    declaration ends: return the position after the semicolon.
-  *    If there is a following identifier but it is not 'external', then the
-  *    declaration ends: return the position after the semicolon.
-  * 4. If the first identifier is not a calling convention, check if it is
-  *    'external'. If not, then the declaration ends: return the position after
-  *    the semicolon. If it is 'external', extract the library name and then
-  *    handle optional 'name' or 'index' clauses.
-  * 5. All extractions are terminated by a semicolon; if a semicolon is missing,
-  *    log an error and return -1.
-  *
-  * Note: The key fix is that whenever there is no 'external', we must return
-  * the position after the semicolon, not the index of the next identifier,
-  * to avoid skipping the current declaration.
-}
   function ProcessExternalAndCallingConvention(Idx: Integer; var Output: tfunc_decl): Integer;
   var
     TokenAfterSemi, TokenAfterExternal: PTokenData;
@@ -404,62 +534,59 @@ procedure tpascal_func_decl_tool.Fill;
     Keyword: TPascal_Keyword;
   begin
     Output.EPos := Parser.Tokens[Idx]^.EPos;
+    DebugLog('ProcessExternalAndCallingConvention: starting at index %d', [Idx]);
 
-    // Find the first identifier after the semicolon
     TokenAfterSemi := Parser.ProbeR(Idx, [ttAscii]);
     if TokenAfterSemi = nil then
       begin
         DebugLog('No identifier found after "%s", skipping', [Output.Name.Text]);
         Result := Idx;
-        Exit;
+        exit;
       end;
+    DebugLog('  Token after semicolon: "%s" (type=%s)',
+      [TokenAfterSemi^.Text.Text, GetEnumName(TypeInfo(TTokenType), Ord(TokenAfterSemi^.TokenType))]);
 
     Keyword := Pascal_Keyword(TokenAfterSemi^.Text);
-    // Check for calling convention
+
     if Keyword in [kRegister, kPascal, kCdecl, kStdcall, kSafeCall] then
       begin
         Output.CallConv := TokenAfterSemi^.Text;
         DebugLog('Routine "%s" recognised calling convention: %s', [Output.Name.Text, TokenAfterSemi^.Text.Text]);
 
-        // Locate the semicolon after the calling convention
         TokenAfterExternal := Parser.ProbeR(TokenAfterSemi^.Index + 1, [ttSymbol], ';');
         if TokenAfterExternal = nil then
           begin
             DebugLog('In declaration of "%s", missing semicolon after calling convention "%s"', [Output.Name.Text, TokenAfterSemi^.Text.Text]);
             Result := -1;
-            Exit;
+            exit;
           end;
         Output.EPos := TokenAfterExternal^.EPos;
+        DebugLog('  Semicolon after calling convention at index %d', [TokenAfterExternal^.Index]);
 
-        // Look for a subsequent identifier (possibly 'external')
         TokenAfterSemi := Parser.ProbeR(TokenAfterExternal^.Index + 1, [ttAscii]);
         if TokenAfterSemi = nil then
           begin
-            // No further identifier, declaration ends after the semicolon
+            DebugLog('  No further identifier, declaration ends after semicolon');
             Result := TokenAfterExternal^.Index + 1;
-            Exit;
+            exit;
           end;
-        // Check if it is 'external'
         if not TokenAfterSemi^.Text.Same(Pascal_Keyword_DICT[kExternal].Decl) then
           begin
-            // Not external, declaration ends after the semicolon
+            DebugLog('  Not external, declaration ends after semicolon');
             Result := TokenAfterExternal^.Index + 1;
-            Exit;
+            exit;
           end;
-        // Otherwise, it is 'external', continue processing below.
       end
     else if not TokenAfterSemi^.Text.Same(Pascal_Keyword_DICT[kExternal].Decl) then
       begin
-        // Neither calling convention nor external, declaration ends after the semicolon
+        DebugLog('  No calling convention nor external, declaration ends after semicolon');
         Result := Idx;
-        Exit;
+        exit;
       end;
 
-    // At this point, TokenAfterSemi is 'external'
     Output.IsExternal := True;
     DebugLog('Routine "%s" marked as external', [Output.Name.Text]);
 
-    // Extract library name (must be a string or identifier)
     TokenAfterExternal := Parser.ProbeR(TokenAfterSemi^.Index + 1,
       [ttTextDecl, ttNumber, ttSymbol, ttAscii]);
     if (TokenAfterExternal <> nil) and (TokenAfterExternal^.TokenType in [ttTextDecl, ttAscii]) then
@@ -470,19 +597,17 @@ procedure tpascal_func_decl_tool.Fill;
     else if (TokenAfterExternal <> nil) and (TokenAfterExternal^.TokenType in [ttSymbol]) and
       (TokenAfterExternal^.Text.Same(';')) then
       begin
-        // external without library name (valid: 'external;')
-        DebugLog('external without library name (direct semicolon)', []);
+        DebugLog('external without library name (direct semicolon)');
         Result := TokenAfterExternal^.Index + 1;
-        Exit;
+        exit;
       end
     else
       begin
         DebugLog('In external declaration of "%s", library name missing or invalid (string or identifier expected)', [Output.Name.Text]);
         Result := -1;
-        Exit;
+        exit;
       end;
 
-    // Check for 'name' or 'index' clauses
     TokenAfterSemi := Parser.ProbeR(TokenAfterExternal^.Index + 1,
       [ttTextDecl, ttNumber, ttSymbol, ttAscii]);
     if TokenAfterSemi^.TokenType = ttAscii then
@@ -497,15 +622,13 @@ procedure tpascal_func_decl_tool.Fill;
             else
                 DebugLog('Routine "%s" found "index" clause', [Output.Name.Text]);
 
-            // Find the following semicolon
             TokenAfterExternal := Parser.ProbeR(TokenAfterSemi^.Index + 1, [ttSymbol], ';');
             if TokenAfterExternal = nil then
               begin
                 DebugLog('In "%s" clause of "%s", missing terminating semicolon', [TokenAfterSemi^.Text.Text, Output.Name.Text]);
                 Result := -1;
-                Exit;
+                exit;
               end;
-            // Concatenate all tokens between the keyword and the semicolon
             for i := TokenAfterSemi^.Index + 1 to TokenAfterExternal^.Index - 1 do
               if Output.HasExplicitName then
                   Output.ExplicitName.Append(Parser.Tokens[i]^.Text)
@@ -523,33 +646,17 @@ procedure tpascal_func_decl_tool.Fill;
       end
     else if (TokenAfterSemi^.TokenType = ttSymbol) and (TokenAfterSemi^.Text.Same(';')) then
       begin
-        // external without name/index
-        DebugLog('external without name/index clause', []);
+        DebugLog('external without name/index clause');
         Output.EPos := TokenAfterSemi^.EPos;
       end;
 
     Result := TokenAfterSemi^.Index + 1;
   end;
 
-{
-  * Core function/procedure declaration processing.
-  * Inputs: ProcDeclToken (the 'function' or 'procedure' token) and
-  * ProcNameToken (the routine name token). Extracts parameters (if any),
-  * return type (for functions), and then processes calling convention/external.
-  * Returns the next index to process, or -1 on error.
-  *
-  * Parsing strategy:
-  * 1. Use ProbeR to find the first symbol after the name; it should be '(' ':' or ';'.
-  * 2. If it is '(', extract the parameter list using ProbeR to locate the matching ')'.
-  * 3. If it is a procedure and followed by ';', process calling convention/external directly.
-  * 4. If it is a function and followed by ':', extract the return type, then process
-  *    calling convention/external.
-  * 5. Any unexpected structure logs an error and returns -1.
-}
   function ProcessProcDeclaration(ProcDeclToken, ProcNameToken: PTokenData;
     var Output: tfunc_decl): Integer;
   var
-    TokenAfterName, TokenAfterParen, TokenAfterColon: PTokenData;
+    TokenAfterName, TokenAfterParen: PTokenData;
     i: Integer;
   begin
     Output.IsProc := True;
@@ -562,27 +669,41 @@ procedure tpascal_func_decl_tool.Fill;
     DebugLog('Parsing routine: %s (type: %s)',
       [Output.Name.Text, if_(Output.IsFunction, 'function', 'procedure')]);
 
-    // Find first symbol after the name
     TokenAfterName := Parser.ProbeR(ProcNameToken^.Index + 1, [ttSymbol]);
     if (TokenAfterName <> nil) and (TokenAfterName^.TokenType = ttSymbol) then
       begin
-        // Handle parameter list
+        DebugLog('  Symbol after name: "%s"', [TokenAfterName^.Text.Text]);
+
         if TokenAfterName^.Text.Same('(') then
           begin
-            TokenAfterParen := Parser.ProbeR(TokenAfterName^.Index + 1, [ttSymbol], ')');
+            DebugLog('  Found parameter list start');
+            TokenAfterParen := Parser.IndentSymbolEndProbeR(TokenAfterName^.Index, '(', ')');
             if TokenAfterParen = nil then
               begin
-                DebugLog('In routine "%s", missing matching closing parenthesis ")"', [Output.Name.Text]);
-                Result := -1;
-                Exit;
+                TokenAfterParen := Parser.ProbeR(TokenAfterName^.Index + 1, [ttSymbol], ')');
+                if TokenAfterParen = nil then
+                  begin
+                    DebugLog('In routine "%s", missing matching closing parenthesis ")"', [Output.Name.Text]);
+                    Result := -1;
+                    exit;
+                  end;
               end;
+
             Output.ParamDecl := Parser.TokenCombine(TokenAfterName^.Index, TokenAfterParen^.Index);
-            DebugLog('Parameters: %s', [Output.ParamDecl.Text]);
+            Output.param_arry := tfunc_param_tool.extract_param_to_arry(Output.ParamDecl);
+
+            DebugLog('Parameters: %s (count=%d)', [Output.ParamDecl.Text, Length(Output.param_arry)]);
+
             TokenAfterName := Parser.ProbeR(TokenAfterParen^.Index + 1, [ttSymbol]);
+            DebugLog('  Token after closing paren: "%s"', [TokenAfterName^.Text.Text]);
+          end
+        else
+          begin
+            DebugLog('  No parameter list');
+            Output.param_arry := nil;
           end;
 
-        // If procedure (not function) and followed by ';'
-        if (not Output.IsFunction) and TokenAfterName^.Text.Same(';') then
+        if (not Output.IsFunction) and (TokenAfterName <> nil) and TokenAfterName^.Text.Same(';') then
           begin
             Output.EPos := TokenAfterName^.EPos;
             DebugLog('Procedure "%s" directly followed by semicolon, entering external processing', [Output.Name.Text]);
@@ -591,43 +712,59 @@ procedure tpascal_func_decl_tool.Fill;
                 DebugLog('Routine "%s" external processing failed', [Output.Name.Text])
             else
                 DebugLog('Routine "%s" parsed successfully', [Output.Name.Text]);
-            Exit;
+            exit;
           end;
 
-        // If function, must handle return type
-        if Output.IsFunction and TokenAfterName^.Text.Same(':') then
+        if Output.IsFunction and (TokenAfterName <> nil) and TokenAfterName^.Text.Same(':') then
           begin
-            // Get return type identifier
-            TokenAfterColon := Parser.ProbeR(TokenAfterName^.Index + 1, [ttAscii, ttSymbol]);
-            if TokenAfterColon = nil then
+            DebugLog('  Found return type start');
+            i := TokenAfterName^.Index + 1;
+            Output.ResultDecl := '';
+            while (i < Parser.TokenCount) and (not Parser.Tokens[i]^.Text.Same(';')) do
               begin
-                DebugLog('In function "%s", return type name not found', [Output.Name.Text]);
-                Result := -1;
-                Exit;
+                if Output.ResultDecl.Len > 0 then Output.ResultDecl.Append(' ');
+                Output.ResultDecl.Append(Parser.Tokens[i]^.Text);
+                Inc(i);
               end;
-            TokenAfterParen := Parser.ProbeR(TokenAfterColon^.Index + 1, [ttSymbol], ';');
-            if TokenAfterParen = nil then
+            if i >= Parser.TokenCount then
               begin
                 DebugLog('In function "%s", missing terminating semicolon after return type', [Output.Name.Text]);
                 Result := -1;
-                Exit;
+                exit;
               end;
 
-            Output.ResultDecl := TokenAfterColon^.Text;
             DebugLog('Return type: %s', [Output.ResultDecl.Text]);
-            Result := ProcessExternalAndCallingConvention(TokenAfterParen^.Index + 1, Output);
+            Result := ProcessExternalAndCallingConvention(i + 1, Output);
             if Result = -1 then
                 DebugLog('Routine "%s" external processing failed', [Output.Name.Text])
             else
                 DebugLog('Routine "%s" parsed successfully', [Output.Name.Text]);
-            Exit;
+            exit;
           end
-        else
+        else if Output.IsFunction and ((TokenAfterName = nil) or (not TokenAfterName^.Text.Same(':'))) then
           begin
-            DebugLog('In routine "%s", unexpected symbol "%s" (expected ";" or ":")',
-              [Output.Name.Text, TokenAfterName^.Text.Text]);
+            DebugLog('In function "%s", missing ":" or return type', [Output.Name.Text]);
             Result := -1;
-            Exit;
+            exit;
+          end
+        else if (not Output.IsFunction) and ((TokenAfterName = nil) or (not TokenAfterName^.Text.Same(';'))) then
+          begin
+            if TokenAfterName <> nil then
+              begin
+                if Pascal_Keyword(TokenAfterName^.Text) in [kRegister, kPascal, kCdecl, kStdcall, kSafeCall, kExternal] then
+                  begin
+                    Output.EPos := TokenAfterName^.EPos;
+                    Result := ProcessExternalAndCallingConvention(TokenAfterName^.Index, Output);
+                    if Result = -1 then
+                        DebugLog('Routine "%s" external processing failed', [Output.Name.Text])
+                    else
+                        DebugLog('Routine "%s" parsed successfully', [Output.Name.Text]);
+                    exit;
+                  end;
+              end;
+            DebugLog('In routine "%s", unexpected structure', [Output.Name.Text]);
+            Result := -1;
+            exit;
           end;
       end
     else
@@ -637,22 +774,6 @@ procedure tpascal_func_decl_tool.Fill;
       end;
   end;
 
-{
-  * Extracts unit names from a uses clause, deduplicates, and adds them to UsesList.
-  * Parameter AText is the text after the 'uses' keyword (e.g., 'SysUtils, Classes').
-  * This process never fails; if parsing errors occur, they are logged and the result
-  * may be empty.
-  *
-  * Processing steps:
-  * 1. Use an independent TTextParsing (tsPascal) on the text to remove comments.
-  * 2. Split by commas to get candidate unit names.
-  * 3. Trim whitespace and filter empty strings.
-  * 4. Merge into the main UsesList with automatic deduplication using UmlMergeStrings.
-  *
-  * Note: Conditional compilation directives (e.g., $IFDEF) are treated as comments
-  * and removed. Thus the extracted list may include unit names from all conditional
-  * branches, which is a simplification that fits most use cases.
-}
   procedure ProcessUsesClause(const AText: TP_String);
   var
     LocalParser: TTextParsing;
@@ -662,12 +783,12 @@ procedure tpascal_func_decl_tool.Fill;
   begin
     DebugLog('Processing uses clause, raw text: %s', [AText.Text]);
     LocalParser := TTextParsing.Create(AText, tsPascal);
-    LocalParser.DeletedComment; // Remove comments
-    CleanedText := LocalParser.ParsingData.Text.DeleteChar(#13#10#9); // Remove newlines and tabs
-    DisposeObject(LocalParser);
+    LocalParser.DeletedComment;
+    CleanedText := LocalParser.ParsingData.Text.DeleteChar(#13#10#9);
+    disposeObject(LocalParser);
 
     LocalList := TPascalStringList.Create;
-    UmlSeparatorText(CleanedText, LocalList, ','); // Split by comma
+    UmlSeparatorText(CleanedText, LocalList, ',');
     i := 0;
     while i < LocalList.Count do
       begin
@@ -678,12 +799,11 @@ procedure tpascal_func_decl_tool.Fill;
             Inc(i);
       end;
     DebugLog('Extracted %d unit names', [LocalList.Count]);
-    UmlMergeStrings(LocalList, UsesList, True); // Merge and deduplicate
-    DisposeObject(LocalList);
+    UmlMergeStrings(LocalList, UsesList, True);
+    disposeObject(LocalList);
   end;
 
 type
-  { Represents the current parsing region, used for state machine control }
   TCurrentSection = (csBeginUnit, csEndUnit, csIntf, csIntfUses, csImp);
   TCurrentSections = set of TCurrentSection;
 
@@ -692,11 +812,11 @@ var
   CurrentToken, NextToken, NextNextToken: PTokenData;
   DeclItem: pfunc_decl;
   Sections: TCurrentSections;
-  NestedLevel: Integer; // Tracks nesting depth (classes, records, interfaces)
+  NestedLevel: Integer;
   Keyword: TPascal_Keyword;
   PreComment: TP_String;
-  FuncCount: Integer; // Number of successfully parsed routines
-  ErrorOccurred: Boolean; // Flag indicating if an error occurred
+  FuncCount: Integer;
+  ErrorOccurred: Boolean;
 begin
   DebugLog('Starting Pascal unit parsing', []);
 
@@ -709,17 +829,18 @@ begin
   while (i < Parser.TokenCount) and (not ErrorOccurred) do
     begin
       CurrentToken := Parser.Tokens[i];
+      DebugLog('Main loop: index=%d, type=%s, text="%s"',
+        [i, GetEnumName(TypeInfo(TTokenType), Ord(CurrentToken^.TokenType)), CurrentToken^.Text.Text]);
 
-      // Skip whitespace tokens (ttUnknow and empty trim) – do not add to FuncList
       if (CurrentToken^.TokenType = ttUnknow) and (CurrentToken^.Text.TrimChar(#32#9#13#10) = '') then
         begin
+          DebugLog('  Skipping whitespace');
           Inc(i);
           Continue;
         end;
 
       New(DeclItem);
       DeclItem^.Init;
-      { +++ RECORD CURRENT NESTING LEVEL +++ }
       DeclItem^.NestLevel := NestedLevel;
 
       DeclItem^.Body := CurrentToken^.Text;
@@ -727,19 +848,14 @@ begin
       DeclItem^.BPos := CurrentToken^.BPos;
       DeclItem^.EPos := CurrentToken^.EPos;
 
-      { Block 1: Handle nested structures (classes, interfaces, records, etc.)
-        Only active when we are in the interface section, not in implementation,
-        and NestedLevel > 0. This block maintains the NestedLevel counter so
-        that inner declarations do not interfere with top-level parsing. }
       if (not(csEndUnit in Sections)) and (csIntf in Sections) and
         (not(csImp in Sections)) and (NestedLevel > 0) then
         begin
           if (CurrentToken^.TokenType = ttAscii) then
             begin
               Keyword := Pascal_Keyword(CurrentToken^.Text);
+              DebugLog('  Nested level %d, keyword: %s', [NestedLevel, CurrentToken^.Text.Text]);
 
-              { Encountering 'class' with a preceding '=' could indicate a class
-                declaration; increase nesting unless followed by '(', ';', or 'of'. }
               if Keyword = kClass then
                 begin
                   NextToken := Parser.TokenProbeL(CurrentToken^.Index - 1,
@@ -766,7 +882,6 @@ begin
                         end;
                     end;
                 end
-                { 'interface' with a preceding '=' similarly indicates an interface declaration }
               else if Keyword = kInterface then
                 begin
                   NextToken := Parser.TokenProbeL(CurrentToken^.Index - 1,
@@ -793,13 +908,11 @@ begin
                         end;
                     end;
                 end
-                { 'record' always increases nesting }
               else if Keyword = kRecord then
                 begin
                   Inc(NestedLevel);
                   DebugLog('Nesting +1 (record), depth: %d', [NestedLevel]);
                 end
-                { 'end' decreases nesting, but only if it is a standalone 'end' (not 'end;' inside a statement) }
               else if Keyword = kEnd then
                 begin
                   if Parser.ComparePosStr(CurrentToken^.BPos, 'end;') or
@@ -812,14 +925,12 @@ begin
             end;
         end
 
-        { Block 2: Process top-level structures (non-nested)
-          Only when NestedLevel = 0 and we have not reached 'end.' }
       else if (not(csEndUnit in Sections)) and (NestedLevel = 0) and
         (CurrentToken^.TokenType = ttAscii) then
         begin
           Keyword := Pascal_Keyword(CurrentToken^.Text);
+          DebugLog('  Top-level token: "%s" (keyword=%s)', [CurrentToken^.Text.Text, GetEnumName(TypeInfo(TPascal_Keyword), Ord(Keyword))]);
 
-          { Locate the 'unit' keyword and record the unit name }
           if (not(csBeginUnit in Sections)) and (Keyword = kUnit) then
             begin
               Sections := [csBeginUnit];
@@ -836,50 +947,44 @@ begin
               DebugLog('Unit name identified: "%s"', [UnitName.Text]);
             end;
 
-          { Once the unit keyword is found, continue parsing }
           if (csBeginUnit in Sections) then
             begin
-              { Look for 'interface' }
               if (not(csIntf in Sections)) and (Keyword = kInterface) then
                 begin
                   Include(Sections, csIntf);
                   InterfaceToken := DeclItem;
-                  DebugLog('Entering interface section', []);
+                  DebugLog('Entering interface section');
                 end
-                { Look for 'implementation' }
               else if (not(csImp in Sections)) and (Keyword = kImplementation) then
                 begin
                   Include(Sections, csImp);
                   ImplementationToken := DeclItem;
-                  DebugLog('Entering implementation section', []);
+                  DebugLog('Entering implementation section');
                 end
-                { In implementation section, look for 'initialization', 'finalization', 'end.' }
               else if (csImp in Sections) and (not(csEndUnit in Sections)) and
                 (CurrentToken^.TokenType = ttAscii) then
                 begin
                   if Keyword = kInitialization then
                     begin
                       InitToken := DeclItem;
-                      DebugLog('Initialization block identified', []);
+                      DebugLog('Initialization block identified');
                     end
                   else if Keyword = kFinalization then
                     begin
                       FinalToken := DeclItem;
-                      DebugLog('Finalization block identified', []);
+                      DebugLog('Finalization block identified');
                     end
                   else if (Parser.ComparePosStr(CurrentToken^.BPos, 'end.')) then
                     begin
                       Include(Sections, csEndUnit);
                       DeclItem^.Body := 'end.';
-                      Inc(i); // Skip further processing of 'end.'
+                      Inc(i);
                       EndToken := DeclItem;
-                      DebugLog('End. identified', []);
+                      DebugLog('End. identified');
                     end;
                 end
-                { In interface section (before implementation), parse uses and function/procedure declarations }
               else if (csIntf in Sections) and (not(csImp in Sections)) then
                 begin
-                  { Handle uses clause }
                   if (not(csIntfUses in Sections)) and (Keyword = kUses) then
                     begin
                       NextToken := Parser.ProbeR(CurrentToken^.Index + 1, [ttSymbol], ';');
@@ -893,16 +998,14 @@ begin
                       ProcessUsesClause(Parser.TokenCombine(CurrentToken^.Index + 1,
                           NextToken^.Index - 1));
                       i := NextToken^.Index + 1;
-                      DeclItem^.Body := ''; // uses is not stored as a function item
-                      DebugLog('Uses clause processed', []);
+                      DeclItem^.Body := '';
+                      DebugLog('Uses clause processed');
                     end;
-                  { Ensure uses is processed only once }
                   Include(Sections, csIntfUses);
 
-                  { Identify function/procedure declarations }
                   if (Keyword in [kFunction, kProcedure]) then
                     begin
-                      { Extract preceding comment and store it }
+                      DebugLog('  Found function/procedure keyword: %s', [CurrentToken^.Text.Text]);
                       PreComment := ExtractPrecedingComments(i);
                       DeclItem^.Comment := PreComment;
                       if PreComment.Len > 0 then
@@ -927,7 +1030,6 @@ begin
                         end;
                     end
 
-                    { Handle class, interface, record starts to increase nesting }
                   else if Keyword = kClass then
                     begin
                       NextToken := Parser.TokenProbeL(CurrentToken^.Index - 1,
@@ -989,13 +1091,11 @@ begin
             end;
         end;
 
-      { Add the current declaration item to the list }
-      DeclItem^.Index := FuncList.Count;
+      DeclItem^.Index := FuncList.Num;
       FuncList.Add(DeclItem);
       Inc(i);
-    end; // while
+    end;
 
-  { After parsing, check if unit structure is complete }
   if ErrorOccurred then
     begin
       DoStatus('Error occurred during parsing, aborted');
@@ -1021,32 +1121,25 @@ begin
       if ParseSuccess then
           DebugLog('Parsing successful, found %d function/procedure declarations', [FuncCount])
       else
-          DebugLog('Parsing failed, missing required structure', []);
+          DebugLog('Parsing failed, missing required structure');
     end;
 end;
 
-{ tpascal_func_decl_tool.Clear ----------------------------------------------------
-  Frees all declaration memory and clears the list. Iterates backwards to
-  avoid index shifts. }
+{ ------------------------------------------------------------------------------
+  tpascal_func_decl_tool.Clear
+  ------------------------------------------------------------------------------ }
 procedure tpascal_func_decl_tool.Clear;
-var
-  i: Integer;
 begin
-  for i := FuncList.Count - 1 downto 0 do
-    begin
-      FuncList[i]^.Init; // Clear string fields to help garbage collection
-      Dispose(FuncList[i]);
-    end;
   FuncList.Clear;
 end;
 
-{ tpascal_func_decl_tool.Combine --------------------------------------------------
-  Concatenates the bodies of all declaration items in the index range
-  BTokenIdx..ETokenIdx. If the start index is greater than the end, they are
-  swapped. Useful for reconstructing code sections. }
+{ ------------------------------------------------------------------------------
+  tpascal_func_decl_tool.Combine
+  ------------------------------------------------------------------------------ }
 function tpascal_func_decl_tool.Combine(const BTokenIdx, ETokenIdx: Integer): TP_String;
 var
-  Lo, Hi, Idx: Integer;
+  Lo, Hi: Integer;
+  It: TFuncDeclList.TRepeat___;
 begin
   if BTokenIdx > ETokenIdx then
     begin
@@ -1060,12 +1153,186 @@ begin
     end;
 
   Result := '';
-  Idx := Lo;
-  while Idx <= Hi do
+  if (Lo >= 0) and (Hi < FuncList.Num) and (Lo <= Hi) then
     begin
-      Result.Append(FuncList[Idx]^.Body);
-      Inc(Idx);
+      It := FuncList.repeat_(Lo, Hi);
+      repeat
+          Result.Append(It.queue^.Data^.Body);
+      until not It.Next;
     end;
+end;
+
+{ ------------------------------------------------------------------------------
+  JSON serialization helpers
+  ------------------------------------------------------------------------------ }
+function ParamDeclToJson(const p: tfunc_param_decl): TZ_JsonObject;
+begin
+  Result := TZ_JsonObject.Create;
+  Result.S['mod'] := p.param_mod.Text;
+  Result.S['name'] := p.param_name.Text;
+  Result.S['typ'] := p.param_typ.Text;
+  Result.S['value'] := p.param_value.Text;
+end;
+
+function JsonToParamDecl(const jo: TZ_JsonObject): tfunc_param_decl;
+begin
+  Result.reset;
+  Result.param_mod := jo.S['mod'];
+  Result.param_name := jo.S['name'];
+  Result.param_typ := jo.S['typ'];
+  Result.param_value := jo.S['value'];
+end;
+
+procedure FuncDeclToJson(const f: tfunc_decl; const obj: TZ_JsonObject);
+var
+  arr: TZ_JsonArray;
+  paramObj: TZ_JsonObject;
+  i: Integer;
+begin
+  obj.S['Body'] := f.Body.Text;
+  obj.B['IsProc'] := f.IsProc;
+  obj.i['BPos'] := f.BPos;
+  obj.i['EPos'] := f.EPos;
+  obj.S['Name'] := f.Name.Text;
+  obj.B['IsFunction'] := f.IsFunction;
+  obj.S['ParamDecl'] := f.ParamDecl.Text;
+
+  arr := obj.A['param_arry'];
+  for i := 0 to High(f.param_arry) do
+    begin
+      paramObj := arr.AddObject;
+      paramObj.S['mod'] := f.param_arry[i].param_mod.Text;
+      paramObj.S['name'] := f.param_arry[i].param_name.Text;
+      paramObj.S['typ'] := f.param_arry[i].param_typ.Text;
+      paramObj.S['value'] := f.param_arry[i].param_value.Text;
+    end;
+
+  obj.S['ResultDecl'] := f.ResultDecl.Text;
+  obj.S['CallConv'] := f.CallConv.Text;
+  obj.B['IsExternal'] := f.IsExternal;
+  obj.S['ExternalLibrary'] := f.ExternalLibrary.Text;
+  obj.B['HasExplicitName'] := f.HasExplicitName;
+  obj.S['ExplicitName'] := f.ExplicitName.Text;
+  obj.B['HasExplicitIndex'] := f.HasExplicitIndex;
+  obj.S['ExplicitIndex'] := f.ExplicitIndex.Text;
+  obj.i['Index'] := f.Index;
+  obj.S['Comment'] := f.Comment.Text;
+  obj.i['NestLevel'] := f.NestLevel;
+end;
+
+procedure JsonToFuncDecl(const jo: TZ_JsonObject; var f: tfunc_decl);
+var
+  arr: TZ_JsonArray;
+  i: Integer;
+begin
+  f.Init;
+  f.Body := jo.S['Body'];
+  f.IsProc := jo.B['IsProc'];
+  f.BPos := jo.i['BPos'];
+  f.EPos := jo.i['EPos'];
+  f.Name := jo.S['Name'];
+  f.IsFunction := jo.B['IsFunction'];
+  f.ParamDecl := jo.S['ParamDecl'];
+
+  arr := jo.A['param_arry'];
+  SetLength(f.param_arry, arr.Count);
+  for i := 0 to arr.Count - 1 do
+      f.param_arry[i] := JsonToParamDecl(arr.O[i]);
+
+  f.ResultDecl := jo.S['ResultDecl'];
+  f.CallConv := jo.S['CallConv'];
+  f.IsExternal := jo.B['IsExternal'];
+  f.ExternalLibrary := jo.S['ExternalLibrary'];
+  f.HasExplicitName := jo.B['HasExplicitName'];
+  f.ExplicitName := jo.S['ExplicitName'];
+  f.HasExplicitIndex := jo.B['HasExplicitIndex'];
+  f.ExplicitIndex := jo.S['ExplicitIndex'];
+  f.Index := jo.i['Index'];
+  f.Comment := jo.S['Comment'];
+  f.NestLevel := jo.i['NestLevel'];
+end;
+
+{ ------------------------------------------------------------------------------
+  tpascal_func_decl_tool.SaveToJson
+  ------------------------------------------------------------------------------ }
+function tpascal_func_decl_tool.SaveToJson: string;
+var
+  root: TZ_JsonObject;
+  arr: TZ_JsonArray;
+  funcObj: TZ_JsonObject;
+  i: Integer;
+  usesArr: TZ_JsonArray;
+begin
+  root := TZ_JsonObject.Create;
+  try
+    root.S['UnitName'] := UnitName.Text;
+    root.B['ParseSuccess'] := ParseSuccess;
+
+    arr := root.A['FuncList'];
+    for i := 0 to FuncList.Count - 1 do
+      begin
+        funcObj := arr.AddObject;
+        FuncDeclToJson(FuncList[i]^, funcObj);
+      end;
+
+    usesArr := root.A['UsesList'];
+    for i := 0 to UsesList.Count - 1 do
+        usesArr.Add(UsesList[i].Text);
+
+    if UnitToken <> nil then
+        root.S['UnitTokenBody'] := UnitToken^.Body.Text;
+    if InterfaceToken <> nil then
+        root.S['InterfaceTokenBody'] := InterfaceToken^.Body.Text;
+    if ImplementationToken <> nil then
+        root.S['ImplementationTokenBody'] := ImplementationToken^.Body.Text;
+    if EndToken <> nil then
+        root.S['EndTokenBody'] := EndToken^.Body.Text;
+    if InitToken <> nil then
+        root.S['InitTokenBody'] := InitToken^.Body.Text;
+    if FinalToken <> nil then
+        root.S['FinalTokenBody'] := FinalToken^.Body.Text;
+
+    Result := root.ToJSONString(True);
+  finally
+      root.Free;
+  end;
+end;
+
+{ ------------------------------------------------------------------------------
+  tpascal_func_decl_tool.LoadFromJson
+  ------------------------------------------------------------------------------ }
+procedure tpascal_func_decl_tool.LoadFromJson(const JsonStr: string);
+var
+  root: TZ_JsonObject;
+  arr: TZ_JsonArray;
+  i: Integer;
+  p: pfunc_decl;
+  usesArr: TZ_JsonArray;
+begin
+  Clear;
+  root := TZ_JsonObject.Create;
+  try
+    root.ParseText(JsonStr);
+    UnitName := root.S['UnitName'];
+    ParseSuccess := root.B['ParseSuccess'];
+
+    arr := root.A['FuncList'];
+    for i := 0 to arr.Count - 1 do
+      begin
+        New(p);
+        p^.Init;
+        JsonToFuncDecl(arr.O[i], p^);
+        FuncList.Add(p);
+      end;
+
+    usesArr := root.A['UsesList'];
+    for i := 0 to usesArr.Count - 1 do
+        UsesList.Add(usesArr.S[i]);
+
+    // Structural token bodies are not restored as pointers
+  finally
+      root.Free;
+  end;
 end;
 
 end.
