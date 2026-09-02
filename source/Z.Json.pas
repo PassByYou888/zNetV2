@@ -216,17 +216,16 @@ type
     procedure SaveToStream(stream: TCore_Stream; Formated_: boolean); overload;
     procedure SaveToStream(stream: TCore_Stream); overload;
     procedure LoadFromStream(stream: TCore_Stream);
-
-    procedure SaveToLines(L_: TCore_Strings);
-    procedure LoadFromLines(L_: TCore_Strings);
     procedure SaveToFile(FileName: SystemString);
     procedure LoadFromFile(FileName: SystemString);
-    procedure LoadFromText(Text_: TZ_JsonString);
 
     function GetMD5: TMD5;
     property MD5: TMD5 read GetMD5;
 
-    function ParseText(Text_: TZ_JsonString): boolean;
+    function Parae(buff: TBytes): boolean;
+    function ToBytes: TBytes;
+    function ParseText(Text_: TZ_JsonString; UseUTF8: boolean): boolean; overload;
+    function ParseText(Text_: TZ_JsonString): boolean; overload;
 
     function ToJSONString(Formated_: boolean): TZ_JsonString; overload;
     function ToJSONString: TZ_JsonString; overload;
@@ -449,40 +448,6 @@ begin
   SaveToStream(stream, True);
 end;
 
-procedure TZ_JsonObject.SaveToLines(L_: TCore_Strings);
-var
-  m64: TMS64;
-begin
-  m64 := TMS64.Create;
-  SaveToStream(m64);
-  m64.Position := 0;
-{$IFDEF FPC}
-  L_.LoadFromStream(m64);
-{$ELSE}
-  L_.LoadFromStream(m64, TEncoding.UTF8);
-{$ENDIF}
-  m64.Free;
-end;
-
-procedure TZ_JsonObject.LoadFromLines(L_: TCore_Strings);
-var
-  bak: boolean;
-  m64: TMS64;
-begin
-  bak := L_.WriteBOM;
-  L_.WriteBOM := False;
-  m64 := TMS64.Create;
-{$IFDEF FPC}
-  L_.SaveToStream(m64);
-{$ELSE}
-  L_.SaveToStream(m64, TEncoding.UTF8);
-{$ENDIF}
-  L_.WriteBOM := bak;
-  m64.Position := 0;
-  LoadFromStream(m64);
-  m64.Free;
-end;
-
 procedure TZ_JsonObject.SaveToFile(FileName: SystemString);
 var
   m64: TMS64;
@@ -515,19 +480,6 @@ begin
   end;
 end;
 
-procedure TZ_JsonObject.LoadFromText(Text_: TZ_JsonString);
-var
-  buff: TBytes;
-  m64: TMS64;
-begin
-  buff := Text_.Bytes;
-  m64 := TMS64.Create;
-  m64.Mapping(buff, length(buff));
-  LoadFromStream(m64);
-  disposeObject(m64);
-  SetLength(buff, 0);
-end;
-
 function TZ_JsonObject.GetMD5: TMD5;
 var
   m64: TMS64;
@@ -538,18 +490,43 @@ begin
   disposeObject(m64);
 end;
 
-function TZ_JsonObject.ParseText(Text_: TZ_JsonString): boolean;
+function TZ_JsonObject.Parae(buff: TBytes): boolean;
 var
-{$IFDEF FPC}
-  j: TJSONData;
-{$ELSE FPC}
-  buff: TBytes;
   m64: TMS64;
+begin
+  try
+    m64 := TMS64.Create;
+    m64.Mapping(@buff[0], length(buff));
+    LoadFromStream(m64);
+    disposeObject(m64);
+    Result := True;
+  except
+      Result := False;
+  end;
+end;
+
+function TZ_JsonObject.ToBytes: TBytes;
+var
+  m64: TMS64;
+begin
+  try
+    m64 := TMS64.Create;
+    SaveToStream(m64);
+    Result := m64.ToBytes;
+    disposeObject(m64);
+  except
+  end;
+end;
+
+function TZ_JsonObject.ParseText(Text_: TZ_JsonString; UseUTF8: boolean): boolean;
+{$IFDEF FPC}
+var j: TJSONData;
 {$ENDIF FPC}
 begin
   try
 {$IFDEF FPC}
-    j := GetJSON(Text_.Text, False);
+    DisposeObjectAndNil(FInstance);
+    j := GetJSON(Text_.Text, UseUTF8);
     if Assigned(j) and (j is TZ_Instance_JsonObject) then
         FInstance := TZ_Instance_JsonObject(j)
     else
@@ -558,13 +535,10 @@ begin
     if FInstance = nil then
         FInstance := TZ_Instance_JsonObject.Create;
 {$ELSE FPC}
-    buff := Text_.Bytes;
-    m64 := TMS64.Create;
-    if length(buff) > 0 then
-        m64.SetPointerWithProtectedMode(@buff[0], length(buff));
-    LoadFromStream(m64);
-    m64.Free;
-    SetLength(buff, 0);
+    if UseUTF8 then
+        FInstance.FromUtf8JSON(Text_.Text)
+    else
+        FInstance.FromJSON(Text_.Text);
 {$ENDIF FPC}
     Result := True;
   except
@@ -572,24 +546,26 @@ begin
   end;
 end;
 
-function TZ_JsonObject.ToJSONString(Formated_: boolean): TZ_JsonString;
-var
-  m64: TMS64;
+function TZ_JsonObject.ParseText(Text_: TZ_JsonString): boolean;
 begin
-  m64 := TMS64.Create;
-  SaveToStream(m64, Formated_);
-  Result.Bytes := m64.ToBytes;
-  m64.Free;
+  Result := ParseText(Text_, False);
+end;
+
+function TZ_JsonObject.ToJSONString(Formated_: boolean): TZ_JsonString;
+begin
+{$IFDEF FPC}
+  if Formated_ then
+      Result.Text := FInstance.FormatJSON([], 2)
+  else
+      Result.Text := FInstance.AsJSON;
+{$ELSE}
+  Result.Text := FInstance.ToJson(not Formated_);
+{$ENDIF}
 end;
 
 function TZ_JsonObject.ToJSONString: TZ_JsonString;
-var
-  m64: TMS64;
 begin
-  m64 := TMS64.Create;
-  SaveToStream(m64, True);
-  Result.Bytes := m64.ToBytes;
-  m64.Free;
+  Result := ToJSONString(True);
 end;
 
 class procedure TZ_JsonObject.Test;
