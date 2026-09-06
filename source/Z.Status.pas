@@ -888,8 +888,8 @@ begin
   if Text_.Exists(#10) then
     begin
       tmp := Text_.DeleteChar(#13); // Remove carriage returns.
-      Do_Trigger_Event_Output_(umlGetFirstStr_Discontinuity(tmp, #10), ID); // Emit first line.
-      tmp := umlDeleteFirstStr_Discontinuity(tmp, #10);
+      Do_Trigger_Event_Output_(umlGetFirstStr___(tmp, #10), ID); // Emit first line.
+      tmp := umlDeleteFirstStr___(tmp, #10);
       Do_Trigger_Event_Output_(tmp, ID); // Recursively emit the rest.
       exit;
     end;

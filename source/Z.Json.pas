@@ -33,12 +33,12 @@ unit Z.Json;
 interface
 
 uses SysUtils,
-{$IFDEF DELPHI}
+  {$IFDEF DELPHI}
   Z.Delphi.JsonDataObjects,
-{$ELSE DELPHI}
+  {$ELSE DELPHI}
   Z.FPC.GenericList,
   fpjson, jsonparser, jsonscanner,
-{$ENDIF DELPHI}
+  {$ENDIF DELPHI}
   Z.Core, Z.PascalStrings, Z.UPascalStrings, Z.Status,
   Z.UnicodeMixedLib,
   Z.MemoryStream,
@@ -47,15 +47,15 @@ uses SysUtils,
 type
   TZ_JsonObject = class;
 
-{$IFDEF DELPHI}
+  {$IFDEF DELPHI}
   TZ_Instance_JsonArray = TJsonArray;
   TZ_Instance_JsonObject = TJsonObject;
   TZ_JsonString = TPascalString;
-{$ELSE DELPHI}
+  {$ELSE DELPHI}
   TZ_Instance_JsonArray = TJsonArray;
   TZ_Instance_JsonObject = TJsonObject;
   TZ_JsonString = TUPascalString;
-{$ENDIF DELPHI}
+  {$ENDIF DELPHI}
 
   TZ_JsonBase = class(TCore_Object_Intermediate)
   protected
@@ -268,7 +268,7 @@ begin
   inherited Create;
   FParent := Parent_;
   if FParent <> nil then
-      FParent.FList.Add(self);
+    FParent.FList.Add(self);
 
   FList := TCore_ObjectList.Create;
   FList.AutoFreeObj := True;
@@ -340,13 +340,13 @@ begin
   inherited Create(Parent_);
   FTag := 0;
   if Parent = nil then
-      FInstance := TZ_Instance_JsonObject.Create;
+    FInstance := TZ_Instance_JsonObject.Create;
 end;
 
 destructor TZ_JsonObject.Destroy;
 begin
   if Parent = nil then
-      FInstance.Free;
+    FInstance.Free;
   inherited Destroy;
 end;
 
@@ -358,7 +358,7 @@ var
   bak_FTag: integer;
 begin
   if FParent <> nil then
-      raiseInfo('error.');
+    raiseInfo('error.');
   bak_FParent := FParent;
   bak_FList := FList;
   bak_FInstance := FInstance;
@@ -420,9 +420,9 @@ end;
 function TZ_JsonObject.Get_Default_S(const Name, Value: string): string;
 begin
   if Exists(Name) then
-      Result := S[Name]
+    Result := S[Name]
   else
-      Result := Value;
+    Result := Value;
 end;
 
 procedure TZ_JsonObject.Set_Default_S(const Name, Value: string);
@@ -433,9 +433,9 @@ end;
 function TZ_JsonObject.GetDefault_S(const Name, Value: string): string;
 begin
   if Exists(Name) then
-      Result := S[Name]
+    Result := S[Name]
   else
-      Result := Value;
+    Result := Value;
 end;
 
 procedure TZ_JsonObject.SetDefault_S(const Name, Value: string);
@@ -457,7 +457,7 @@ begin
     SaveToStream(m64);
     m64.SaveToFile(FileName);
   finally
-      disposeObject(m64);
+    disposeObject(m64);
   end;
 end;
 
@@ -467,16 +467,16 @@ var
 begin
   m64 := TMS64.Create;
   try
-      m64.LoadFromFile(FileName);
+    m64.LoadFromFile(FileName);
   except
     disposeObject(m64);
     Exit;
   end;
 
   try
-      LoadFromStream(m64);
+    LoadFromStream(m64);
   finally
-      disposeObject(m64);
+    disposeObject(m64);
   end;
 end;
 
@@ -501,7 +501,7 @@ begin
     disposeObject(m64);
     Result := True;
   except
-      Result := False;
+    Result := False;
   end;
 end;
 
@@ -524,25 +524,28 @@ var j: TJSONData;
 {$ENDIF FPC}
 begin
   try
-{$IFDEF FPC}
+    {$IFDEF FPC}
     DisposeObjectAndNil(FInstance);
     j := GetJSON(Text_.Text, UseUTF8);
     if Assigned(j) and (j is TZ_Instance_JsonObject) then
         FInstance := TZ_Instance_JsonObject(j)
     else
+        begin
         FInstance := nil;
+        DisposeObjectAndNil(j);
+        end;
     Result := FInstance <> nil;
     if FInstance = nil then
         FInstance := TZ_Instance_JsonObject.Create;
-{$ELSE FPC}
+    {$ELSE FPC}
     if UseUTF8 then
-        FInstance.FromUtf8JSON(Text_.Text)
+      FInstance.FromUtf8JSON(Text_.Text)
     else
-        FInstance.FromJSON(Text_.Text);
-{$ENDIF FPC}
+      FInstance.FromJSON(Text_.Text);
+    {$ENDIF FPC}
     Result := True;
   except
-      Result := False;
+    Result := False;
   end;
 end;
 
@@ -553,14 +556,14 @@ end;
 
 function TZ_JsonObject.ToJSONString(Formated_: boolean): TZ_JsonString;
 begin
-{$IFDEF FPC}
+  {$IFDEF FPC}
   if Formated_ then
       Result.Text := FInstance.FormatJSON([], 2)
   else
       Result.Text := FInstance.AsJSON;
-{$ELSE}
+  {$ELSE}
   Result.Text := FInstance.ToJson(not Formated_);
-{$ENDIF}
+  {$ENDIF}
 end;
 
 function TZ_JsonObject.ToJSONString: TZ_JsonString;
@@ -579,12 +582,12 @@ begin
   DoStatus(js.S['abc']);
 
   for ii := 1 to 3 do
-      js.A['arry'].Add(ii);
+    js.A['arry'].Add(ii);
 
   for ii := 0 to js.A['arry'].Count - 1 do
-    begin
-      DoStatus(js.A['arry'].I[ii]);
-    end;
+  begin
+    DoStatus(js.A['arry'].I[ii]);
+  end;
 
   js.A['arry'].AddObject.S['tt'] := 'inobj';
 
@@ -638,18 +641,18 @@ end;
 procedure TZ_JsonObject_List.Remove(obj: TZ_JsonObject);
 begin
   if AutoFreeObj then
-      disposeObject(obj);
+    disposeObject(obj);
   inherited Remove(obj);
 end;
 
 procedure TZ_JsonObject_List.Delete(Index: integer);
 begin
   if (Index >= 0) and (Index < Count) then
-    begin
-      if AutoFreeObj then
-          disposeObject(Items[Index]);
-      inherited Delete(Index);
-    end;
+  begin
+    if AutoFreeObj then
+      disposeObject(Items[Index]);
+    inherited Delete(Index);
+  end;
 end;
 
 procedure TZ_JsonObject_List.Clear;
@@ -658,7 +661,7 @@ var
 begin
   if AutoFreeObj then
     for I := 0 to Count - 1 do
-        disposeObject(Items[I]);
+      disposeObject(Items[I]);
   inherited Clear;
 end;
 
@@ -667,7 +670,7 @@ var
   I: integer;
 begin
   for I := 0 to Count - 1 do
-      disposeObject(Items[I]);
+    disposeObject(Items[I]);
   inherited Clear;
 end;
 

@@ -450,7 +450,6 @@ type
       * @return new string with leading characters removed.
     }
     function TrimLeftChar(const Chars: TPascalString): TPascalString;
-
     { * Removes all trailing characters that belong to the given set.
       * @param Chars set of characters to trim from the end.
       * @return new string with trailing characters removed.

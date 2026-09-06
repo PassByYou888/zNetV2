@@ -6,9 +6,9 @@ begin
   FInstance.Clear;
 end;
 
-procedure TZ_JsonArray.Delete(Index: Integer);
+procedure TZ_JsonArray.Delete(Index: integer);
 begin
-  FInstance.Delete(index);
+  FInstance.Delete(Index);
 end;
 
 procedure TZ_JsonArray.Add(const v_: string);
@@ -21,22 +21,22 @@ begin
   FInstance.Add(v_.Text);
 end;
 
-procedure TZ_JsonArray.Add(const v_: Integer);
+procedure TZ_JsonArray.Add(const v_: integer);
 begin
   FInstance.Add(v_);
 end;
 
-procedure TZ_JsonArray.Add(const v_: Int64);
+procedure TZ_JsonArray.Add(const v_: int64);
 begin
   FInstance.Add(v_);
 end;
 
-procedure TZ_JsonArray.Add(const v_: UInt64);
+procedure TZ_JsonArray.Add(const v_: uint64);
 begin
   FInstance.Add(v_);
 end;
 
-procedure TZ_JsonArray.AddF(const v_: Double);
+procedure TZ_JsonArray.AddF(const v_: double);
 begin
   FInstance.Add(v_);
 end;
@@ -46,7 +46,7 @@ begin
   FInstance.Add(umlDateTimeToStr(v_).Text);
 end;
 
-procedure TZ_JsonArray.Add(const v_: Boolean);
+procedure TZ_JsonArray.Add(const v_: boolean);
 begin
   FInstance.Add(v_);
 end;
@@ -65,163 +65,163 @@ begin
   FInstance.Add(Result.FInstance);
 end;
 
-procedure TZ_JsonArray.Insert(Index: Integer; const v_: string);
+procedure TZ_JsonArray.Insert(Index: integer; const v_: string);
 begin
-  FInstance.Insert(index, v_);
+  FInstance.Insert(Index, v_);
 end;
 
 procedure TZ_JsonArray.Insert(Index: integer; const v_: TZ_JsonString);
 begin
-  FInstance.Insert(index, v_.Text);
+  FInstance.Insert(Index, v_.Text);
 end;
 
-procedure TZ_JsonArray.Insert(Index: Integer; const v_: Integer);
+procedure TZ_JsonArray.Insert(Index: integer; const v_: integer);
 begin
-  FInstance.Insert(index, v_);
+  FInstance.Insert(Index, v_);
 end;
 
-procedure TZ_JsonArray.Insert(Index: Integer; const v_: Int64);
+procedure TZ_JsonArray.Insert(Index: integer; const v_: int64);
 begin
-  FInstance.Insert(index, v_);
+  FInstance.Insert(Index, v_);
 end;
 
-procedure TZ_JsonArray.Insert(Index: Integer; const v_: UInt64);
+procedure TZ_JsonArray.Insert(Index: integer; const v_: uint64);
 begin
-  FInstance.Insert(index, v_);
+  FInstance.Insert(Index, v_);
 end;
 
-procedure TZ_JsonArray.Insert(Index: Integer; const v_: Double);
+procedure TZ_JsonArray.Insert(Index: integer; const v_: double);
 begin
-  FInstance.Insert(index, v_);
+  FInstance.Insert(Index, v_);
 end;
 
-procedure TZ_JsonArray.Insert(Index: Integer; const v_: TDateTime);
+procedure TZ_JsonArray.Insert(Index: integer; const v_: TDateTime);
 begin
-  FInstance.Insert(index, umlDateTimeToStr(v_).Text);
+  FInstance.Insert(Index, umlDateTimeToStr(v_).Text);
 end;
 
-procedure TZ_JsonArray.Insert(Index: Integer; const v_: Boolean);
+procedure TZ_JsonArray.Insert(Index: integer; const v_: boolean);
 begin
-  FInstance.Insert(index, v_);
+  FInstance.Insert(Index, v_);
 end;
 
-function TZ_JsonArray.InsertArray(Index: Integer): TZ_JsonArray;
+function TZ_JsonArray.InsertArray(Index: integer): TZ_JsonArray;
 begin
   Result := TZ_JsonArray.Create(self);
   Result.FInstance := TZ_Instance_JsonArray.Create;
-  FInstance.Insert(index, Result.FInstance);
+  FInstance.Insert(Index, Result.FInstance);
 end;
 
-function TZ_JsonArray.InsertObject(Index: Integer): TZ_JsonObject;
+function TZ_JsonArray.InsertObject(Index: integer): TZ_JsonObject;
 begin
   Result := TZ_JsonObject.Create(self);
   Result.FInstance := TZ_Instance_JsonObject.Create;
-  FInstance.Insert(index, Result.FInstance);
+  FInstance.Insert(Index, Result.FInstance);
 end;
 
-function TZ_JsonArray.GetString(Index: Integer): string;
+function TZ_JsonArray.GetString(Index: integer): string;
 begin
-  Result := FInstance.Strings[index];
+  Result := FInstance.Strings[Index];
 end;
 
-procedure TZ_JsonArray.SetString(Index: Integer; const Value: string);
+procedure TZ_JsonArray.SetString(Index: integer; const Value: string);
 begin
-  FInstance.Strings[index] := Value;
+  FInstance.Strings[Index] := Value;
 end;
 
-function TZ_JsonArray.GetInt(Index: Integer): Integer;
+function TZ_JsonArray.GetInt(Index: integer): integer;
 begin
-  Result := FInstance.Integers[index];
+  Result := FInstance.Integers[Index];
 end;
 
-procedure TZ_JsonArray.SetInt(Index: Integer; const Value: Integer);
+procedure TZ_JsonArray.SetInt(Index: integer; const Value: integer);
 begin
-  FInstance.Integers[index] := Value;
+  FInstance.Integers[Index] := Value;
 end;
 
-function TZ_JsonArray.GetLong(Index: Integer): Int64;
+function TZ_JsonArray.GetLong(Index: integer): int64;
 begin
-  Result := FInstance.Int64s[index];
+  Result := FInstance.Int64s[Index];
 end;
 
-procedure TZ_JsonArray.SetLong(Index: Integer; const Value: Int64);
+procedure TZ_JsonArray.SetLong(Index: integer; const Value: int64);
 begin
-  FInstance.Int64s[index] := Value;
+  FInstance.Int64s[Index] := Value;
 end;
 
-function TZ_JsonArray.GetULong(Index: Integer): UInt64;
+function TZ_JsonArray.GetULong(Index: integer): uint64;
 begin
-  Result := FInstance.QWords[index];
+  Result := FInstance.QWords[Index];
 end;
 
-procedure TZ_JsonArray.SetULong(Index: Integer; const Value: UInt64);
+procedure TZ_JsonArray.SetULong(Index: integer; const Value: uint64);
 begin
-  FInstance.QWords[index] := Value;
+  FInstance.QWords[Index] := Value;
 end;
 
-function TZ_JsonArray.GetFloat(Index: Integer): Double;
+function TZ_JsonArray.GetFloat(Index: integer): double;
 begin
-  Result := FInstance.Floats[index];
+  Result := FInstance.Floats[Index];
 end;
 
-procedure TZ_JsonArray.SetFloat(Index: Integer; const Value: Double);
+procedure TZ_JsonArray.SetFloat(Index: integer; const Value: double);
 begin
-  FInstance.Floats[index] := Value;
+  FInstance.Floats[Index] := Value;
 end;
 
-function TZ_JsonArray.GetDateTime(Index: Integer): TDateTime;
+function TZ_JsonArray.GetDateTime(Index: integer): TDateTime;
 begin
-  Result := umlStrToDateTime(FInstance.Strings[index]);
+  Result := umlStrToDateTime(FInstance.Strings[Index]);
 end;
 
-procedure TZ_JsonArray.SetDateTime(Index: Integer; const Value: TDateTime);
+procedure TZ_JsonArray.SetDateTime(Index: integer; const Value: TDateTime);
 begin
-  FInstance.Strings[index] := umlDateTimeToStr(Value).Text;
+  FInstance.Strings[Index] := umlDateTimeToStr(Value).Text;
 end;
 
-function TZ_JsonArray.GetBool(Index: Integer): Boolean;
+function TZ_JsonArray.GetBool(Index: integer): boolean;
 begin
-  Result := FInstance.Booleans[index];
+  Result := FInstance.Booleans[Index];
 end;
 
-procedure TZ_JsonArray.SetBool(Index: Integer; const Value: Boolean);
+procedure TZ_JsonArray.SetBool(Index: integer; const Value: boolean);
 begin
-  FInstance.Booleans[index] := Value;
+  FInstance.Booleans[Index] := Value;
 end;
 
-function TZ_JsonArray.GetArray(Index: Integer): TZ_JsonArray;
+function TZ_JsonArray.GetArray(Index: integer): TZ_JsonArray;
 var
   arry: TZ_Instance_JsonArray;
-  j: Integer;
+  j: integer;
 begin
-  arry := FInstance.Arrays[index];
+  arry := FInstance.Arrays[Index];
   for j := FList.Count - 1 downto 0 do
     if (FList[j] is TZ_JsonArray) and (TZ_JsonArray(FList[j]).FInstance = arry) then
-      begin
-        Result := TZ_JsonArray(FList[j]);
-        exit;
-      end;
+    begin
+      Result := TZ_JsonArray(FList[j]);
+      exit;
+    end;
   Result := TZ_JsonArray.Create(self);
   Result.FInstance := arry;
 end;
 
-function TZ_JsonArray.GetObject(Index: Integer): TZ_JsonObject;
+function TZ_JsonArray.GetObject(Index: integer): TZ_JsonObject;
 var
   Obj_: TZ_Instance_JsonObject;
-  j: Integer;
+  j: integer;
 begin
   Obj_ := FInstance.Objects[Index];
   for j := FList.Count - 1 downto 0 do
     if (FList[j] is TZ_JsonObject) and (TZ_JsonObject(FList[j]).FInstance = Obj_) then
-      begin
-        Result := TZ_JsonObject(FList[j]);
-        exit;
-      end;
+    begin
+      Result := TZ_JsonObject(FList[j]);
+      exit;
+    end;
   Result := TZ_JsonObject.Create(self);
   Result.FInstance := Obj_;
 end;
 
-function TZ_JsonArray.GetCount: Integer;
+function TZ_JsonArray.GetCount: integer;
 begin
   Result := FInstance.Count;
 end;
@@ -231,7 +231,7 @@ begin
   FInstance.Clear;
 end;
 
-function TZ_JsonObject.IndexOf(const Name: string): Integer;
+function TZ_JsonObject.IndexOf(const Name: string): integer;
 begin
   Result := FInstance.IndexOfName(Name);
 end;
@@ -246,42 +246,42 @@ begin
   FInstance.Strings[Name] := Value;
 end;
 
-function TZ_JsonObject.GetInt(const Name: string): Integer;
+function TZ_JsonObject.GetInt(const Name: string): integer;
 begin
   Result := FInstance.Integers[Name];
 end;
 
-procedure TZ_JsonObject.SetInt(const Name: string; const Value: Integer);
+procedure TZ_JsonObject.SetInt(const Name: string; const Value: integer);
 begin
   FInstance.Integers[Name] := Value;
 end;
 
-function TZ_JsonObject.GetLong(const Name: string): Int64;
+function TZ_JsonObject.GetLong(const Name: string): int64;
 begin
   Result := FInstance.Int64s[Name];
 end;
 
-procedure TZ_JsonObject.SetLong(const Name: string; const Value: Int64);
+procedure TZ_JsonObject.SetLong(const Name: string; const Value: int64);
 begin
   FInstance.Int64s[Name] := Value;
 end;
 
-function TZ_JsonObject.GetULong(const Name: string): UInt64;
+function TZ_JsonObject.GetULong(const Name: string): uint64;
 begin
   Result := FInstance.QWords[Name];
 end;
 
-procedure TZ_JsonObject.SetULong(const Name: string; const Value: UInt64);
+procedure TZ_JsonObject.SetULong(const Name: string; const Value: uint64);
 begin
   FInstance.QWords[Name] := Value;
 end;
 
-function TZ_JsonObject.GetFloat(const Name: string): Double;
+function TZ_JsonObject.GetFloat(const Name: string): double;
 begin
   Result := FInstance.Floats[Name];
 end;
 
-procedure TZ_JsonObject.SetFloat(const Name: string; const Value: Double);
+procedure TZ_JsonObject.SetFloat(const Name: string; const Value: double);
 begin
   FInstance.Floats[Name] := Value;
 end;
@@ -296,12 +296,12 @@ begin
   FInstance.Strings[Name] := umlDateTimeToStr(Value).Text;
 end;
 
-function TZ_JsonObject.GetBool(const Name: string): Boolean;
+function TZ_JsonObject.GetBool(const Name: string): boolean;
 begin
   Result := FInstance.Booleans[Name];
 end;
 
-procedure TZ_JsonObject.SetBool(const Name: string; const Value: Boolean);
+procedure TZ_JsonObject.SetBool(const Name: string; const Value: boolean);
 begin
   FInstance.Booleans[Name] := Value;
 end;
@@ -309,8 +309,8 @@ end;
 function TZ_JsonObject.GetArray(const Name: string): TZ_JsonArray;
 var
   arry: TZ_Instance_JsonArray;
-  j: Integer;
-  idx: Integer;
+  j: integer;
+  idx: integer;
 begin
   idx := FInstance.IndexOfName(Name);
   if idx <> -1 then
@@ -325,11 +325,11 @@ begin
         if (FList[j] is TZ_JsonArray) and (TZ_JsonArray(FList[j]).FInstance = arry) then
         begin
           Result := TZ_JsonArray(FList[j]);
-          Exit;
+          exit;
         end;
       Result := TZ_JsonArray.Create(self);
       Result.FInstance := arry;
-      Exit;
+      exit;
     end;
   end;
 
@@ -342,8 +342,8 @@ end;
 function TZ_JsonObject.GetObject(const Name: string): TZ_JsonObject;
 var
   Obj_: TZ_Instance_JsonObject;
-  j: Integer;
-  idx: Integer;
+  j: integer;
+  idx: integer;
 begin
   idx := FInstance.IndexOfName(Name);
   if idx <> -1 then
@@ -358,11 +358,11 @@ begin
         if (FList[j] is TZ_JsonObject) and (TZ_JsonObject(FList[j]).FInstance = Obj_) then
         begin
           Result := TZ_JsonObject(FList[j]);
-          Exit;
+          exit;
         end;
       Result := TZ_JsonObject.Create(self);
       Result.FInstance := Obj_;
-      Exit;
+      exit;
     end;
   end;
 
@@ -372,25 +372,25 @@ begin
   Result.FInstance := Obj_;
 end;
 
-function TZ_JsonObject.GetName(Index: Integer): string;
+function TZ_JsonObject.GetName(Index: integer): string;
 begin
-  Result := FInstance.Names[index];
+  Result := FInstance.Names[Index];
 end;
 
-function TZ_JsonObject.GetCount: Integer;
+function TZ_JsonObject.GetCount: integer;
 begin
   Result := FInstance.Count;
 end;
 
-procedure TZ_JsonObject.SaveToStream(stream: TCore_Stream; Formated_: Boolean);
+procedure TZ_JsonObject.SaveToStream(stream: TCore_Stream; Formated_: boolean);
 var
   s_: TZ_JsonString;
   buff: TBytes;
 begin
   if Formated_ then
-      s_.Text := FInstance.FormatJSON()
+    s_.Text := FInstance.FormatJSON()
   else
-      s_.Text := FInstance.AsJSON;
+    s_.Text := FInstance.AsJSON;
   buff := s_.Bytes;
   s_ := '';
   stream.Write(buff[0], length(buff));
@@ -405,14 +405,18 @@ begin
   if (stream = nil) or (stream.Size - stream.Position <= 0) then
   begin
     FInstance := TZ_Instance_JsonObject.Create;
-    Exit;
+    exit;
   end;
+
   j := GetJSON(stream);
   if Assigned(j) and (j is TZ_Instance_JsonObject) then
     FInstance := TZ_Instance_JsonObject(j)
   else
+  begin
     FInstance := nil;
+    DisposeObjectAndNil(j);
+  end;
+
   if FInstance = nil then
     FInstance := TZ_Instance_JsonObject.Create;
 end;
-

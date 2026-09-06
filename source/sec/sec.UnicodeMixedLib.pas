@@ -472,12 +472,12 @@ procedure umlGetSplitArray(const sour: TPascalString; var dest: U_StringArray; c
 function ArrayStringToText(var ary: TArrayPascalString; const splitC: TPascalString): TPascalString; { Convert an array of TPascalString to a single string with splitC as separator. }
 function umlStringsToSplitText(lst: TCore_Strings; const splitC: TPascalString): TPascalString; overload; { Convert a TCore_Strings list to a delimited string. }
 function umlStringsToSplitText(lst: TListPascalString; const splitC: TPascalString): TPascalString; overload; { Convert a TListPascalString list to a delimited string. }
-function umlGetFirstStr_Discontinuity(const sVal, trim_s: TPascalString): TPascalString; { Get the first token, skipping leading delimiters (discontinuity version). }
-function umlDeleteFirstStr_Discontinuity(const sVal, trim_s: TPascalString): TPascalString; { Delete the first token (discontinuity version). }
-function umlGetLastStr_Discontinuity(const sVal, trim_s: TPascalString): TPascalString; { Get the last token (discontinuity version). }
-function umlDeleteLastStr_Discontinuity(const sVal, trim_s: TPascalString): TPascalString; { Delete the last token (discontinuity version). }
-function umlGetIndexStrCount_Discontinuity(const sVal, trim_s: TPascalString): Integer; { Count tokens (discontinuity version). }
-function umlGetIndexStr_Discontinuity(const sVal: TPascalString; trim_s: TPascalString; index: Integer): TPascalString; { Get index-th token (discontinuity version). }
+function umlGetFirstStr___(const sVal, trim_s: TPascalString): TPascalString; { Get the first token, skipping leading delimiters (discontinuity version). }
+function umlDeleteFirstStr___(const sVal, trim_s: TPascalString): TPascalString; { Delete the first token (discontinuity version). }
+function umlGetLastStr___(const sVal, trim_s: TPascalString): TPascalString; { Get the last token (discontinuity version). }
+function umlDeleteLastStr___(const sVal, trim_s: TPascalString): TPascalString; { Delete the last token (discontinuity version). }
+function umlGetIndexStrCount___(const sVal, trim_s: TPascalString): Integer; { Count tokens (discontinuity version). }
+function umlGetIndexStr___(const sVal: TPascalString; trim_s: TPascalString; index: Integer): TPascalString; { Get index-th token (discontinuity version). }
 function umlGetFirstTextPos(const S: TPascalString; const TextArry: TArrayPascalString; var OutText: TPascalString): Integer; { Find the first occurrence of any text in TextArry within S, and output the matched text. Returns position (1-based). }
 function umlDeleteText(const sour: TPascalString; const bToken, eToken: TArrayPascalString; ANeedBegin, ANeedEnd: Boolean): TPascalString; { Delete text between matching begin/end tokens (bToken/eToken). }
 function umlGetTextContent(const sour: TPascalString; const bToken, eToken: TArrayPascalString): TPascalString; { Extract text between begin/end tokens. }
@@ -3743,7 +3743,7 @@ begin
         Result := lst[i];
 end;
 
-function umlGetFirstStr_Discontinuity(const sVal, trim_s: TPascalString): TPascalString;
+function umlGetFirstStr___(const sVal, trim_s: TPascalString): TPascalString;
 var
   Next_Pos_, First_Pos_: Integer;
 begin
@@ -3772,7 +3772,7 @@ begin
   Result := umlCopyStr(Result, Next_Pos_, First_Pos_);
 end;
 
-function umlDeleteFirstStr_Discontinuity(const sVal, trim_s: TPascalString): TPascalString;
+function umlDeleteFirstStr___(const sVal, trim_s: TPascalString): TPascalString;
 var
   First_Pos_: Integer;
 begin
@@ -3797,7 +3797,7 @@ begin
   Result := umlCopyStr(Result, First_Pos_, Result.L + 1);
 end;
 
-function umlGetLastStr_Discontinuity(const sVal, trim_s: TPascalString): TPascalString;
+function umlGetLastStr___(const sVal, trim_s: TPascalString): TPascalString;
 var
   Prev_Pos_, Last_Pos_: Integer;
 begin
@@ -3820,7 +3820,7 @@ begin
   Result := umlCopyStr(Result, Last_Pos_ + 1, Prev_Pos_ + 1);
 end;
 
-function umlDeleteLastStr_Discontinuity(const sVal, trim_s: TPascalString): TPascalString;
+function umlDeleteLastStr___(const sVal, trim_s: TPascalString): TPascalString;
 var
   Last_Pos_: Integer;
 begin
@@ -3845,7 +3845,7 @@ begin
   umlSetLength(Result, Last_Pos_);
 end;
 
-function umlGetIndexStrCount_Discontinuity(const sVal, trim_s: TPascalString): Integer;
+function umlGetIndexStrCount___(const sVal, trim_s: TPascalString): Integer;
 var
   S: TPascalString;
   Pos_: Integer;
@@ -3871,7 +3871,7 @@ begin
     end;
 end;
 
-function umlGetIndexStr_Discontinuity(const sVal: TPascalString; trim_s: TPascalString; index: Integer): TPascalString;
+function umlGetIndexStr___(const sVal: TPascalString; trim_s: TPascalString; index: Integer): TPascalString;
 var
   umlGetIndexName_Repeat: Integer;
 begin
@@ -3883,19 +3883,19 @@ begin
       end;
     0, 1:
       begin
-        Result := umlGetFirstStr_Discontinuity(sVal, trim_s);
+        Result := umlGetFirstStr___(sVal, trim_s);
         exit;
       end;
   end;
-  if index >= umlGetIndexStrCount_Discontinuity(sVal, trim_s) then
+  if index >= umlGetIndexStrCount___(sVal, trim_s) then
     begin
-      Result := umlGetLastStr_Discontinuity(sVal, trim_s);
+      Result := umlGetLastStr___(sVal, trim_s);
       exit;
     end;
   Result := sVal;
   for umlGetIndexName_Repeat := 2 to index do
-      Result := umlDeleteFirstStr_Discontinuity(Result, trim_s);
-  Result := umlGetFirstStr_Discontinuity(Result, trim_s);
+      Result := umlDeleteFirstStr___(Result, trim_s);
+  Result := umlGetFirstStr___(Result, trim_s);
 end;
 
 function umlGetFirstTextPos(const S: TPascalString; const TextArry: TArrayPascalString; var OutText: TPascalString): Integer;
@@ -8250,8 +8250,8 @@ begin
           j := 0;
           while (j < length(king)) and (n.L > 0) do
             begin
-              king[j] := umlGetFirstStr_Discontinuity(n, ',');
-              n := umlDeleteFirstStr_Discontinuity(n, ',');
+              king[j] := umlGetFirstStr___(n, ',');
+              n := umlDeleteFirstStr___(n, ',');
               inc(j);
             end;
 
@@ -8271,8 +8271,8 @@ begin
             j := 0;
             while (j < length(buff)) and (n.L > 0) do
               begin
-                buff[j] := umlGetFirstStr_Discontinuity(n, ',');
-                n := umlDeleteFirstStr_Discontinuity(n, ',');
+                buff[j] := umlGetFirstStr___(n, ',');
+                n := umlDeleteFirstStr___(n, ',');
                 inc(j);
               end;
             OnNotify(sour[i], king, buff);
@@ -8310,8 +8310,8 @@ begin
           j := 0;
           while (j < length(king)) and (n.L > 0) do
             begin
-              king[j] := umlGetFirstStr_Discontinuity(n, ',');
-              n := umlDeleteFirstStr_Discontinuity(n, ',');
+              king[j] := umlGetFirstStr___(n, ',');
+              n := umlDeleteFirstStr___(n, ',');
               inc(j);
             end;
 
@@ -8335,8 +8335,8 @@ begin
           j := 0;
           while (j < length(buff)) and (n.L > 0) do
             begin
-              buff[j] := umlGetFirstStr_Discontinuity(n, ',');
-              n := umlDeleteFirstStr_Discontinuity(n, ',');
+              buff[j] := umlGetFirstStr___(n, ',');
+              n := umlDeleteFirstStr___(n, ',');
               inc(j);
             end;
           OnNotify(S, king, buff);
@@ -8371,8 +8371,8 @@ begin
           j := 0;
           while (j < length(king)) and (n.L > 0) do
             begin
-              king[j] := umlGetFirstStr_Discontinuity(n, ',');
-              n := umlDeleteFirstStr_Discontinuity(n, ',');
+              king[j] := umlGetFirstStr___(n, ',');
+              n := umlDeleteFirstStr___(n, ',');
               inc(j);
             end;
 
@@ -8392,8 +8392,8 @@ begin
             j := 0;
             while (j < length(buff)) and (n.L > 0) do
               begin
-                buff[j] := umlGetFirstStr_Discontinuity(n, ',');
-                n := umlDeleteFirstStr_Discontinuity(n, ',');
+                buff[j] := umlGetFirstStr___(n, ',');
+                n := umlDeleteFirstStr___(n, ',');
                 inc(j);
               end;
             OnNotify(sour[i], king, buff);
@@ -8431,8 +8431,8 @@ begin
           j := 0;
           while (j < length(king)) and (n.L > 0) do
             begin
-              king[j] := umlGetFirstStr_Discontinuity(n, ',');
-              n := umlDeleteFirstStr_Discontinuity(n, ',');
+              king[j] := umlGetFirstStr___(n, ',');
+              n := umlDeleteFirstStr___(n, ',');
               inc(j);
             end;
 
@@ -8456,8 +8456,8 @@ begin
           j := 0;
           while (j < length(buff)) and (n.L > 0) do
             begin
-              buff[j] := umlGetFirstStr_Discontinuity(n, ',');
-              n := umlDeleteFirstStr_Discontinuity(n, ',');
+              buff[j] := umlGetFirstStr___(n, ',');
+              n := umlDeleteFirstStr___(n, ',');
               inc(j);
             end;
           OnNotify(S, king, buff);
@@ -8492,8 +8492,8 @@ begin
           j := 0;
           while (j < length(king)) and (n.L > 0) do
             begin
-              king[j] := umlGetFirstStr_Discontinuity(n, ',');
-              n := umlDeleteFirstStr_Discontinuity(n, ',');
+              king[j] := umlGetFirstStr___(n, ',');
+              n := umlDeleteFirstStr___(n, ',');
               inc(j);
             end;
 
@@ -8513,8 +8513,8 @@ begin
             j := 0;
             while (j < length(buff)) and (n.L > 0) do
               begin
-                buff[j] := umlGetFirstStr_Discontinuity(n, ',');
-                n := umlDeleteFirstStr_Discontinuity(n, ',');
+                buff[j] := umlGetFirstStr___(n, ',');
+                n := umlDeleteFirstStr___(n, ',');
                 inc(j);
               end;
             OnNotify(sour[i], king, buff);
@@ -8552,8 +8552,8 @@ begin
           j := 0;
           while (j < length(king)) and (n.L > 0) do
             begin
-              king[j] := umlGetFirstStr_Discontinuity(n, ',');
-              n := umlDeleteFirstStr_Discontinuity(n, ',');
+              king[j] := umlGetFirstStr___(n, ',');
+              n := umlDeleteFirstStr___(n, ',');
               inc(j);
             end;
 
@@ -8577,8 +8577,8 @@ begin
           j := 0;
           while (j < length(buff)) and (n.L > 0) do
             begin
-              buff[j] := umlGetFirstStr_Discontinuity(n, ',');
-              n := umlDeleteFirstStr_Discontinuity(n, ',');
+              buff[j] := umlGetFirstStr___(n, ',');
+              n := umlDeleteFirstStr___(n, ',');
               inc(j);
             end;
           OnNotify(S, king, buff);

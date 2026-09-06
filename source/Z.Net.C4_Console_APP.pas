@@ -123,6 +123,17 @@ SOFTWARE.
   *   after disconnection. The internal flag Auto_Repair_First_BuildDependNetwork_Fault
   *   is set to True automatically.
   *
+  *   NewKeepAlive ( ip, port, depend [, Min_Workload ] )
+  *   Aliases: NewKeepAliveClient, NewKeepAliveCli, NewKeepAliveTunnel,
+  *            NewKeepAliveConnect, NewKeepAliveConnection, NewKeepAliveNet,
+  *            NewKeepAliveBuild, New_KeepAlive, New_KeepAliveClient,
+  *            New_KeepAliveCli, New_KeepAliveTunnel, New_KeepAliveConnect,
+  *            New_KeepAliveConnection, New_KeepAliveNet, New_KeepAliveBuild
+  *   Similar to KeepAlive, but forces the creation of a new physics tunnel
+  *   even if one already exists for the same ip:port. This is useful when you
+  *   need multiple independent client connections to the same server (e.g.,
+  *   for load testing or separate logical channels).
+  *
   * ----------------------------------------------------------------------------
   * 3. Utility Commands
   * ----------------------------------------------------------------------------
@@ -188,21 +199,35 @@ SOFTWARE.
   *   Wait(2000)
   *   Client('192.168.1.100', 8008, 'MyCustomService')
   *
+  *   // Start an additional independent client using a new tunnel
+  *   NewKeepAlive('192.168.1.100', 8008, 'MyCustomService')
+  *
   * ----------------------------------------------------------------------------
   * 6. Aliases Quick Reference
   * ----------------------------------------------------------------------------
-  *   Service  : Server, Serv, Listen, Listening
-  *   Client   : Cli, Tunnel, Connect, Connection, Net, Build
-  *   Auto     : AutoClient, AutoCli, AutoTunnel, AutoConnect, AutoConnection, AutoNet, AutoBuild
-  *   KeepAlive: KeepAliveClient, KeepAliveCli, KeepAliveTunnel, KeepAliveConnect, KeepAliveConnection, KeepAliveNet, KeepAliveBuild
-  *   Wait     : Sleep
-  *   Quiet    : SetQuiet
+  *   Service    : Server, Serv, Listen, Listening
+  *   Client     : Cli, Tunnel, Connect, Connection, Net, Build
+  *   Auto       : AutoClient, AutoCli, AutoTunnel, AutoConnect, AutoConnection,
+  *                AutoNet, AutoBuild
+  *   KeepAlive  : KeepAliveClient, KeepAliveCli, KeepAliveTunnel,
+  *                KeepAliveConnect, KeepAliveConnection, KeepAliveNet,
+  *                KeepAliveBuild
+  *   NewKeepAlive: NewKeepAliveClient, NewKeepAliveCli, NewKeepAliveTunnel,
+  *                NewKeepAliveConnect, NewKeepAliveConnection, NewKeepAliveNet,
+  *                NewKeepAliveBuild, New_KeepAlive, New_KeepAliveClient,
+  *                New_KeepAliveCli, New_KeepAliveTunnel, New_KeepAliveConnect,
+  *                New_KeepAliveConnection, New_KeepAliveNet, New_KeepAliveBuild,
+  *                NewKeepAlive
+  *   Wait       : Sleep
+  *   Quiet      : SetQuiet
   *
   * ----------------------------------------------------------------------------
   * 7. Important Notes
   * ----------------------------------------------------------------------------
   *   - KeepAlive and Auto require a working DP service in the network for
   *     service discovery; Client does not.
+  *   - NewKeepAlive creates a separate physical tunnel even if another tunnel
+  *     to the same server already exists, which may increase resource usage.
   *   - The 'depend' parameter can be a single identifier or a composite
   *     expression with parameters (e.g., 'UserDB@Identifier_HashPool=8*1024*1024').
   *   - In Windows shell, escape quotes properly; in Linux, use single quotes.
@@ -224,51 +249,82 @@ uses
 {$ENDIF FPC}
   Z.Core, Z.PascalStrings, Z.UPascalStrings, Z.UnicodeMixedLib, Z.Status,
   Z.ListEngine, Z.HashList.Templet, Z.Expression, Z.OpCode, Z.Parsing, Z.DFE, Z.TextDataEngine,
-  Z.Json, Z.Geometry2D, Z.Geometry3D, Z.Number,
-  Z.MemoryStream,
-  Z.ZDB.ObjectData_LIB, Z.ZDB, Z.ZDB.Engine, Z.ZDB.LocalManager,
-  Z.ZDB.FileIndexPackage_LIB, Z.ZDB.FilePackage_LIB, Z.ZDB.ItemStream_LIB, Z.ZDB.HashField_LIB, Z.ZDB.HashItem_LIB,
-  Z.ZDB2, Z.ZDB2.FileEncoder,
+  Z.Json, Z.Geometry2D, Z.Geometry3D, Z.Number, Z.MemoryStream, Z.ZDB2,
   Z.Net, Z.Net.C4, Z.Net.PhysicsIO;
 
 var
-  { Array of command-line parameters extracted from the system command line. }
-  { Assigned by C40_Init_AppParamFromSystemCmdLine or by caller. }
+  { * Array of command-line parameters extracted from the system command line.
+    * Assigned by C40_Init_AppParamFromSystemCmdLine or by caller.
+    * This global array is used by C40_Extract_CmdLine to build the network.
+  }
   C40AppParam: U_StringArray;
 
-  { Text style (Pascal, C, etc.) used for parsing script expressions. }
-  { Default is tsPascal; can be changed before calling C40_Extract_CmdLine. }
+  { * Text style (Pascal, C, etc.) used for parsing script expressions.
+    * Default is tsPascal; can be changed before calling C40_Extract_CmdLine.
+    * Affects how the scripting engine interprets expression syntax.
+  }
   C40AppParsingTextStyle: TTextStyle;
 
-  { Event interface for physics tunnel events (e.g., connect/disconnect). }
-  { Can be assigned by user to receive tunnel lifecycle callbacks. }
+  { * Event interface for physics tunnel events (e.g., connect/disconnect).
+    * Can be assigned by user to receive tunnel lifecycle callbacks.
+    * This interface is passed to the physics tunnel pool when creating tunnels.
+  }
   On_C40_PhysicsTunnel_Event_Console: IC40_PhysicsTunnel_Event;
 
-  { Event interface for physics service events (e.g., start/stop, link). }
-  { Can be assigned by user to receive service lifecycle callbacks. }
+  { * Event interface for physics service events (e.g., start/stop, link).
+    * Can be assigned by user to receive service lifecycle callbacks.
+  }
   On_C40_PhysicsService_Event_Console: IC40_PhysicsService_Event;
 
   { -------------------------------------------------------------------------- }
   { Public API }
   { -------------------------------------------------------------------------- }
 
-  { Copies the system command-line parameters (ParamStr) into C40AppParam. }
-  { Typically called at program startup before C40_Extract_CmdLine. }
+  { * Copies the system command-line parameters (ParamStr) into C40AppParam.
+    * Typically called at program startup before C40_Extract_CmdLine.
+    * @Example:
+    *   C40_Init_AppParamFromSystemCmdLine;
+    *   if C40_Extract_CmdLine then
+    *     C40_Execute_Main_Loop;
+  }
 procedure C40_Init_AppParamFromSystemCmdLine;
 
-{ Parses the parameters stored in C40AppParam and builds the C4 network. }
-{ Returns True if at least one service or tunnel was successfully initialized. }
+{ * Parses the parameters stored in C40AppParam and builds the C4 network.
+  * Returns True if at least one service or tunnel was successfully initialized.
+  * Internally uses a scripting engine to evaluate each parameter as a C4 command.
+  * @Example:
+  *   SetLength(C40AppParam, 1);
+  *   C40AppParam[0] := 'Service(''0.0.0.0'',''127.0.0.1'',8008,''DP'')';
+  *   if C40_Extract_CmdLine then ...
+}
 function C40_Extract_CmdLine(): Boolean; overload;
 
-{ Parses the given parameter array instead of using C40AppParam. }
+{ * Parses the given parameter array instead of using C40AppParam.
+  * @Param Param_  Array of script commands, each a string expression.
+  * @Example:
+  *   var Params: U_StringArray;
+  *   SetLength(Params, 2);
+  *   Params[0] := 'Client(''192.168.1.100'',8008,''MyService'')';
+  *   Params[1] := 'Wait(1000)';
+  *   C40_Extract_CmdLine(Params);
+}
 function C40_Extract_CmdLine(const Param_: U_StringArray): Boolean; overload;
 
-{ Parses the given parameter array with a specified text style for expressions. }
+{ * Parses the given parameter array with a specified text style for expressions.
+  * @Param TextStyle_  The text style (tsPascal, tsC, etc.) used for expression parsing.
+  * @Param Param_      Array of script commands.
+  * @Example:
+  *   C40_Extract_CmdLine(tsC, Params); // parse as C-style expressions
+}
 function C40_Extract_CmdLine(const TextStyle_: TTextStyle; const Param_: U_StringArray): Boolean; overload;
 
-{ Starts the main application loop with an interactive console. }
-{ This loop continuously processes C4 progress and reads user input for commands. }
-{ It exits when the user types 'exit' in the console. }
+{ * Starts the main application loop with an interactive console.
+  * This loop continuously processes C4 progress and reads user input for commands.
+  * It exits when the user types 'exit' in the console.
+  * The console supports all commands defined in TC40_Console_Help.
+  * @Example:
+  *   C40_Execute_Main_Loop; // Blocking call until user exits
+}
 procedure C40_Execute_Main_Loop;
 
 implementation
@@ -276,35 +332,87 @@ implementation
 uses Variants;
 
 type
+  { * Internal structure holding information for one network command (client or service).
+    * Used to store parsed command parameters before actual network creation.
+    * Each command produces one record stored in a list.
+  }
   TCmd_Net_Info_ = record
-    listen_ip: string;
-    ip: string;
-    port: word;
-    depend: string;
-    isAuto, Min_Workload: Boolean;
-    KeepAlive_Connected: Boolean;
-    procedure Init;
+    listen_ip: string; // IP to bind on (for servers)
+    ip: string; // Remote/local IP address
+    port: word; // Port number
+    depend: string; // Dependency string (service types)
+    isAuto, Min_Workload: Boolean; // For Auto/KeepAlive: auto-discovery and min-workload selection
+    KeepAlive_Connected: Boolean; // If True, automatically reconnect on failure
+    New_Client: Boolean; // If True, forces creation of a new client even if one exists
+    procedure Init; // Zero-initializes the record
   end;
 
   TCmd_Net_Info_List = TGenericsList<TCmd_Net_Info_>;
 
+  { * Internal class that implements the scripting engine for C4 commands.
+    * It maintains a runtime (opRT) with registered functions for each command,
+    * and collects parsed network info into lists.
+    * This is the core of the command-line parser.
+  }
   TCommand_Script = class(TCore_Object_Intermediate)
   private
+    { * Handler for configuration variable assignment (e.g., 'SafeCheckTime = 10000').
+      * Registered as a generic runtime handler for any variable name.
+      * If a value is provided, it stores it in the Config hash list.
+      * If no value, it returns the current value.
+    }
     function Do_Config(OpRunTime: TOpCustomRunTime; OP_RT_Data: POpRTData; var OP_Param: TOpParam): Variant;
+
+    { * Handler for the KeepAlive command (and its aliases).
+      * Parses parameters and adds a client network info record with KeepAlive_Connected=True.
+    }
     function Do_KeepAlive_Client(var OP_Param: TOpParam): Variant;
+
+    { * Handler for the Auto command (AutoClient, etc.).
+      * Adds a client record with isAuto=True, enabling automatic service discovery.
+    }
     function Do_AutoClient(var OP_Param: TOpParam): Variant;
+
+    { * Handler for the Client command (Cli, Tunnel, etc.).
+      * Adds a basic client record (no auto/keepalive).
+    }
     function Do_Client(var OP_Param: TOpParam): Variant;
+
+    { * Handler for the New_KeepAlive commands.
+      * Similar to KeepAlive but forces creation of a new client tunnel.
+    }
+    function Do_NewClient(var OP_Param: TOpParam): Variant;
+
+    { * Handler for the Service command (Server, Serv, etc.).
+      * Parses parameters and adds a service network info record.
+      * Supports both 3-parameter and 4-parameter forms.
+    }
     function Do_Service(var OP_Param: TOpParam): Variant;
+
+    { * Handler for Wait/Sleep command.
+      * Simply sleeps the current thread for the specified milliseconds.
+    }
     function Do_Sleep(var OP_Param: TOpParam): Variant;
   public
-    opRT: TOpCustomRunTime;
-    Config: THashStringList;
-    ConfigIsUpdate: Boolean;
-    Client_NetInfo_List: TCmd_Net_Info_List;
-    Service_NetInfo_List: TCmd_Net_Info_List;
+    opRT: TOpCustomRunTime; // The expression runtime that holds all registered functions
+    Config: THashStringList; // Configuration variables parsed from script
+    ConfigIsUpdate: Boolean; // True if any configuration variable was set (to trigger apply)
+    Client_NetInfo_List: TCmd_Net_Info_List; // List of parsed client commands
+    Service_NetInfo_List: TCmd_Net_Info_List; // List of parsed service commands
+
     constructor Create;
     destructor Destroy; override;
+
+    { * Registers all command functions into the runtime (opRT).
+      * Must be called before executing any script.
+    }
     procedure RegApi;
+
+    { * Executes one script expression (command) using the runtime.
+      * @Param Expression  A string containing a C4 command expression.
+      * @Example:
+      *   script.Execute('Service(''0.0.0.0'',''127.0.0.1'',8008,''DP'')');
+    }
     procedure Execute(Expression: U_String);
   end;
 
@@ -317,6 +425,7 @@ begin
   isAuto := False;
   Min_Workload := False;
   KeepAlive_Connected := False;
+  New_Client := False;
 end;
 
 function TCommand_Script.Do_Config(OpRunTime: TOpCustomRunTime; OP_RT_Data: POpRTData; var OP_Param: TOpParam): Variant;
@@ -381,6 +490,26 @@ begin
   net_info_.isAuto := False;
   net_info_.Min_Workload := False;
   net_info_.KeepAlive_Connected := False;
+  Client_NetInfo_List.Add(net_info_);
+  Result := True;
+end;
+
+function TCommand_Script.Do_NewClient(var OP_Param: TOpParam): Variant;
+var
+  net_info_: TCmd_Net_Info_;
+begin
+  net_info_.Init;
+  net_info_.listen_ip := '';
+  net_info_.ip := OP_Param[0];
+  net_info_.port := OP_Param[1];
+  net_info_.depend := OP_Param[2];
+  net_info_.isAuto := False;
+  if length(OP_Param) > 3 then
+      net_info_.Min_Workload := OP_Param[3]
+  else
+      net_info_.Min_Workload := False;
+  net_info_.KeepAlive_Connected := True;
+  net_info_.New_Client := True;
   Client_NetInfo_List.Add(net_info_);
   Result := True;
 end;
@@ -489,6 +618,23 @@ begin
   opRT.Reg_Param_OpM('Net', Do_Client)^.Category := 'C4 Param Command';
   opRT.Reg_Param_OpM('Build', Do_Client)^.Category := 'C4 Param Command';
 
+  opRT.Reg_Param_OpM('New_KeepAlive', Do_NewClient)^.Category := 'C4 Param Command';
+  opRT.Reg_Param_OpM('New_KeepAliveClient', Do_NewClient)^.Category := 'C4 Param Command';
+  opRT.Reg_Param_OpM('New_KeepAliveCli', Do_NewClient)^.Category := 'C4 Param Command';
+  opRT.Reg_Param_OpM('New_KeepAliveTunnel', Do_NewClient)^.Category := 'C4 Param Command';
+  opRT.Reg_Param_OpM('New_KeepAliveConnect', Do_NewClient)^.Category := 'C4 Param Command';
+  opRT.Reg_Param_OpM('New_KeepAliveConnection', Do_NewClient)^.Category := 'C4 Param Command';
+  opRT.Reg_Param_OpM('New_KeepAliveNet', Do_NewClient)^.Category := 'C4 Param Command';
+  opRT.Reg_Param_OpM('New_KeepAliveBuild', Do_NewClient)^.Category := 'C4 Param Command';
+  opRT.Reg_Param_OpM('NewKeepAlive', Do_NewClient)^.Category := 'C4 Param Command';
+  opRT.Reg_Param_OpM('NewKeepAliveClient', Do_NewClient)^.Category := 'C4 Param Command';
+  opRT.Reg_Param_OpM('NewKeepAliveCli', Do_NewClient)^.Category := 'C4 Param Command';
+  opRT.Reg_Param_OpM('NewKeepAliveTunnel', Do_NewClient)^.Category := 'C4 Param Command';
+  opRT.Reg_Param_OpM('NewKeepAliveConnect', Do_NewClient)^.Category := 'C4 Param Command';
+  opRT.Reg_Param_OpM('NewKeepAliveConnection', Do_NewClient)^.Category := 'C4 Param Command';
+  opRT.Reg_Param_OpM('NewKeepAliveNet', Do_NewClient)^.Category := 'C4 Param Command';
+  opRT.Reg_Param_OpM('NewKeepAliveBuild', Do_NewClient)^.Category := 'C4 Param Command';
+
   opRT.Reg_Param_OpM('Service', Do_Service)^.Category := 'C4 Param Command';
   opRT.Reg_Param_OpM('Server', Do_Service)^.Category := 'C4 Param Command';
   opRT.Reg_Param_OpM('Serv', Do_Service)^.Category := 'C4 Param Command';
@@ -504,6 +650,13 @@ begin
   EvaluateExpressionValue(False, C40AppParsingTextStyle, Expression, opRT);
 end;
 
+{ * Copies system command-line arguments into the global C40AppParam array.
+  * This function must be called before C40_Extract_CmdLine unless you manually
+  * assign C40AppParam.
+  * @Example:
+  *   C40_Init_AppParamFromSystemCmdLine;
+  *   if C40_Extract_CmdLine then ...
+}
 procedure C40_Init_AppParamFromSystemCmdLine;
 var
   i: Integer;
@@ -513,6 +666,17 @@ begin
       C40AppParam[i - 1] := ParamStr(i);
 end;
 
+{ * Parses the C40AppParam array and builds the C4 network.
+  * It uses an internal scripting engine (TCommand_Script) to evaluate each
+  * command. After parsing, it applies configuration changes, creates physics
+  * services and/or clients according to the parsed commands, and returns True
+  * if at least one network component was successfully initialized.
+  * @Returns True if at least one service or tunnel was created.
+  * @Example:
+  *   C40AppParam[0] := 'Service(''0.0.0.0'',''127.0.0.1'',8008,''DP'')';
+  *   if C40_Extract_CmdLine then
+  *     C40_Execute_Main_Loop;
+}
 function C40_Extract_CmdLine(): Boolean;
 var
   error_: Boolean;
@@ -557,8 +721,8 @@ begin
             net_info_ := cmd_script_.Client_NetInfo_List[i];
             if (IsMobile) and (Is_IPC_Addr(net_info_.listen_ip) or Is_IPC_Addr(net_info_.ip)) then
               begin
-                  DoStatus('no support "%s"', [net_info_.ip]);
-                  error_ := True;
+                DoStatus('no support "%s"', [net_info_.ip]);
+                error_ := True;
               end;
             arry := ExtractDependInfo(net_info_.depend);
             for j := Low(arry) to high(arry) do
@@ -577,8 +741,8 @@ begin
             net_info_ := cmd_script_.Service_NetInfo_List[i];
             if (IsMobile) and (Is_IPC_Addr(net_info_.listen_ip) or Is_IPC_Addr(net_info_.ip)) then
               begin
-                  DoStatus('no support "%s"', [net_info_.ip]);
-                  error_ := True;
+                DoStatus('no support "%s"', [net_info_.ip]);
+                error_ := True;
               end;
             arry := ExtractDependInfo(net_info_.depend);
             for j := Low(arry) to high(arry) do
@@ -631,7 +795,9 @@ begin
                     C40_PhysicsTunnelPool.Auto_Repair_First_BuildDependNetwork_Fault := True;
                   end;
 
-                if net_info_.isAuto then
+                if net_info_.New_Client then
+                    Z.Net.C4.C40_PhysicsTunnelPool.CreatePhysicsTunnel(net_info_.ip, net_info_.port, net_info_.depend, On_C40_PhysicsTunnel_Event_Console)
+                else if net_info_.isAuto then
                     Z.Net.C4.C40_PhysicsTunnelPool.SearchServiceAndBuildConnection(net_info_.ip, net_info_.port, not net_info_.Min_Workload, net_info_.depend, On_C40_PhysicsTunnel_Event_Console)
                 else
                     Z.Net.C4.C40_PhysicsTunnelPool.GetOrCreatePhysicsTunnel(net_info_.ip, net_info_.port, net_info_.depend, On_C40_PhysicsTunnel_Event_Console);
@@ -672,15 +838,24 @@ begin
 end;
 
 type
+  { * Internal helper class that runs a separate thread to read console input
+    * and execute help commands while the main loop is running.
+    * This allows interactive command processing without blocking the main loop.
+  }
   TMain_Loop_Instance__ = class(TCore_Object_Intermediate)
   private
-    exit_signal: Boolean;
-    procedure Do_Check_On_Exit;
+    exit_signal: Boolean; // Set to True when user types 'exit', causing the loop to terminate
+    procedure Do_Check_On_Exit; // Thread entry: reads commands from stdin and executes them
   public
     constructor Create;
-    procedure Wait();
+    procedure Wait(); // Waits until exit_signal becomes True
   end;
 
+  { * Thread procedure that runs in the background to handle interactive console commands.
+    * It reads lines from stdin, creates a TC40_Console_Help instance, and executes
+    * the command. It loops until the user types 'exit', then sets exit_signal=True.
+    * This is the brains of the interactive console.
+  }
 procedure TMain_Loop_Instance__.Do_Check_On_Exit;
 var
   n: string;
@@ -708,12 +883,22 @@ begin
   TCompute.RunM_NP(Do_Check_On_Exit);
 end;
 
+{ * Waits until the exit_signal becomes True, i.e., until the user types 'exit'.
+  * During waiting, it continuously calls C40Progress to keep the network alive.
+}
 procedure TMain_Loop_Instance__.Wait;
 begin
   while not exit_signal do
       Z.Net.C4.C40Progress;
 end;
 
+{ * Starts the main application loop with an interactive console.
+  * It creates a TMain_Loop_Instance__ which launches a background thread for
+  * reading console input, and then waits until exit_signal is set.
+  * The main loop is driven by C40Progress, which processes all C4 network events.
+  * @Example:
+  *   C40_Execute_Main_Loop; // Blocks until user types 'exit'
+}
 procedure C40_Execute_Main_Loop;
 begin
   with TMain_Loop_Instance__.Create do

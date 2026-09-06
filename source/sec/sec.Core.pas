@@ -21,9 +21,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 *)
-{ ****************************************************************************** }
-{ * Core library                                                               * }
-{ ****************************************************************************** }
 {
   Z.Core.pas - The foundational infrastructure library for the Z-framework.
 
@@ -2267,6 +2264,7 @@ procedure Close_Core_Dispatch_Thread();
   restart the dispatcher if it was previously stopped.
   **************************************************************}
 procedure Open_Core_Dispatch_Thread();
+function Core_Dispatch_Order_Activted: Boolean; // check Open_Core_Dispatch_Thread
 
 // NoP = No Operation. It's the empty function, whose purpose is only for the
 // debugging, or for the piece of code where intentionaly nothing is planned to be.
@@ -2656,29 +2654,27 @@ const
 
 implementation
 
-{$I sec.Core.CPS.inc}
-{$I sec.Core.Intermediate.inc}
-{$I sec.Core.Critical.inc}
-{$I sec.Core.Atomic.inc}
-{$I sec.Core.MT19937.inc}
-{$I sec.Core.Timer.inc}
-{$I sec.Core.API.inc}
-{$I sec.Core.Endian.inc}
-{$I sec.Core.SoftSynchronize.inc}
-{$I sec.Core.ThreadPost.inc}
-{$I sec.Core.ComputeThread.inc}
-
+{$I sec.Core.CPS.inc}                         // Calls-per-second profiling tool for performance measurement
+{$I sec.Core.Intermediate.inc}                // Base classes with optional instance tracking for debugging
+{$I sec.Core.Critical.inc}                    // Critical section wrapper with object pooling and atomic helpers
+{$I sec.Core.Atomic.inc}                      // Atomic increment/decrement operations and lock pool
+{$I sec.Core.MT19937.inc}                     // Mersenne Twister (MT19937) random number generator core
+{$I sec.Core.Timer.inc}                       // Timer subscription and management infrastructure
+{$I sec.Core.API.inc}                         // Core API utilities: memory ops, disposal, time, hashing, etc.
+{$I sec.Core.Endian.inc}                      // Endianness conversion and bitwise rotation functions
+{$I sec.Core.SoftSynchronize.inc}             // User-space thread synchronisation (soft sync) tools
+{$I sec.Core.ThreadPost.inc}                  // Thread message posting and progress handling
+{$I sec.Core.ComputeThread.inc}               // Compute thread pool, task dispatch, and worker threads
 {$IFDEF FPC}
-  {$I sec.Core.FPCParallelFor.inc}
+  {$I sec.Core.FPCParallelFor.inc}            // Parallel for implementation for Free Pascal (block/fold)
 {$ELSE FPC}
-  {$I sec.Core.DelphiParallelFor.inc}
+  {$I sec.Core.DelphiParallelFor.inc}         // Parallel for implementation for Delphi (block/fold)
 {$ENDIF FPC}
-
-{$I sec.Core.AtomVar.inc}
-{$I sec.Core.OrderData.inc}
-{$I sec.Core.BigList.inc}
-{$I sec.Core.Hash_Pair.inc}
-{$I sec.Core.Hash_Tool.inc}
+{$I sec.Core.AtomVar.inc}                     // Atomic variable wrapper (TAtomVar) for thread-safe access
+{$I sec.Core.OrderData.inc}                   // FIFO queue structures (TOrderStruct and variants)
+{$I sec.Core.BigList.inc}                     // High-performance doubly linked list with recycle pool and indexing
+{$I sec.Core.Hash_Pair.inc}                   // Pair record definitions and tool classes (TPair*)
+{$I sec.Core.Hash_Tool.inc}                   // Generic hash map implementation (big hash pair pools)
 
 
 {$Region 'Base_Define_Imp'}

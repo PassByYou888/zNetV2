@@ -1098,10 +1098,10 @@ begin
         end
       else if ((n.Exists(':')) or (n.Exists('='))) and (not CharIn(n.First, [':', '='])) then
         begin
-          TextName := umlGetFirstStr_Discontinuity(n, ':=');
+          TextName := umlGetFirstStr___(n, ':=');
           if TextName.Len > 0 then
             begin
-              TextValue := umlDeleteFirstStr_Discontinuity(n, ':=');
+              TextValue := umlDeleteFirstStr___(n, ':=');
               VL[TextName.Text] := THashVariantTextStream.StrToV(TextValue.Text);
             end
           else
@@ -1325,10 +1325,10 @@ begin
         end
       else if ((n.Exists(':')) or (n.Exists('='))) and (not CharIn(n.First, [':', '='])) then
         begin
-          TextName := umlGetFirstStr_Discontinuity(n, ':=');
+          TextName := umlGetFirstStr___(n, ':=');
           if TextName.Len > 0 then
             begin
-              TextValue := umlDeleteFirstStr_Discontinuity(n, ':=');
+              TextValue := umlDeleteFirstStr___(n, ':=');
               VL[TextName.Text] := THashVariantTextStream.StrToV(TextValue.Text);
             end
           else

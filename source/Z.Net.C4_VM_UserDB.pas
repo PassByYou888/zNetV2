@@ -566,8 +566,8 @@ begin
   msg_arry := Json.Data.A['Msg'];
   for i := 0 to msg_arry.Count - 1 do
     begin
-      FromUserName_ := umlGetFirstStr_Discontinuity(msg_arry.S[i], '|');
-      Msg_ := umlDeleteFirstStr_Discontinuity(msg_arry.S[i], '|');
+      FromUserName_ := umlGetFirstStr___(msg_arry.S[i], '|');
+      Msg_ := umlDeleteFirstStr___(msg_arry.S[i], '|');
       Recv_IO_Def.SendUser_Msg(FromUserName_, UserName_, Msg_);
     end;
   msg_arry.Clear;
@@ -579,8 +579,8 @@ begin
   request_friend_arry := Json.Data.A['request_friend'];
   for i := 0 to request_friend_arry.Count - 1 do
     begin
-      FromUserName_ := umlGetFirstStr_Discontinuity(request_friend_arry.S[i], '|');
-      Msg_ := umlDeleteFirstStr_Discontinuity(request_friend_arry.S[i], '|');
+      FromUserName_ := umlGetFirstStr___(request_friend_arry.S[i], '|');
+      Msg_ := umlDeleteFirstStr___(request_friend_arry.S[i], '|');
       Recv_IO_Def.SendUser_Request_Friend(FromUserName_, UserName_, Msg_);
     end;
   request_friend_arry.Clear;

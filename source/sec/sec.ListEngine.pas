@@ -7107,7 +7107,7 @@ begin
         'express(*)', 'express[*]', 'express<*>', 'express"*"', 'exp'#39'*'#39
         ], n) then
       begin
-        body := umlDeleteFirstStr_Discontinuity(n, '([<"'#39);
+        body := umlDeleteFirstStr___(n, '([<"'#39);
         body.DeleteLast;
         V := EvaluateExpressionValue(False, body);
         if VarIsNull(V) then
@@ -7118,7 +7118,7 @@ begin
     else if n.ComparePos(1, 'e') and umlMultipleMatch(['e(*)', 'e[*]', 'e<*>', 'e"*"', 'e'#39'*'#39], n) then
       begin
         body := n;
-        body := umlDeleteFirstStr_Discontinuity(n, '([<"'#39);
+        body := umlDeleteFirstStr___(n, '([<"'#39);
         body.DeleteLast;
         V := EvaluateExpressionValue(False, body);
         if VarIsNull(V) then
@@ -7150,10 +7150,10 @@ begin
 
         if ((n.Exists(':')) or (n.Exists('='))) and (not CharIn(n.First, [':', '='])) then
           begin
-            TextName := umlGetFirstStr_Discontinuity(n, ':=');
+            TextName := umlGetFirstStr___(n, ':=');
             if TextName.L > 0 then
               begin
-                TextValue := umlDeleteFirstStr_Discontinuity(n, ':=');
+                TextValue := umlDeleteFirstStr___(n, ':=');
                 FStringList[TextName.Text] := StrToV(TextValue.Text);
               end
             else
@@ -8237,7 +8237,7 @@ begin
         'express(*)', 'express[*]', 'express<*>', 'express"*"', 'exp'#39'*'#39
         ], n) then
       begin
-        body := umlDeleteFirstStr_Discontinuity(n, '([<"'#39);
+        body := umlDeleteFirstStr___(n, '([<"'#39);
         body.DeleteLast;
         V := EvaluateExpressionValue(False, body);
         if VarIsNull(V) then
@@ -8248,7 +8248,7 @@ begin
     else if n.ComparePos(1, 'e') and umlMultipleMatch(['e(*)', 'e[*]', 'e<*>', 'e"*"', 'e'#39'*'#39], n) then
       begin
         body := n;
-        body := umlDeleteFirstStr_Discontinuity(n, '([<"'#39);
+        body := umlDeleteFirstStr___(n, '([<"'#39);
         body.DeleteLast;
         V := EvaluateExpressionValue(False, body);
         if VarIsNull(V) then
@@ -8298,10 +8298,10 @@ begin
 
         if ((n.Exists(':')) or (n.Exists('='))) and (not CharIn(n.First, [':', '='])) then
           begin
-            TextName := umlGetFirstStr_Discontinuity(n, ':=');
+            TextName := umlGetFirstStr___(n, ':=');
             if TextName.L > 0 then
               begin
-                TextValue := umlDeleteFirstStr_Discontinuity(n, ':=');
+                TextValue := umlDeleteFirstStr___(n, ':=');
                 FVariantList[TextName.Text] := StrToV(TextValue.Text);
               end
             else

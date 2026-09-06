@@ -1,118 +1,118 @@
-﻿{*
- * Z.Core.ComputeThread.inc
- * ------------------------
- * Core thread-pool and task-dispatch subsystem for the Z framework.
- *
- * This file implements a self-scaling thread pool (TCompute workers) and a
- * central dispatcher thread that schedules asynchronous tasks posted via
- * TCompute.Run* methods. It is designed for high-throughput, concurrent
- * execution of both CPU-bound and I/O-bound work.
- *
- * Key concepts:
- *   - Dispatcher thread (TCore_Dispatch_Order_Thread) continuously polls a
- *     global task queue (Core_Dispatch_Order__). Tasks are TComputeDispatch
- *     records holding callbacks and user data.
- *   - When a task is posted, the dispatcher either assigns it to an idle
- *     worker or creates a new one (up to a configurable limit).
- *   - Workers execute the task, then wait for new tasks. If idle longer than
- *     Core_Thread_Life_Time_Tick__, they terminate, shrinking the pool.
- *   - A global critical section (Core_Thread_Dispatch_Critical__) protects
- *     all shared structures.
- *   - Soft synchronisation (user-space) is used for cross-thread calls,
- *     avoiding OS context switches.
- *   - Parallel for loops (block/fold) are built on top of this pool with
- *     overflow control.
- *
- * This infrastructure is used throughout the Z framework for CPU-bound and
- * I/O-bound parallelism, as well as background job processing.
- *}
+﻿{ *
+  * Z.Core.ComputeThread.inc
+  * ------------------------
+  * Core thread-pool and task-dispatch subsystem for the Z framework.
+  *
+  * This file implements a self-scaling thread pool (TCompute workers) and a
+  * central dispatcher thread that schedules asynchronous tasks posted via
+  * TCompute.Run* methods. It is designed for high-throughput, concurrent
+  * execution of both CPU-bound and I/O-bound work.
+  *
+  * Key concepts:
+  *   - Dispatcher thread (TCore_Dispatch_Order_Thread) continuously polls a
+  *     global task queue (Core_Dispatch_Order__). Tasks are TComputeDispatch
+  *     records holding callbacks and user data.
+  *   - When a task is posted, the dispatcher either assigns it to an idle
+  *     worker or creates a new one (up to a configurable limit).
+  *   - Workers execute the task, then wait for new tasks. If idle longer than
+  *     Core_Thread_Life_Time_Tick__, they terminate, shrinking the pool.
+  *   - A global critical section (Core_Thread_Dispatch_Critical__) protects
+  *     all shared structures.
+  *   - Soft synchronisation (user-space) is used for cross-thread calls,
+  *     avoiding OS context switches.
+  *   - Parallel for loops (block/fold) are built on top of this pool with
+  *     overflow control.
+  *
+  * This infrastructure is used throughout the Z framework for CPU-bound and
+  * I/O-bound parallelism, as well as background job processing.
+  * }
 
 type
-  {* Pointer to a TComputeDispatch record. }
+  { * Pointer to a TComputeDispatch record. }
   PComputeDispatchData = ^TComputeDispatch;
 
-  {* Big list that holds pending dispatch records while waiting for idle
-   * workers. Each element is a pointer to a TComputeDispatch. }
+  { * Big list that holds pending dispatch records while waiting for idle
+    * workers. Each element is a pointer to a TComputeDispatch. }
   TCompute_Dispatch_Queue_Pool = TBigList<PComputeDispatchData>;
 
-  {* TComputeDispatch – a task descriptor containing all callbacks and user
-   * data for a single unit of work. It is posted to the dispatch order and
-   * later assigned to a TCompute worker thread.
-   *
-   * Only one of the OnRun_* fields (C, M, P, or NP variants) will be set.
-   * The OnDone_* callbacks are executed on the main thread via soft sync.
-   *
-   * @Example:
-   *   var Dispatch: TComputeDispatch;
-   *   Dispatch.Init;
-   *   Dispatch.OnRun_C := MyProcedure;   // procedure(Th: TCompute)
-   *   Dispatch.UserData := Pointer(123);
-   *   PostComputeDispatchData(Dispatch); // enqueue for execution
-   *}
+  { * TComputeDispatch – a task descriptor containing all callbacks and user
+    * data for a single unit of work. It is posted to the dispatch order and
+    * later assigned to a TCompute worker thread.
+    *
+    * Only one of the OnRun_* fields (C, M, P, or NP variants) will be set.
+    * The OnDone_* callbacks are executed on the main thread via soft sync.
+    *
+    * @Example:
+    *   var Dispatch: TComputeDispatch;
+    *   Dispatch.Init;
+    *   Dispatch.OnRun_C := MyProcedure;   // procedure(Th: TCompute)
+    *   Dispatch.UserData := Pointer(123);
+    *   PostComputeDispatchData(Dispatch); // enqueue for execution
+    * }
   TComputeDispatch = record
-    OnRun_C: TRun_Thread_C;          // procedure(ThSender: TCompute)
-    OnRun_M: TRun_Thread_M;          // procedure(ThSender: TCompute) of object
-    OnRun_P: TRun_Thread_P;          // reference to procedure(ThSender: TCompute)
-    OnRun_C_NP: TRun_Thread_C_NP;    // procedure() – no parameters (C-style)
-    OnRun_M_NP: TRun_Thread_M_NP;    // procedure() of object (M-style)
-    OnRun_P_NP: TRun_Thread_P_NP;    // reference to procedure() (P-style)
+    OnRun_C: TRun_Thread_C; // procedure(ThSender: TCompute)
+    OnRun_M: TRun_Thread_M; // procedure(ThSender: TCompute) of object
+    OnRun_P: TRun_Thread_P; // reference to procedure(ThSender: TCompute)
+    OnRun_C_NP: TRun_Thread_C_NP; // procedure() – no parameters (C-style)
+    OnRun_M_NP: TRun_Thread_M_NP; // procedure() of object (M-style)
+    OnRun_P_NP: TRun_Thread_P_NP; // reference to procedure() (P-style)
 
-    OnDone_C: TRun_Thread_C;         // completion callback (C-style)
-    OnDone_M: TRun_Thread_M;         // completion callback (M-style)
-    OnDone_P: TRun_Thread_P;         // completion callback (P-style)
+    OnDone_C: TRun_Thread_C; // completion callback (C-style)
+    OnDone_M: TRun_Thread_M; // completion callback (M-style)
+    OnDone_P: TRun_Thread_P; // completion callback (P-style)
 
-    UserData: Pointer;               // arbitrary user pointer
-    UserObject: TCore_Object;        // arbitrary user object
+    UserData: Pointer; // arbitrary user pointer
+    UserObject: TCore_Object; // arbitrary user object
 
-    IsRuning_: PBoolean;             // set to True while task runs, False after
-    IsExit_: PBoolean;               // set to True when task finishes
+    IsRuning_: PBoolean; // set to True while task runs, False after
+    IsExit_: PBoolean; // set to True when task finishes
 
-    IsPicked__: PBoolean;            // internal: set to True when a worker picks this task
+    IsPicked__: PBoolean; // internal: set to True when a worker picks this task
     Pool_Queue_Ptr__: TCompute_Dispatch_Queue_Pool.PQueueStruct; // internal: pointer in the pending queue
 
-    procedure Init;                  // zeroes all fields
+    procedure Init; // zeroes all fields
     procedure AssignTo(Th: TCompute); // copies callbacks and data into a worker thread
   end;
 
-  {* Thread-safe FIFO queue of TComputeDispatch records. }
+  { * Thread-safe FIFO queue of TComputeDispatch records. }
   TCompute_Dispatch_Order = TCriticalOrderStruct<TComputeDispatch>;
 
-  {* TParallelOverflow – a simple counter used to limit the number of
-   * concurrently executing parallel loops, preventing over-subscription.
-   * It uses a busy-wait loop in Acquire until the limit is not exceeded.
-   *
-   * @Example:
-   *   Parallel_Overflow__.Acquire;
-   *   try
-   *     // run parallel loop
-   *   finally
-   *     Parallel_Overflow__.Release;
-   *   end;
-   *}
+  { * TParallelOverflow – a simple counter used to limit the number of
+    * concurrently executing parallel loops, preventing over-subscription.
+    * It uses a busy-wait loop in Acquire until the limit is not exceeded.
+    *
+    * @Example:
+    *   Parallel_Overflow__.Acquire;
+    *   try
+    *     // run parallel loop
+    *   finally
+    *     Parallel_Overflow__.Release;
+    *   end;
+    * }
   TParallelOverflow = record
   public
-    ActivtedParallel: Integer;        // number of active parallel loops
-    procedure Acquire;                // wait until not busy, then increment
-    procedure Release;                // decrement the counter
-    function Busy(): Boolean;         // True if the limit has been reached
+    ActivtedParallel: Integer; // number of active parallel loops
+    procedure Acquire; // wait until not busy, then increment
+    procedure Release; // decrement the counter
+    function Busy(): Boolean; // True if the limit has been reached
   end;
 
-{* Global state for the thread pool and dispatch system. }
+  { * Global state for the thread pool and dispatch system. }
 var
-  Core_Dispatch_Order__: TCompute_Dispatch_Order;               // task queue for new tasks
+  Core_Dispatch_Order__: TCompute_Dispatch_Order; // task queue for new tasks
   Core_Dispatch_Order_Activted__,
-  Core_Dispatch_Order_IsExit__: TAtomBool;                      // dispatcher status flags
-  Core_Thread_Pool__: TCoreCompute_Thread_Pool;                 // pool of worker threads
-  Core_Thread_Dispatch_Critical__: TCritical;                   // protects shared data
-  Core_Thread_Task_Runing__: TAtomInt;                          // number of active workers
+    Core_Dispatch_Order_IsExit__: TAtomBool; // dispatcher status flags
+  Core_Thread_Pool__: TCoreCompute_Thread_Pool; // pool of worker threads
+  Core_Thread_Dispatch_Critical__: TCritical; // protects shared data
+  Core_Thread_Task_Runing__: TAtomInt; // number of active workers
   Core_Thread_Dispatch_Queue_Pool__: TCompute_Dispatch_Queue_Pool; // pending tasks waiting for idle workers
-  Core_Thread_Wait_Sum__: TAtomInt;                             // number of workers waiting for tasks
-  Core_Thread_Life_Time_Tick__: TTimeTick;                      // idle timeout (ms) before worker exits
-  Parallel_Granularity__: Integer;                              // default thread count for parallel loops
-  Max_Activted_Parallel__: Integer;                             // maximum concurrent parallel loops (0 = unlimited)
-  Parallel_Overflow__: TParallelOverflow;                       // overflow controller
+  Core_Thread_Wait_Sum__: TAtomInt; // number of workers waiting for tasks
+  Core_Thread_Life_Time_Tick__: TTimeTick; // idle timeout (ms) before worker exits
+  Parallel_Granularity__: Integer; // default thread count for parallel loops
+  Max_Activted_Parallel__: Integer; // maximum concurrent parallel loops (0 = unlimited)
+  Parallel_Overflow__: TParallelOverflow; // overflow controller
 
-{* TComputeDispatch.Init – zeroes all fields of the record. }
+  { * TComputeDispatch.Init – zeroes all fields of the record. }
 procedure TComputeDispatch.Init;
 begin
   OnRun_C := nil;
@@ -132,9 +132,9 @@ begin
   Pool_Queue_Ptr__ := nil;
 end;
 
-{* TComputeDispatch.AssignTo – copies all callbacks and data into a worker thread.
- * Called by the dispatcher or a worker when the task is about to be executed.
- *}
+{ * TComputeDispatch.AssignTo – copies all callbacks and data into a worker thread.
+  * Called by the dispatcher or a worker when the task is about to be executed.
+  * }
 procedure TComputeDispatch.AssignTo(Th: TCompute);
 begin
   Th.OnRun_C := OnRun_C;
@@ -152,9 +152,9 @@ begin
   Th.IsExit := IsExit_;
 end;
 
-{* TParallelOverflow.Acquire – blocks until the parallel limit is not exceeded,
- * then increments the counter. Uses a busy-wait loop to avoid kernel transitions.
- *}
+{ * TParallelOverflow.Acquire – blocks until the parallel limit is not exceeded,
+  * then increments the counter. Uses a busy-wait loop to avoid kernel transitions.
+  * }
 procedure TParallelOverflow.Acquire;
 begin
   while Busy() do
@@ -162,56 +162,56 @@ begin
   AtomInc(ActivtedParallel);
 end;
 
-{* TParallelOverflow.Release – decrements the counter. }
+{ * TParallelOverflow.Release – decrements the counter. }
 procedure TParallelOverflow.Release;
 begin
   AtomDec(ActivtedParallel);
 end;
 
-{* TParallelOverflow.Busy – returns True if we have reached the maximum allowed
- * parallel loops.
- *}
+{ * TParallelOverflow.Busy – returns True if we have reached the maximum allowed
+  * parallel loops.
+  * }
 function TParallelOverflow.Busy(): Boolean;
 begin
   Result := (Max_Activted_Parallel__ > 0) and (ActivtedParallel >= Max_Activted_Parallel__);
 end;
 
-{* Pick_Or_Create_Compute_Thread – creates a new worker thread and adds it to
- * the global pool. Called by the dispatcher when no idle worker is available.
- *}
+{ * Pick_Or_Create_Compute_Thread – creates a new worker thread and adds it to
+  * the global pool. Called by the dispatcher when no idle worker is available.
+  * }
 function Pick_Or_Create_Compute_Thread(): TCompute;
 begin
   Result := TCompute.Create;
   Result.Thread_Pool_Queue_Data_Ptr := Core_Thread_Pool__.Add(Result);
 end;
 
-{* PostComputeDispatchData – adds a task to the dispatch order queue.
- * This is the entry point for submitting work to the thread pool.
- *}
+{ * PostComputeDispatchData – adds a task to the dispatch order queue.
+  * This is the entry point for submitting work to the thread pool.
+  * }
 procedure PostComputeDispatchData(var Data: TComputeDispatch);
 begin
   Core_Dispatch_Order__.Push(Data);
 end;
 
-{* Max_Thread_Supported – returns the maximum number of worker threads allowed,
- * based on Parallel_Granularity__. Used when LimitMaxComputeThread is defined.
- *}
+{ * Max_Thread_Supported – returns the maximum number of worker threads allowed,
+  * based on Parallel_Granularity__. Used when LimitMaxComputeThread is defined.
+  * }
 function Max_Thread_Supported: Integer;
 begin
   Result := Parallel_Granularity__ * 10;
 end;
 
-{****************************************************************************
- * TCore_Dispatch_Order_Thread – the dispatcher thread.
- *
- * This thread runs a loop that picks tasks from Core_Dispatch_Order__ and
- * assigns them to idle workers or creates new ones. It also handles the case
- * where a task is posted but no idle worker exists – it places the task in a
- * separate queue (Core_Thread_Dispatch_Queue_Pool__) that waiting workers
- * check.
- *
- * The loop checks Core_Dispatch_Order_Activted__ to know when to exit.
- *}
+{ ****************************************************************************
+  * TCore_Dispatch_Order_Thread – the dispatcher thread.
+  *
+  * This thread runs a loop that picks tasks from Core_Dispatch_Order__ and
+  * assigns them to idle workers or creates new ones. It also handles the case
+  * where a task is posted but no idle worker exists – it places the task in a
+  * separate queue (Core_Thread_Dispatch_Queue_Pool__) that waiting workers
+  * check.
+  *
+  * The loop checks Core_Dispatch_Order_Activted__ to know when to exit.
+  * }
 type
   TCore_Dispatch_Order_Thread = class(TCore_Thread)
   protected
@@ -224,21 +224,21 @@ type
 var
   Core_Dispatch_Order_Thread: TCore_Dispatch_Order_Thread = nil;
 
-{* TCore_Dispatch_Order_Thread.Execute – the main dispatch loop.
- * It repeatedly processes tasks from the dispatch order, using an inner
- * Do_Pick procedure to handle each task.
- *}
+  { * TCore_Dispatch_Order_Thread.Execute – the main dispatch loop.
+    * It repeatedly processes tasks from the dispatch order, using an inner
+    * Do_Pick procedure to handle each task.
+    * }
 procedure TCore_Dispatch_Order_Thread.Execute;
-  {* Do_Pick – processes a single task from the order queue.
-   * It first tries to find an idle worker. If none exists, it adds the task
-   * to the pending queue and waits for a worker to pick it up. If no worker
-   * picks it within the idle timeout, the dispatcher creates a new worker.
-   *
-   * The waiting logic uses a busy-check with a timeout to avoid busy-waiting
-   * indefinitely.
-   *
-   * @param Data_ : The task record to be scheduled.
-   *}
+{ * Do_Pick – processes a single task from the order queue.
+  * It first tries to find an idle worker. If none exists, it adds the task
+  * to the pending queue and waits for a worker to pick it up. If no worker
+  * picks it within the idle timeout, the dispatcher creates a new worker.
+  *
+  * The waiting logic uses a busy-check with a timeout to avoid busy-waiting
+  * indefinitely.
+  *
+  * @param Data_ : The task record to be scheduled.
+  * }
   procedure Do_Pick(var Data_: TComputeDispatch);
   var
     Tick: TTimeTick;
@@ -332,7 +332,7 @@ end;
 
 constructor TCore_Dispatch_Order_Thread.Create;
 begin
-  inherited Create(True);               // create suspended
+  inherited Create(True); // create suspended
   FreeOnTerminate := True;
 end;
 
@@ -342,9 +342,9 @@ begin
   inherited Destroy;
 end;
 
-{* ----------------------------------------------------------------------------
- * Public configuration functions
- * ---------------------------------------------------------------------------- }
+{ * ----------------------------------------------------------------------------
+  * Public configuration functions
+  * ---------------------------------------------------------------------------- }
 function Get_Parallel_Granularity: Integer;
 begin
   Result := Parallel_Granularity__;
@@ -360,18 +360,18 @@ begin
   Core_Thread_Life_Time_Tick__ := Tick_;
 end;
 
-{* InitCoreThreadPool – initialises the entire thread pool and dispatch system.
- * Must be called once at application startup before using any thread-pool
- * features.
- *
- * @Param Thread_Num : number of threads to pre-create (currently unused, but
- *                     kept for compatibility).
- * @Param Parallel_Granularity_ : default number of threads used by parallel
- *                                for loops.
- *
- * @Example:
- *   InitCoreThreadPool(CpuCount * 2, CpuCount * 2);
- *}
+{ * InitCoreThreadPool – initialises the entire thread pool and dispatch system.
+  * Must be called once at application startup before using any thread-pool
+  * features.
+  *
+  * @Param Thread_Num : number of threads to pre-create (currently unused, but
+  *                     kept for compatibility).
+  * @Param Parallel_Granularity_ : default number of threads used by parallel
+  *                                for loops.
+  *
+  * @Example:
+  *   InitCoreThreadPool(CpuCount * 2, CpuCount * 2);
+  * }
 procedure InitCoreThreadPool(Thread_Num, Parallel_Granularity_: Integer);
 begin
 {$IFDEF DEBUG}
@@ -407,16 +407,16 @@ begin
 {$ENDIF DEBUG}
 end;
 
-{****************************************************************************
- * Open/Close Core Dispatch Thread – safe start/stop for libraries and apps.
- *
- * These procedures provide a robust way to start and stop the dispatcher
- * thread, with explicit timeouts to prevent deadlocks during library unloading.
- *}
-{* Open_Core_Dispatch_Thread:
- * - Stops any previous dispatcher (by calling Close first).
- * - Marks the system as active and creates a new dispatcher thread.
- *}
+{ ****************************************************************************
+  * Open/Close Core Dispatch Thread – safe start/stop for libraries and apps.
+  *
+  * These procedures provide a robust way to start and stop the dispatcher
+  * thread, with explicit timeouts to prevent deadlocks during library unloading.
+  * }
+{ * Open_Core_Dispatch_Thread:
+  * - Stops any previous dispatcher (by calling Close first).
+  * - Marks the system as active and creates a new dispatcher thread.
+  * }
 procedure Open_Core_Dispatch_Thread();
 begin
   if Core_Dispatch_Order_Activted__.V then
@@ -429,13 +429,13 @@ begin
   Core_Dispatch_Order_Thread.Start();
 end;
 
-{* Close_Core_Dispatch_Thread:
- * - Signals the dispatcher to exit and waits up to 1 second for it.
- * - Then waits up to another second for all active worker tasks to finish,
- *   while pumping soft synchronisation calls to avoid deadlocks.
- * - If timeouts expire, it forces continuation (preferring a small leak
- *   over a process hang).
- *}
+{ * Close_Core_Dispatch_Thread:
+  * - Signals the dispatcher to exit and waits up to 1 second for it.
+  * - Then waits up to another second for all active worker tasks to finish,
+  *   while pumping soft synchronisation calls to avoid deadlocks.
+  * - If timeouts expire, it forces continuation (preferring a small leak
+  *   over a process hang).
+  * }
 procedure Close_Core_Dispatch_Thread();
 var
   tk: TTimeTick;
@@ -464,15 +464,20 @@ begin
     end;
 end;
 
-{* FreeCoreThreadPool – final cleanup.
- *
- * This procedure is called during application/library finalisation.
- * It signals the dispatcher to exit, waits (with timeouts) for tasks to finish,
- * and then frees all global objects.
- *
- * It is designed to be safe even if some threads refuse to exit: it will
- * release resources and return, preventing a deadlock.
- *}
+function Core_Dispatch_Order_Activted: Boolean;
+begin
+  Result := Core_Dispatch_Order_Activted__.V;
+end;
+
+{ * FreeCoreThreadPool – final cleanup.
+  *
+  * This procedure is called during application/library finalisation.
+  * It signals the dispatcher to exit, waits (with timeouts) for tasks to finish,
+  * and then frees all global objects.
+  *
+  * It is designed to be safe even if some threads refuse to exit: it will
+  * release resources and return, preventing a deadlock.
+  * }
 procedure FreeCoreThreadPool;
 var
   tk: TTimeTick;
@@ -527,20 +532,20 @@ begin
   Core_Dispatch_Order_IsExit__ := nil;
 end;
 
-{****************************************************************************
- * TCompute – the worker thread class.
- *
- * Each TCompute thread executes a single task (the callbacks stored in its
- * fields) and then enters a wait loop for new tasks. If it remains idle for
- * longer than Core_Thread_Life_Time_Tick__, it terminates.
- *
- * The thread also maintains a per‑thread MT19937 random generator (FRndInstance)
- * to avoid contention.
- *
- * @Example:
- *   TCompute.RunC(MyProcedure);  // non-blocking
- *   TCompute.Sync(MyProcedure);  // blocks until executed on main thread
- *}
+{ ****************************************************************************
+  * TCompute – the worker thread class.
+  *
+  * Each TCompute thread executes a single task (the callbacks stored in its
+  * fields) and then enters a wait loop for new tasks. If it remains idle for
+  * longer than Core_Thread_Life_Time_Tick__, it terminates.
+  *
+  * The thread also maintains a per‑thread MT19937 random generator (FRndInstance)
+  * to avoid contention.
+  *
+  * @Example:
+  *   TCompute.RunC(MyProcedure);  // non-blocking
+  *   TCompute.Sync(MyProcedure);  // blocks until executed on main thread
+  * }
 procedure TCompute.Execute;
 var
   Tick: TTimeTick;
@@ -619,10 +624,10 @@ begin
   Core_Thread_Task_Runing__.Unlock();
 end;
 
-{* Done_Sync – executed on the main thread via soft synchronisation
- * to run the OnDone callbacks. This ensures completion callbacks run
- * in the main thread context.
- *}
+{ * Done_Sync – executed on the main thread via soft synchronisation
+  * to run the OnDone callbacks. This ensures completion callbacks run
+  * in the main thread context.
+  * }
 procedure TCompute.Done_Sync;
 begin
   try
@@ -636,9 +641,9 @@ begin
   end;
 end;
 
-{* TCompute.Set_Thread_Info – sets the current thread's info string (for debugging).
- * If the current thread is a TCompute, its FThread_Info is updated.
- *}
+{ * TCompute.Set_Thread_Info – sets the current thread's info string (for debugging).
+  * If the current thread is a TCompute, its FThread_Info is updated.
+  * }
 class procedure TCompute.Set_Thread_Info(Thread_Info_: string);
 var
   Th: TCore_Thread;
@@ -662,7 +667,7 @@ end;
 
 constructor TCompute.Create;
 begin
-  inherited Create(True);  // create suspended
+  inherited Create(True); // create suspended
   FreeOnTerminate := True;
   FSync_Tool := nil;
   Thread_Pool_Queue_Data_Ptr := nil;
@@ -690,10 +695,10 @@ begin
   inherited Destroy;
 end;
 
-{* Sync_Tool – returns a soft synchronisation tool for this thread.
- * If the thread is the main thread, returns the global main thread tool;
- * otherwise, creates a per‑thread tool on demand.
- *}
+{ * Sync_Tool – returns a soft synchronisation tool for this thread.
+  * If the thread is the main thread, returns the global main thread tool;
+  * otherwise, creates a per‑thread tool on demand.
+  * }
 function TCompute.Sync_Tool: TSoft_Synchronize_Tool;
 begin
   if Self = Main_Thread then
@@ -756,16 +761,16 @@ begin
   Result := Max_Activted_Parallel__;
 end;
 
-{* ----------------------------------------------------------------------------
- * Synchronisation helpers – allow any thread to execute code on the main
- * thread (or on a specific TCompute thread) using either soft (user‑space)
- * or system (OS) synchronisation.
- * ---------------------------------------------------------------------------- }
+{ * ----------------------------------------------------------------------------
+  * Synchronisation helpers – allow any thread to execute code on the main
+  * thread (or on a specific TCompute thread) using either soft (user‑space)
+  * or system (OS) synchronisation.
+  * ---------------------------------------------------------------------------- }
 
 type
-  {* TSyncTmp – internal helper that wraps a callback and frees itself after
-   * execution. Used by the Sync* methods to post a procedure to the main thread.
-   *}
+  { * TSyncTmp – internal helper that wraps a callback and frees itself after
+    * execution. Used by the Sync* methods to post a procedure to the main thread.
+    * }
   TSyncTmp = class
   private
     OnRunC: TRun_Thread_C_NP;
@@ -914,18 +919,18 @@ begin
   Dest_Thread_.Sync_Tool.Synchronize_P(TCompute.CurrentThread, OnRun_);
 end;
 
-{* ----------------------------------------------------------------------------
- * Task posting – asynchronous execution.
- * Multiple overloads are provided for different callback signatures.
- * Each method creates a TComputeDispatch record, initialises it, and posts it
- * to the dispatch order. The task will be executed on a worker thread.
- *
- * @Example:
- *   TCompute.RunC(MyProcedure);  // MyProcedure: procedure(Th: TCompute)
- *   TCompute.RunC_NP(MyProcNoParam); // MyProcNoParam: procedure()
- *   TCompute.RunM(MyObj.MyMethod); // method of object
- *   TCompute.RunP(procedure(Th) begin ... end); // anonymous
- * ---------------------------------------------------------------------------- }
+{ * ----------------------------------------------------------------------------
+  * Task posting – asynchronous execution.
+  * Multiple overloads are provided for different callback signatures.
+  * Each method creates a TComputeDispatch record, initialises it, and posts it
+  * to the dispatch order. The task will be executed on a worker thread.
+  *
+  * @Example:
+  *   TCompute.RunC(MyProcedure);  // MyProcedure: procedure(Th: TCompute)
+  *   TCompute.RunC_NP(MyProcNoParam); // MyProcNoParam: procedure()
+  *   TCompute.RunM(MyObj.MyMethod); // method of object
+  *   TCompute.RunP(procedure(Th) begin ... end); // anonymous
+  * ---------------------------------------------------------------------------- }
 
 class procedure TCompute.RunC(const Data: Pointer; const Obj: TObject; const OnRun, OnDone: TRun_Thread_C);
 var
@@ -1281,11 +1286,11 @@ begin
   PostComputeDispatchData(Dispatch_);
 end;
 
-{* ----------------------------------------------------------------------------
- * PostFreeObjectInThread – asynchronously frees an object on a worker thread.
- * This avoids blocking the caller and ensures the object is freed in a thread‑safe
- * context.
- * ---------------------------------------------------------------------------- }
+{ * ----------------------------------------------------------------------------
+  * PostFreeObjectInThread – asynchronously frees an object on a worker thread.
+  * This avoids blocking the caller and ensures the object is freed in a thread‑safe
+  * context.
+  * ---------------------------------------------------------------------------- }
 
 procedure Do_PostFreeObjectInThread(ThSender: TCompute);
 begin
@@ -1308,19 +1313,19 @@ begin
     end;
 end;
 
-{* ----------------------------------------------------------------------------
- * Main thread progress – pumps the main thread's TThreadPost queue.
- * ---------------------------------------------------------------------------- }
+{ * ----------------------------------------------------------------------------
+  * Main thread progress – pumps the main thread's TThreadPost queue.
+  * ---------------------------------------------------------------------------- }
 class procedure TCompute.ProgressPost();
 begin
   MainThreadProgress.Progress();
 end;
 
-{* ----------------------------------------------------------------------------
- * Posting to the main thread – these are convenience wrappers around
- * MainThreadProgress.Post* methods. They allow posting a procedure to be
- * executed on the main thread asynchronously (non-blocking).
- * ---------------------------------------------------------------------------- }
+{ * ----------------------------------------------------------------------------
+  * Posting to the main thread – these are convenience wrappers around
+  * MainThreadProgress.Post* methods. They allow posting a procedure to be
+  * executed on the main thread asynchronously (non-blocking).
+  * ---------------------------------------------------------------------------- }
 
 class procedure TCompute.PostC1(OnSync: TThreadPost_C1);
 begin
@@ -1442,14 +1447,14 @@ begin
   MainThreadProgress.PostP4(Data1, Data2, OnSync, IsRuning_, IsExit_);
 end;
 
-{* ----------------------------------------------------------------------------
- * Synchronous post – blocks the caller until the posted procedure has been
- * executed on the main thread. This is useful when you need to ensure that
- * the main thread has processed the procedure before continuing.
- *
- * @Example:
- *   TCompute.Sync_Wait_PostC1(procedure begin ShowMessage('Done'); end);
- * ---------------------------------------------------------------------------- }
+{ * ----------------------------------------------------------------------------
+  * Synchronous post – blocks the caller until the posted procedure has been
+  * executed on the main thread. This is useful when you need to ensure that
+  * the main thread has processed the procedure before continuing.
+  *
+  * @Example:
+  *   TCompute.Sync_Wait_PostC1(procedure begin ShowMessage('Done'); end);
+  * ---------------------------------------------------------------------------- }
 
 class procedure TCompute.Sync_Wait_PostC1(OnSync: TThreadPost_C1);
 begin
