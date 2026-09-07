@@ -66,63 +66,150 @@ type
   TC40_Base_VirtualAuth_Client = class;
   TC40_Base_DataStoreVirtualAuth_Service = class;
   TC40_Base_DataStoreVirtualAuth_Client = class;
+
 {$REGION 'PhysicsService'}
+  { Array of dependency strings, each specifying a service type and optional parameters. }
   TC40_DependNetworkString = U_StringArray;
 
+  {
+    * Represents a single dependency entry: a service type and its associated parameters.
+    * Used to define which services a physics tunnel or service should depend on.
+  }
   TC40_DependNetworkInfo = record
-    Typ: U_String;
-    Param: U_String;
+    Typ: U_String;   { Service type identifier, e.g., 'FileServer'. }
+    Param: U_String; { Optional parameter string, e.g., 'RootPath=/data'. }
   end;
 
   TC40_DependNetworkInfoArray = array of TC40_DependNetworkInfo;
   TC40_DependNetworkInfoList = class(TGenericsList<TC40_DependNetworkInfo>);
 
+  {
+    * Interface for receiving lifecycle events from the physics service layer.
+    * Implement this interface to be notified when a physics service starts, stops,
+    * establishes a link with a client, or when a user-defined service is built.
+    * This is the primary way to react to low-level network events.
+  }
   IC40_PhysicsService_Event = interface
+    {
+      * Called when a new custom service is being built within this physics service.
+      * @param Sender The physics service that is building the network.
+      * @param Custom_Service_ The new custom service instance being created.
+    }
     procedure C40_PhysicsService_Build_Network(Sender: TC40_PhysicsService; Custom_Service_: TC40_Custom_Service);
+    {
+      * Called after the physics service has successfully started listening.
+      * @param Sender The physics service that has started.
+    }
     procedure C40_PhysicsService_Start(Sender: TC40_PhysicsService);
+    {
+      * Called after the physics service has stopped listening.
+      * @param Sender The physics service that has stopped.
+    }
     procedure C40_PhysicsService_Stop(Sender: TC40_PhysicsService);
+    {
+      * Called when a logical link (e.g., a double tunnel) has been successfully established.
+      * @param Sender The physics service that owns the link.
+      * @param Custom_Service_ The custom service instance that is now linked.
+      * @param Trigger_ The object that triggered the link event.
+    }
     procedure C40_PhysicsService_LinkSuccess(Sender: TC40_PhysicsService; Custom_Service_: TC40_Custom_Service; Trigger_: TCore_Object);
+    {
+      * Called when a user-defined service disconnects or is removed.
+      * @param Sender The physics service that owns the service.
+      * @param Custom_Service_ The custom service instance that is disconnecting.
+      * @param Trigger_ The object that triggered the disconnect event.
+    }
     procedure C40_PhysicsService_UserOut(Sender: TC40_PhysicsService; Custom_Service_: TC40_Custom_Service; Trigger_: TCore_Object);
   end;
 
+  {
+    * Represents a physical network server endpoint.
+    * It manages a TZNet_Server instance and acts as a container for
+    * TC40_Custom_Service instances. This class is responsible for listening for
+    * incoming physical connections and hosting the top-level network services.
+    *
+    * @example:
+    *   // Create a physics service that listens on all interfaces, port 9810,
+    *   // but advertises its internal IP to clients.
+    *   var
+    *     svc: TC40_PhysicsService;
+    *   begin
+    *     svc := TC40_PhysicsService.Create('0.0.0.0', '192.168.1.100', 9810, TPhysicsServer.Create);
+    *     svc.StartService;  // Start listening
+    *   end;
+  }
   TC40_PhysicsService = class(TCore_InterfacedObject_Intermediate)
   private
-    FActivted: Boolean;
-    FLastDeadConnectionCheckTime_: TTimeTick;
-    procedure cmd_QueryInfo(Sender: TPeerIO; InData, OutData: TDFE);
+    FActivted: Boolean; { Indicates if the service is currently active and listening. }
+    FLastDeadConnectionCheckTime_: TTimeTick; { Timestamp for periodic dead connection cleanup. }
+    procedure cmd_QueryInfo(Sender: TPeerIO; InData, OutData: TDFE); { Handles 'QueryInfo' command from clients. }
   public
-    ListeningAddr: U_String;
-    PhysicsAddr: U_String;
-    PhysicsPort: Word;
-    PhysicsTunnel: TZNet_Server;
-    AutoFreePhysicsTunnel: Boolean;
-    DependNetworkServicePool: TC40_Custom_ServicePool;
-    OnEvent: IC40_PhysicsService_Event;
+    ListeningAddr: U_String; { The IP address or IPC path the service is listening on. }
+    PhysicsAddr: U_String;   { The public-facing IP address advertised to clients. }
+    PhysicsPort: Word;       { The port the service is listening on. }
+    PhysicsTunnel: TZNet_Server; { The underlying Z.Net server instance. }
+    AutoFreePhysicsTunnel: Boolean; { If true, the PhysicsTunnel is freed when this object is destroyed. }
+    DependNetworkServicePool: TC40_Custom_ServicePool; { Pool of custom services built on this physics service. }
+    OnEvent: IC40_PhysicsService_Event; { Event interface for lifecycle notifications. }
+
+    {
+      * Creates a new physics service with a specific listening and advertised address.
+      * @param ListeningAddr_ The local address to bind to (e.g., '0.0.0.0').
+      * @param PhysicsAddr_ The public address to advertise to clients.
+      * @param PhysicsPort_ The port to listen on.
+      * @param PhysicsTunnel_ The TZNet_Server instance to use for the underlying network.
+    }
     constructor Create(ListeningAddr_, PhysicsAddr_: U_String; PhysicsPort_: Word; PhysicsTunnel_: TZNet_Server); overload;
+    {
+      * Creates a new physics service with the same address for listening and advertising.
+      * @param PhysicsAddr_ The address to bind and advertise.
+      * @param PhysicsPort_ The port.
+      * @param PhysicsTunnel_ The underlying server instance.
+    }
     constructor Create(PhysicsAddr_: U_String; PhysicsPort_: Word; PhysicsTunnel_: TZNet_Server); overload;
     destructor Destroy; override;
-    procedure Progress; virtual;
+
+    procedure Progress; virtual; { Drives the internal network engine – call regularly. }
+
+    {
+      * Returns true if the underlying network tunnel is an IPC (Inter-Process Communication) tunnel.
+      * IPC tunnels are used for local communication and have different timeout/security handling.
+    }
     function IPC_Mode: Boolean;
+
+    {
+      * Builds the nested dependency network by instantiating the required custom services.
+      * @param Depend_ An array of service types and parameters to instantiate.
+      * @returns True if all dependencies were successfully built, False otherwise.
+      * @example:
+      *   var deps: TC40_DependNetworkInfoArray;
+      *   SetLength(deps, 1);
+      *   deps[0].Typ := 'MyService';
+      *   deps[0].Param := 'Param1=Value';
+      *   PhysicsService.BuildDependNetwork(deps); // Instantiates and starts MyService
+    }
     function BuildDependNetwork(const Depend_: TC40_DependNetworkInfoArray): Boolean; overload; virtual;
     function BuildDependNetwork(const Depend_: TC40_DependNetworkString): Boolean; overload;
     function BuildDependNetwork(const Depend_: U_String): Boolean; overload;
-    property Activted: Boolean read FActivted;
-    procedure StartService; virtual;
-    procedure StopService; virtual;
-    procedure DoLinkSuccess(Custom_Service_: TC40_Custom_Service; Trigger_: TCore_Object);
-    procedure DoUserOut(Custom_Service_: TC40_Custom_Service; Trigger_: TCore_Object);
+
+    property Activted: Boolean read FActivted; { True if the service is running and accepting connections. }
+
+    procedure StartService; virtual; { Starts the underlying TZNet_Server and begins listening. }
+    procedure StopService; virtual;  { Stops the underlying server and cleans up the listening socket. }
+    procedure DoLinkSuccess(Custom_Service_: TC40_Custom_Service; Trigger_: TCore_Object); { Forward LinkSuccess to OnEvent. }
+    procedure DoUserOut(Custom_Service_: TC40_Custom_Service; Trigger_: TCore_Object); { Forward UserOut to OnEvent. }
   end;
 
   TC40_PhysicsServicePool = class(TGenericsList<TC40_PhysicsService>)
   public
-    procedure Progress;
-    procedure Enabled_Progress;
-    procedure Disable_Progress;
-    function ExistsPhysicsAddr(PhysicsAddr: U_String; PhysicsPort: Word): Boolean;
-    function ExistsListenAddr(ListenAddr: U_String; Port: Word): Boolean;
-    procedure GetRS(var recv, send: Int64);
+    procedure Progress; { Drives progress for all physics services in the pool. }
+    procedure Enabled_Progress; { Enables progress for all contained physics services. }
+    procedure Disable_Progress; { Disables progress for all contained physics services. }
+    function ExistsPhysicsAddr(PhysicsAddr: U_String; PhysicsPort: Word): Boolean; { Checks if a service with the given physics address exists. }
+    function ExistsListenAddr(ListenAddr: U_String; Port: Word): Boolean; { Checks if a service is listening on the given address/port. }
+    procedure GetRS(var recv, send: Int64); { Returns total received and sent bytes across all services. }
   end;
-{$ENDREGION 'PhysicsTunnel'}
+{$ENDREGION 'PhysicsService'}
 {$REGION 'PhysicsTunnel'}
 
   TDCT40_OnQueryResultC = procedure(Sender: TC40_PhysicsTunnel; L: TC40_InfoList);
@@ -170,6 +257,22 @@ type
     procedure C40_PhysicsTunnel_Client_Connected(Sender: TC40_PhysicsTunnel; Custom_Client_: TC40_Custom_Client);
   end;
 
+  {
+    * Represents a physical network client endpoint.
+    * It manages a TZNet_Client instance and acts as a container for
+    * TC40_Custom_Client instances. It handles the connection lifecycle to a
+    * remote physics service and the management of its dependent clients.
+    *
+    * @example:
+    *   // Create a tunnel to a physics service at 192.168.1.100:9810
+    *   var
+    *     tunnel: TC40_PhysicsTunnel;
+    *   begin
+    *     tunnel := TC40_PhysicsTunnel.Create('192.168.1.100', 9810);
+    *     tunnel.ResetDepend('DP@');  // Depend on dispatch service
+    *     tunnel.BuildDependNetwork;  // Connect and build dependencies
+    *   end;
+  }
   TC40_PhysicsTunnel = class(TCore_InterfacedObject_Intermediate, IZNet_ClientInterface)
   private
     FLast_Delay_Connecting_Time: TTimeTick;
@@ -189,34 +292,60 @@ type
     procedure ClientDisconnect(Sender: TZNet_Client); virtual;
     procedure Do_Notify_All_Disconnect;
   public
-    PhysicsAddr: U_String;
-    PhysicsPort: Word;
-    PhysicsTunnel: TZNet_Client;
-    DependNetworkInfoArray: TC40_DependNetworkInfoArray;
-    DependNetworkClientPool: TC40_Custom_ClientPool;
-    OnEvent: IC40_PhysicsTunnel_Event;
+    PhysicsAddr: U_String;   { The remote address this tunnel connects to. }
+    PhysicsPort: Word;       { The remote port. }
+    PhysicsTunnel: TZNet_Client; { The underlying Z.Net client instance. }
+    DependNetworkInfoArray: TC40_DependNetworkInfoArray; { The list of services this tunnel depends on. }
+    DependNetworkClientPool: TC40_Custom_ClientPool; { Pool of custom clients built for dependencies. }
+    OnEvent: IC40_PhysicsTunnel_Event; { Event interface for tunnel lifecycle events. }
+
     constructor Create(Addr_: U_String; Port_: Word);
     destructor Destroy; override;
+
     procedure Progress; virtual;
-    function IPC_Mode: Boolean;
-    function IsLocalNetwork: Boolean;
-    function IsLoopbackNetwork: Boolean;
+
+    function IPC_Mode: Boolean; { Returns True if the tunnel uses IPC. }
+    function IsLocalNetwork: Boolean; { Returns True if the tunnel is on a local network (e.g., 192.168.*). }
+    function IsLoopbackNetwork: Boolean; { Returns True if the tunnel is loopback (127.0.0.1 or ::1). }
+
+    {
+      * Resets the dependency network for this tunnel.
+      * This defines which services this tunnel should automatically connect to.
+      * @param Depend_ An array of service types and parameters.
+      * @returns True if all specified service types are registered, False otherwise.
+    }
     function ResetDepend(const Depend_: TC40_DependNetworkInfoArray): Boolean; overload;
     function ResetDepend(const Depend_: TC40_DependNetworkString): Boolean; overload;
     function ResetDepend(const Depend_: U_String): Boolean; overload;
-    function CheckDepend(): Boolean;
-    function CheckDependC(OnResult: TOnState_C): Boolean;
-    function CheckDependM(OnResult: TOnState_M): Boolean;
-    function CheckDependP(OnResult: TOnState_P): Boolean;
+
+    function CheckDepend(): Boolean; { Checks if all dependencies are satisfied by the remote service. }
+    function CheckDependC(OnResult: TOnState_C): Boolean; { Asynchronous check with C-style callback. }
+    function CheckDependM(OnResult: TOnState_M): Boolean; { Asynchronous check with method callback. }
+    function CheckDependP(OnResult: TOnState_P): Boolean; { Asynchronous check with nested callback. }
+
+    {
+      * Builds the dependency network.
+      * This initiates the process of connecting to the remote physics service,
+      * querying for available services, and instantiating the local TC40_Custom_Client
+      * instances for each matched dependency.
+      * @returns True if the build process started successfully.
+    }
     function BuildDependNetwork(): Boolean;
     function BuildDependNetworkC(OnResult: TOnState_C): Boolean;
     function BuildDependNetworkM(OnResult: TOnState_M): Boolean;
     function BuildDependNetworkP(OnResult: TOnState_P): Boolean;
+
+    {
+      * Queries the remote physics service for its available service information.
+      * Results are returned via a callback.
+    }
     procedure QueryInfoC(OnResult: TDCT40_OnQueryResultC);
     procedure QueryInfoM(OnResult: TDCT40_OnQueryResultM);
     procedure QueryInfoP(OnResult: TDCT40_OnQueryResultP);
-    function DependNetworkIsConnected: Boolean;
-    procedure DoNetworkOnline(Custom_Client_: TC40_Custom_Client);
+
+    function DependNetworkIsConnected: Boolean; { Returns True if all dependency clients are connected. }
+
+    procedure DoNetworkOnline(Custom_Client_: TC40_Custom_Client); { Notifies OnEvent that a client is online. }
   end;
 
   TSearchServiceAndBuildConnection_Bridge = class;
@@ -232,7 +361,7 @@ type
 
   TC40_PhysicsTunnelPool = class(TGenericsList<TC40_PhysicsTunnel>)
   public
-    Auto_Repair_First_BuildDependNetwork_Fault: Boolean;
+    Auto_Repair_First_BuildDependNetwork_Fault: Boolean; { If true, automatically retry first build failure. }
     constructor Create;
     procedure GetRS(var recv, send: Int64);
     function ExistsPhysicsAddr(PhysicsAddr: U_String; PhysicsPort: Word): Boolean;
@@ -314,74 +443,81 @@ type
 {$ENDREGION 'PhysicsTunnel'}
 {$REGION 'infoDefine'}
 
+  {
+    * Represents metadata for a logical service.
+    * This includes its type, physical address, P2PVM tunnel addresses,
+    * and workload information. It is used for service discovery and load balancing.
+  }
   TC40_Info = class(TCore_Object_Intermediate)
   private
-    Ignored: Boolean;
-    procedure MakeHash;
+    Ignored: Boolean; { If true, this service should be ignored by the dispatch system. }
+    procedure MakeHash; { Computes a unique hash from address and P2PVM info. }
   public
-    OnlyInstance: Boolean;
-    ServiceTyp: U_String;
-    PhysicsAddr: U_String;
-    PhysicsPort: Word;
-    p2pVM_RecvTunnel_Addr: U_String;
-    p2pVM_RecvTunnel_Port: Word;
-    p2pVM_SendTunnel_Addr: U_String;
-    p2pVM_SendTunnel_Port: Word;
-    Workload: Integer;
-    MaxWorkload: Integer;
-    Hash: TMD5;
-    property p2pVM_ClientRecvTunnel_Addr: U_String read p2pVM_SendTunnel_Addr;
+    OnlyInstance: Boolean;        { If true, only one instance of this service type can exist. }
+    ServiceTyp: U_String;         { The logical service type (e.g., 'FileServer'). }
+    PhysicsAddr: U_String;        { The physical IP address of the service. }
+    PhysicsPort: Word;            { The physical port. }
+    p2pVM_RecvTunnel_Addr: U_String; { IPv6 address for the P2PVM receive tunnel. }
+    p2pVM_RecvTunnel_Port: Word;    { Port for the P2PVM receive tunnel. }
+    p2pVM_SendTunnel_Addr: U_String; { IPv6 address for the P2PVM send tunnel. }
+    p2pVM_SendTunnel_Port: Word;    { Port for the P2PVM send tunnel. }
+    Workload: Integer;              { Current workload (e.g., number of connections). }
+    MaxWorkload: Integer;           { Maximum workload capacity. }
+    Hash: TMD5;                     { A unique hash for this service info. }
+
+    property p2pVM_ClientRecvTunnel_Addr: U_String read p2pVM_SendTunnel_Addr; { For client, receive tunnel is remote send tunnel. }
     property p2pVM_ClientRecvTunnel_Port: Word read p2pVM_SendTunnel_Port;
-    property p2pVM_ClientSendTunnel_Addr: U_String read p2pVM_RecvTunnel_Addr;
+    property p2pVM_ClientSendTunnel_Addr: U_String read p2pVM_RecvTunnel_Addr; { For client, send tunnel is remote receive tunnel. }
     property p2pVM_ClientSendTunnel_Port: Word read p2pVM_RecvTunnel_Port;
+
     constructor Create;
     destructor Destroy; override;
-    procedure Assign(source: TC40_Info);
-    function Clone: TC40_Info;
-    procedure Load(stream: TCore_Stream);
-    procedure Save(stream: TCore_Stream);
-    function Same(Data_: TC40_Info): Boolean;
-    function SameServiceTyp(Data_: TC40_Info): Boolean;
-    function SamePhysicsAddr(PhysicsAddr_: U_String): Boolean; overload;
-    function SamePhysicsAddr(Arry_: TArrayPascalString): Boolean; overload;
-    function SamePhysicsAddr(PhysicsAddr_: U_String; PhysicsPort_: Word): Boolean; overload;
-    function SamePhysicsAddr(Data_: TC40_Info): Boolean; overload;
-    function SamePhysicsAddr(Data_: TC40_PhysicsTunnel): Boolean; overload;
-    function SamePhysicsAddr(Data_: TC40_PhysicsService): Boolean; overload;
-    function SameP2PVMAddr(Data_: TC40_Info): Boolean;
-    function FoundServiceTyp(Arry_: TC40_DependNetworkInfoArray): Boolean; overload;
-    function FoundServiceTyp(servTyp_: U_String): Boolean; overload;
-    function ReadyC40Client: Boolean;
-    function GetOrCreateC40Client(PhysicsTunnel_: TC40_PhysicsTunnel; Param_: U_String): TC40_Custom_Client;
+    procedure Assign(source: TC40_Info); { Copies all fields from source. }
+    function Clone: TC40_Info; { Returns a new TC40_Info with the same values. }
+    procedure Load(stream: TCore_Stream); { Deserializes from a stream. }
+    procedure Save(stream: TCore_Stream); { Serializes to a stream. }
+    function Same(Data_: TC40_Info): Boolean; { True if all fields match. }
+    function SameServiceTyp(Data_: TC40_Info): Boolean; { True if ServiceTyp matches. }
+    function SamePhysicsAddr(PhysicsAddr_: U_String): Boolean; overload; { True if PhysicsAddr matches. }
+    function SamePhysicsAddr(Arry_: TArrayPascalString): Boolean; overload; { True if PhysicsAddr matches any in array. }
+    function SamePhysicsAddr(PhysicsAddr_: U_String; PhysicsPort_: Word): Boolean; overload; { True if both address and port match. }
+    function SamePhysicsAddr(Data_: TC40_Info): Boolean; overload; { True if PhysicsAddr and Port match. }
+    function SamePhysicsAddr(Data_: TC40_PhysicsTunnel): Boolean; overload; { Compare with a tunnel. }
+    function SamePhysicsAddr(Data_: TC40_PhysicsService): Boolean; overload; { Compare with a service. }
+    function SameP2PVMAddr(Data_: TC40_Info): Boolean; { True if both P2PVM addresses match. }
+    function FoundServiceTyp(Arry_: TC40_DependNetworkInfoArray): Boolean; overload; { True if ServiceTyp is in the dependency array. }
+    function FoundServiceTyp(servTyp_: U_String): Boolean; overload; { True if ServiceTyp matches the given string. }
+    function ReadyC40Client: Boolean; { True if a client class is registered for this ServiceTyp. }
+    function GetOrCreateC40Client(PhysicsTunnel_: TC40_PhysicsTunnel; Param_: U_String): TC40_Custom_Client; { Creates a client instance for this service info. }
   end;
 
   TC40_InfoList = class(TGenericsList<TC40_Info>)
   public
-    AutoFree: Boolean;
+    AutoFree: Boolean; { If true, items are automatically freed when removed. }
     constructor Create(AutoFree_: Boolean);
     destructor Destroy; override;
     procedure Remove(obj: TC40_Info);
     procedure Delete(index: Integer);
     procedure Clear;
-    class procedure SortWorkLoad(L_: TC40_InfoList);
-    function GetInfoArray: TC40_Info_Array;
-    function IsOnlyInstance(ServiceTyp: U_String): Boolean;
-    function GetServiceTypNum(ServiceTyp: U_String): Integer;
-    function SearchMinWorkload(arry: TC40_DependNetworkInfoArray): TC40_Info_Array; overload;
+    class procedure SortWorkLoad(L_: TC40_InfoList); { Sorts by workload ratio (ascending). }
+    function GetInfoArray: TC40_Info_Array; { Returns a dynamic array of all items. }
+    function IsOnlyInstance(ServiceTyp: U_String): Boolean; { Checks if the service type is marked as only instance. }
+    function GetServiceTypNum(ServiceTyp: U_String): Integer; { Returns number of entries matching ServiceTyp. }
+    function SearchMinWorkload(arry: TC40_DependNetworkInfoArray): TC40_Info_Array; overload; { Returns the minimum workload info for each dependency. }
     function SearchMinWorkload(ServiceTyp: U_String): TC40_Info_Array; overload;
-    function SearchService(arry: TC40_DependNetworkInfoArray; full_: Boolean): TC40_Info_Array; overload;
-    function SearchService(arry: TC40_DependNetworkInfoArray): TC40_Info_Array; overload;
+    function SearchService(arry: TC40_DependNetworkInfoArray; full_: Boolean): TC40_Info_Array; overload; { Searches for services matching any dependency. If full_=False, only one per dependency. }
+    function SearchService(arry: TC40_DependNetworkInfoArray): TC40_Info_Array; overload; { Full search (all matches). }
     function SearchService(ServiceTyp: U_String): TC40_Info_Array; overload;
-    function ExistsService(arry: TC40_DependNetworkInfoArray): Boolean; overload;
+    function ExistsService(arry: TC40_DependNetworkInfoArray): Boolean; overload; { True if any service matches any dependency. }
     function ExistsService(ServiceTyp: U_String): Boolean; overload;
-    function FindSame(Data_: TC40_Info): TC40_Info;
-    function FindHash(Hash: TMD5): TC40_Info;
-    function ExistsPhysicsAddr(PhysicsAddr: U_String; PhysicsPort: Word): Boolean;
-    procedure RemovePhysicsAddr(PhysicsAddr: U_String; PhysicsPort: Word);
-    function OverwriteInfo(Data_: TC40_Info): Boolean;
-    function MergeAndUpdateWorkload(source: TC40_InfoList): Boolean;
-    function MergeFromDF(D: TDFE): Boolean;
-    procedure SaveToDF(D: TDFE);
+    function FindSame(Data_: TC40_Info): TC40_Info; { Finds an entry with identical fields. }
+    function FindHash(Hash: TMD5): TC40_Info; { Finds an entry by its hash. }
+    function ExistsPhysicsAddr(PhysicsAddr: U_String; PhysicsPort: Word): Boolean; { True if any entry has the given address/port. }
+    procedure RemovePhysicsAddr(PhysicsAddr: U_String; PhysicsPort: Word); { Removes all entries with the given address/port. }
+    function OverwriteInfo(Data_: TC40_Info): Boolean; { Updates an existing entry or adds a clone if not found. }
+    function MergeAndUpdateWorkload(source: TC40_InfoList): Boolean; { Merges entries from source, updating workloads. }
+    function MergeFromDF(D: TDFE): Boolean; { Merges entries from a DFE stream. }
+    procedure SaveToDF(D: TDFE); { Saves all non-ignored entries to a DFE stream. }
   end;
 {$ENDREGION 'infoDefine'}
 {$REGION 'Help_Console_Command'}
@@ -396,65 +532,96 @@ type
 
   TC4_Help_Console_Command_Data = class(TCore_Object_Intermediate)
   public
-    Cmd: SystemString;
-    Desc: SystemString;
-    OnEvent_C: TOn_C4_Help_Console_Command_C;
-    OnEvent_M: TOn_C4_Help_Console_Command_M;
-    OnEvent_P: TOn_C4_Help_Console_Command_P;
+    Cmd: SystemString; { Command name. }
+    Desc: SystemString; { Command description. }
+    OnEvent_C: TOn_C4_Help_Console_Command_C; { C-style event handler. }
+    OnEvent_M: TOn_C4_Help_Console_Command_M; { Method event handler. }
+    OnEvent_P: TOn_C4_Help_Console_Command_P; { Nested event handler. }
     constructor Create;
     destructor Destroy; override;
-    procedure DoExecute(var OP_Param: TOpParam);
+    procedure DoExecute(var OP_Param: TOpParam); { Invokes the appropriate event handler. }
   end;
 
   TC4_Help_Console_Command_Decl = class(TBigList<TC4_Help_Console_Command_Data>);
 
   TC4_Help_Console_Command = class(TC4_Help_Console_Command_Decl)
   public
-    procedure DoFree(var Data: TC4_Help_Console_Command_Data); override;
+    procedure DoFree(var Data: TC4_Help_Console_Command_Data); override; { Frees a command data item. }
   end;
 {$ENDREGION 'Help_Console_Command'}
 {$REGION 'p2p_Custom_Service_Templet'}
 
+  {
+    * The base class for all user-defined services in the C4 framework.
+    * This is a template that, when instantiated, registers itself with its
+    * parent TC40_PhysicsService and makes its metadata available for discovery.
+    * Inherit from this class to implement your own business logic.
+    *
+    * @example:
+    *   type
+    *     TMyFileService = class(TC40_Custom_Service)
+    *     protected
+    *       procedure cmd_GetFile(Sender: TPeerIO; InData: TDFE; OutData: TDFE);
+    *     end;
+    *
+    *   procedure TMyFileService.cmd_GetFile(Sender: TPeerIO; InData: TDFE; OutData: TDFE);
+    *   begin
+    *     // File serving logic here
+    *     OutData.WriteString('File content');
+    *   end;
+    *
+    *   // In the service creation logic:
+    *   MyFileService := TMyFileService.Create(PhysicsService, 'FileServer', 'RootPath=/data');
+    *   MyFileService.Service.RecvTunnel.RegisterStream('GetFile').OnExecute := MyFileService.cmd_GetFile;
+  }
   TC40_Custom_Service = class(TCore_InterfacedObject_Intermediate)
   private
-    FLastSafeCheckTime: TTimeTick;
+    FLastSafeCheckTime: TTimeTick; { Timestamp of last SafeCheck call. }
   private
-    FCycle_Order_Default: Int64;
-    FCycle_Anchor: TString_Num64_Analysis_Tool;
-    FCycle_Anchor_Temp: Int64;
-    procedure Init_Cycle_Anchor;
-    procedure Free_Cycle_Anchor;
-    procedure Inc_Cycle_Anchor(TaskName: U_String);
-    procedure Ready_Cycle_Anchor(TaskName: U_String);
+    FCycle_Order_Default: Int64; { Default order for cycle anchor. }
+    FCycle_Anchor: TString_Num64_Analysis_Tool; { Used for load balancing via cycle order. }
+    FCycle_Anchor_Temp: Int64; { Temporary anchor value. }
+    procedure Init_Cycle_Anchor; { Initializes the cycle anchor. }
+    procedure Free_Cycle_Anchor; { Frees the cycle anchor. }
+    procedure Inc_Cycle_Anchor(TaskName: U_String); { Increments the anchor value for a task. }
+    procedure Ready_Cycle_Anchor(TaskName: U_String); { Reads the current anchor value. }
   public
-    Param: U_String;
-    Param_File: U_String;
-    ParamList: THashStringList;
-    SafeCheckTime: TTimeTick;
-    Alias_or_Hash___: U_String;
-    enablePerServiceDirectory: Boolean;
-    Tag: Integer;
-    ServiceInfo: TC40_Info;
-    C40PhysicsService: TC40_PhysicsService;
-    ConsoleCommand: TC4_Help_Console_Command;
+    Param: U_String;               { The raw parameter string for this service. }
+    Param_File: U_String;          { The configuration file path loaded for this service. }
+    ParamList: THashStringList;    { Parsed key-value parameters from Param and Param_File. }
+    SafeCheckTime: TTimeTick;      { Interval for calling SafeCheck. }
+    Alias_or_Hash___: U_String;    { A user-friendly alias for this service. }
+    enablePerServiceDirectory: Boolean; { If true, service data is stored in a dedicated directory. }
+    Tag: Integer;                  { A user-defined integer tag for grouping/filtering. }
+    ServiceInfo: TC40_Info;        { The published metadata for this service. }
+    C40PhysicsService: TC40_PhysicsService; { The parent physics service. }
+    ConsoleCommand: TC4_Help_Console_Command; { Console commands registered by this service. }
+
     property PhysicsService: TC40_PhysicsService read C40PhysicsService;
+
     constructor Create(PhysicsService_: TC40_PhysicsService; ServiceTyp, Param_: U_String); virtual;
     destructor Destroy; override;
-    procedure SafeCheck; virtual;
-    procedure Progress; virtual;
-    procedure SetWorkload(Workload_, MaxWorkload_: Integer);
-    procedure UpdateToGlobalDispatch;
-    function GetHash: TMD5;
+
+    procedure SafeCheck; virtual; { Called periodically for self-validation/cleanup. }
+    procedure Progress; virtual; { Called on every main loop iteration for driving service logic. }
+
+    procedure SetWorkload(Workload_, MaxWorkload_: Integer); { Updates the workload values in ServiceInfo. }
+    procedure UpdateToGlobalDispatch; { Publishes this service's info to the global dispatch service. }
+
+    function GetHash: TMD5; { Returns the hash of ServiceInfo. }
     property Hash: TMD5 read GetHash;
-    function GetAliasOrHash: U_String;
+    function GetAliasOrHash: U_String; { Returns Alias_or_Hash___ if non-empty, else the hash string. }
     property AliasOrHash: U_String read GetAliasOrHash write Alias_or_Hash___;
-    function Get_P2PVM_Service(var recv_, send_: TZNet_WithP2PVM_Server): Boolean;
-    function Get_DB_FileName_Config(source_: U_String): U_String;
-    function Where_C4_File(fileName, ServiceTyp: U_String): U_String; overload;
+
+    function Get_P2PVM_Service(var recv_, send_: TZNet_WithP2PVM_Server): Boolean; { Retrieves the P2PVM server tunnels. }
+    function Get_DB_FileName_Config(source_: U_String): U_String; { Returns a config value from ParamList. }
+    function Where_C4_File(fileName, ServiceTyp: U_String): U_String; overload; { Locates a file in C4 root or service-specific directory. }
     function Where_C4_File(fileName: U_String): U_String; overload;
-    function Register_ConsoleCommand(Cmd, Desc: SystemString): TC4_Help_Console_Command_Data;
-    procedure DoLinkSuccess(Trigger_: TCore_Object);
-    procedure DoUserOut(Trigger_: TCore_Object);
+
+    function Register_ConsoleCommand(Cmd, Desc: SystemString): TC4_Help_Console_Command_Data; { Registers a console command for this service. }
+
+    procedure DoLinkSuccess(Trigger_: TCore_Object); { Forwards link success to physics service. }
+    procedure DoUserOut(Trigger_: TCore_Object); { Forwards user out to physics service. }
   end;
 
   TC40_Custom_Service_Class = class of TC40_Custom_Service;
@@ -462,32 +629,32 @@ type
 
   TC40_Custom_ServicePool = class(TGenericsList<TC40_Custom_Service>)
   private
-    FIPV6_Seed: Word;
+    FIPV6_Seed: Word; { Seed for generating IPv6 addresses. }
   public
-    Enabled_Auto_Sort_for_Select_And_Next_Cycle_Anchor: Boolean;
+    Enabled_Auto_Sort_for_Select_And_Next_Cycle_Anchor: Boolean; { If true, sorts before selecting. }
     constructor Create;
-    procedure Progress;
-    procedure Sort_Cycle_Anchor(TaskName: U_String);
-    function Select_And_Next_Cycle_Anchor(TaskName: U_String): TC40_Custom_Service;
+    procedure Progress; { Calls Progress on all services. }
+    procedure Sort_Cycle_Anchor(TaskName: U_String); { Sorts services by their cycle anchor for the given task. }
+    function Select_And_Next_Cycle_Anchor(TaskName: U_String): TC40_Custom_Service; { Selects the service with smallest anchor and increments it. }
 
-    procedure MakeP2PVM_IPv6_Port(var ip6, Port: U_String);
-    function MakeAlias(preset_: U_String): U_String;
-    function ExistsPhysicsAddr(PhysicsAddr: U_String; PhysicsPort: Word): Boolean;
-    function ExistsOnlyInstance(ServiceTyp: U_String): Boolean;
+    procedure MakeP2PVM_IPv6_Port(var ip6, Port: U_String); { Generates a unique IPv6 address and port for P2PVM. }
+    function MakeAlias(preset_: U_String): U_String; { Creates a unique alias based on preset. }
+    function ExistsPhysicsAddr(PhysicsAddr: U_String; PhysicsPort: Word): Boolean; { Checks if any service has the given address/port. }
+    function ExistsOnlyInstance(ServiceTyp: U_String): Boolean; { Checks if any service of the type is marked OnlyInstance. }
 
-    function FindHash(hash_: TMD5): TC40_Custom_Service;
-    function FindAliasOrHash(AliasOrhash_: U_String): TC40_Custom_Service;
-    function FindTag(Tag: Integer): TC40_Custom_Service;
-    function GetServiceFromHash(Hash: TMD5): TC40_Custom_Service;
-    function GetServiceFromAliasOrHash(AliasOrhash_: U_String): TC40_Custom_Service;
+    function FindHash(hash_: TMD5): TC40_Custom_Service; { Finds a service by hash. }
+    function FindAliasOrHash(AliasOrhash_: U_String): TC40_Custom_Service; { Finds by alias or hash string. }
+    function FindTag(Tag: Integer): TC40_Custom_Service; { Finds a service by tag. }
+    function GetServiceFromHash(Hash: TMD5): TC40_Custom_Service; { Alias for FindHash. }
+    function GetServiceFromAliasOrHash(AliasOrhash_: U_String): TC40_Custom_Service; { Alias for FindAliasOrHash. }
 
-    function GetC40Array(is_ipc_mode: Boolean): TC40_Custom_Service_Array; overload;
+    function GetC40Array(is_ipc_mode: Boolean): TC40_Custom_Service_Array; overload; { Returns array of services, optionally filtering IPC mode. }
     function GetC40Array: TC40_Custom_Service_Array; overload;
-    function GetFromServiceTyp(ServiceTyp: U_String; is_ipc_mode: Boolean): TC40_Custom_Service_Array; overload;
+    function GetFromServiceTyp(ServiceTyp: U_String; is_ipc_mode: Boolean): TC40_Custom_Service_Array; overload; { Filters by ServiceTyp and IPC mode. }
     function GetFromServiceTyp(ServiceTyp: U_String): TC40_Custom_Service_Array; overload;
     function GetFromPhysicsAddr(PhysicsAddr: U_String; PhysicsPort: Word; is_ipc_mode: Boolean): TC40_Custom_Service_Array; overload;
     function GetFromPhysicsAddr(PhysicsAddr: U_String; PhysicsPort: Word): TC40_Custom_Service_Array; overload;
-    function GetFromClass(Class_: TC40_Custom_Service_Class; is_ipc_mode: Boolean): TC40_Custom_Service_Array; overload;
+    function GetFromClass(Class_: TC40_Custom_Service_Class; is_ipc_mode: Boolean): TC40_Custom_Service_Array; overload; { Filters by class type. }
     function GetFromClass(Class_: TC40_Custom_Service_Class): TC40_Custom_Service_Array; overload;
   end;
 {$ENDREGION 'p2p_Custom_Service_Templet'}
@@ -495,6 +662,31 @@ type
 
   TOn_Client_Offline = procedure(Sender: TC40_Custom_Client) of object;
 
+  {
+    * The base class for all user-defined clients in the C4 framework.
+    * Inherit from this class to create a client that connects to a specific
+    * service type and manages the communication state.
+    *
+    * @example:
+    *   type
+    *     TMyFileClient = class(TC40_Custom_Client)
+    *     public
+    *       function GetFile(const FileName: string): TStream;
+    *     end;
+    *
+    *   function TMyFileClient.GetFile(const FileName: string): TStream;
+    *   var
+    *     D: TDFE;
+    *   begin
+    *     Result := nil;
+    *     D := TDFE.Create;
+    *     D.WriteString(FileName);
+    *     // Wait for the response stream.
+    *     WaitSendStreamCmd('GetFile', D, ResultD, 5000);
+    *     // ResultD contains the response stream.
+    *     DisposeObject(D);
+    *   end;
+  }
   TC40_Custom_Client = class(TCore_InterfacedObject_Intermediate)
   private
     FLastSafeCheckTime: TTimeTick;
@@ -517,25 +709,32 @@ type
     C40PhysicsTunnel: TC40_PhysicsTunnel;
     ConsoleCommand: TC4_Help_Console_Command;
     On_Client_Offline: TOn_Client_Offline;
+
     property PhysicsTunnel: TC40_PhysicsTunnel read C40PhysicsTunnel;
+
     constructor Create(PhysicsTunnel_: TC40_PhysicsTunnel; source_: TC40_Info; Param_: U_String); virtual;
     destructor Destroy; override;
+
     procedure SafeCheck; virtual;
     procedure Progress; virtual;
-    procedure Connect; virtual;
-    function Connected: Boolean; virtual;
-    procedure Disconnect; virtual;
+
+    procedure Connect; virtual; { Initiates the connection process. }
+    function Connected: Boolean; virtual; { Returns true if the client is fully connected to its service. }
+    procedure Disconnect; virtual; { Terminates the client connection. }
+
     function GetHash: TMD5;
     property Hash: TMD5 read GetHash;
     function GetAliasOrHash: U_String;
     property AliasOrHash: U_String read GetAliasOrHash write Alias_or_Hash___;
-    function Get_P2PVM_Tunnel(var recv_, send_: TZNet_WithP2PVM_Client): Boolean;
-    function Get_DB_FileName_Config(source_: U_String): U_String;
-    function Where_C4_File(fileName: U_String): U_String;
-    function Register_ConsoleCommand(Cmd, Desc: SystemString): TC4_Help_Console_Command_Data;
-    function IsLocal: Boolean;
-    procedure DoNetworkOnline; virtual;
-    procedure DoNetworkOffline; virtual;
+
+    function Get_P2PVM_Tunnel(var recv_, send_: TZNet_WithP2PVM_Client): Boolean; { Retrieves the P2PVM client tunnels. }
+    function Get_DB_FileName_Config(source_: U_String): U_String; { Returns config value. }
+    function Where_C4_File(fileName: U_String): U_String; { Locates a file in C4 root. }
+    function Register_ConsoleCommand(Cmd, Desc: SystemString): TC4_Help_Console_Command_Data; { Registers a console command. }
+    function IsLocal: Boolean; { True if the client is on local/loopback network. }
+
+    procedure DoNetworkOnline; virtual;   { Called when the client has successfully connected. }
+    procedure DoNetworkOffline; virtual;  { Called when the client has been disconnected. }
   end;
 
   TC40_Custom_Client_Class = class of TC40_Custom_Client;
@@ -597,6 +796,23 @@ type
 {$ENDREGION 'p2p_Custom_Client_Templet'}
 {$REGION 'Auto_Deployment'}
 
+  {
+    * Generic class for automatically deploying a client of type T_.
+    * It waits until the required dependency network is ready, then
+    * instantiates and provides the client instance.
+    *
+    * @example:
+    *   var
+    *     MyClient: TMyClient;
+    *   begin
+    *     TC40_Auto_Deployment_Client<TMyClient>.Create_M2('MyService', DoOnClientReady);
+    *   end;
+    *
+    *   procedure DoOnClientReady(var Sender: TMyClient);
+    *   begin
+    *     // Sender is connected and ready to use.
+    *   end;
+  }
   TC40_Auto_Deployment_Client<T_: class> = class(TCore_Object_Intermediate)
   public type
     PT_ = ^T_;
@@ -608,21 +824,21 @@ type
     TOn_Ready_P = reference to procedure(var Sender: T_);
 {$ENDIF FPC}
   private
-    FClient_Second: T_;
-    FClient_Ptr: PT_;
-    FDependNetwork: U_String;
+    FClient_Second: T_; { Temporary storage when no pointer provided. }
+    FClient_Ptr: PT_; { Pointer to the client variable to set. }
+    FDependNetwork: U_String; { Dependency string to wait for. }
     FOn_Ready_C: TOn_Ready_C;
     FOn_Ready_M: TOn_Ready_M;
     FOn_Ready_P: TOn_Ready_P;
-    procedure Do_Deployment_Ready(States: TC40_Custom_ClientPool_Wait_States);
+    procedure Do_Deployment_Ready(States: TC40_Custom_ClientPool_Wait_States); { Called when dependencies are ready. }
   public
-    constructor Create_Ptr(dependNetwork_: U_String; Client_: PT_);
-    constructor Create(dependNetwork_: U_String; var Client: T_); overload;
-    constructor Create(var Client: T_); overload;
-    constructor Create_C(OnReady: TOn_Ready_C);
+    constructor Create_Ptr(dependNetwork_: U_String; Client_: PT_); { Provide a pointer to a client variable. }
+    constructor Create(dependNetwork_: U_String; var Client: T_); overload; { Pass client variable by reference. }
+    constructor Create(var Client: T_); overload; { Auto-detect dependency from registered type. }
+    constructor Create_C(OnReady: TOn_Ready_C); { Creates with C-style callback, auto-detects dependency. }
     constructor Create_M(OnReady: TOn_Ready_M);
     constructor Create_P(OnReady: TOn_Ready_P);
-    constructor Create_C2(dependNetwork_: U_String; OnReady: TOn_Ready_C);
+    constructor Create_C2(dependNetwork_: U_String; OnReady: TOn_Ready_C); { With explicit dependency. }
     constructor Create_M2(dependNetwork_: U_String; OnReady: TOn_Ready_M);
     constructor Create_P2(dependNetwork_: U_String; OnReady: TOn_Ready_P);
     destructor Destroy; override;
@@ -643,11 +859,17 @@ type
     PhysicsAddr: U_String;
     PhysicsPort: Word;
     constructor Create;
-    procedure DoRun; virtual;
+    procedure DoRun; virtual; { Calls C40RemovePhysics for the stored address/port. }
   end;
 
   TOnServiceInfoChange = procedure(Sender: TCore_Object; Service_Info_Pool: TC40_InfoList) of object;
 
+  {
+    * The dispatch service acts as a service registry and load balancer.
+    * It collects service information from all local TC40_Custom_Service instances
+    * and distributes this information to all connected TC40_Dispatch_Client instances.
+    * Clients use this information to discover and load-balance connections.
+  }
   TC40_Dispatch_Service = class(TC40_Custom_Service)
   private
     FOnServiceInfoChange: TOnServiceInfoChange;
@@ -670,13 +892,19 @@ type
     constructor Create(PhysicsService_: TC40_PhysicsService; ServiceTyp, Param_: U_String); override;
     destructor Destroy; override;
     procedure Progress; override;
-    procedure IgnoreChangeToAllClient(Hash__: TMD5; Ignored: Boolean);
-    procedure UpdateServiceStateToAllClient;
+    procedure IgnoreChangeToAllClient(Hash__: TMD5; Ignored: Boolean); { Broadcasts ignore change to all clients. }
+    procedure UpdateServiceStateToAllClient; { Broadcasts current workload states to all clients. }
     property OnServiceInfoChange: TOnServiceInfoChange read FOnServiceInfoChange write FOnServiceInfoChange;
   end;
 {$ENDREGION 'DispatchService'}
 {$REGION 'DispatchClient'}
 
+  {
+    * The dispatch client is a special TC40_Custom_Client that connects to a
+    * TC40_Dispatch_Service. It receives and maintains a local copy of the
+    * global service registry (Service_Info_Pool). This enables the client
+    * and its parent tunnel to perform service discovery and load balancing.
+  }
   TC40_Dispatch_Client = class(TC40_Custom_Client)
   private
     FOnServiceInfoChange: TOnServiceInfoChange;
@@ -696,11 +924,11 @@ type
     procedure Connect; override;
     function Connected: Boolean; override;
     procedure Disconnect; override;
-    procedure PostLocalServiceInfo(forcePost_: Boolean);
-    procedure RequestUpdate();
-    procedure IgnoreChangeToService(Hash__: TMD5; Ignored: Boolean);
-    procedure UpdateLocalServiceState;
-    procedure RemovePhysicsNetwork(PhysicsAddr: U_String; PhysicsPort: Word);
+    procedure PostLocalServiceInfo(forcePost_: Boolean); { Sends local service info to dispatch service. }
+    procedure RequestUpdate(); { Requests a full update from dispatch service. }
+    procedure IgnoreChangeToService(Hash__: TMD5; Ignored: Boolean); { Sends ignore change request to dispatch. }
+    procedure UpdateLocalServiceState; { Sends local workload states to dispatch. }
+    procedure RemovePhysicsNetwork(PhysicsAddr: U_String; PhysicsPort: Word); { Requests removal of a physics network. }
     property OnServiceInfoChange: TOnServiceInfoChange read FOnServiceInfoChange write FOnServiceInfoChange;
   end;
 {$ENDREGION 'DispatchClient'}
@@ -717,12 +945,13 @@ type
   TC40_RegistedDataList = class(TGenericsList<PC40_RegistedData>)
   public
     destructor Destroy; override;
-    procedure Clean;
-    procedure Print;
+    procedure Clean; { Frees all registered data. }
+    procedure Print; { Outputs registration information to status. }
   end;
 {$ENDREGION 'RegistedData'}
 {$REGION 'DTC40NULLModel'}
 
+  { Base service that uses NoAuth double-tunnel but does not override any behavior. }
   TC40_Base_NULL_Service = class(TC40_Custom_Service)
   protected
     procedure DoLinkSuccess_Event(Sender: TDTService_NoAuth; UserDefineIO: TService_RecvTunnel_UserDefine_NoAuth); virtual;
@@ -753,6 +982,7 @@ type
 {$ENDREGION 'DTC40NULLModel'}
 {$REGION 'DTC40NoAuthModel'}
 
+  { Service using NoAuth double-tunnel with link and user-out events. }
   TC40_Base_NoAuth_Service = class(TC40_Custom_Service)
   protected
     procedure DoLinkSuccess_Event(Sender: TDTService_NoAuth; UserDefineIO: TService_RecvTunnel_UserDefine_NoAuth); virtual;
@@ -813,6 +1043,7 @@ type
 {$ENDREGION 'DTC40NoAuthModel'}
 {$REGION 'DTC40VirtualAuthModel'}
 
+  { Service using VirtualAuth double-tunnel with registration and authentication callbacks. }
   TC40_Base_VirtualAuth_Service = class(TC40_Custom_Service)
   protected
     procedure DoUserReg_Event(Sender: TDTService_VirtualAuth; RegIO: TVirtualRegIO); virtual;
@@ -844,7 +1075,7 @@ type
     procedure Connect; override;
     function Connected: Boolean; override;
     procedure Disconnect; override;
-    function LoginIsSuccessed: Boolean;
+    function LoginIsSuccessed: Boolean; { Returns True if the user is logged in. }
   end;
 
   TC40_Base_DataStoreVirtualAuth_Service = class(TC40_Custom_Service)
@@ -883,6 +1114,7 @@ type
 {$ENDREGION 'DTC40VirtualAuthModel'}
 {$REGION 'DTC40BuildInAuthModel'}
 
+  { Service using built-in authentication (TDTService). }
   TC40_Base_Service = class(TC40_Custom_Service)
   protected
     procedure DoLinkSuccess_Event(Sender: TDTService; UserDefineIO: TService_RecvTunnel_UserDefine); virtual;
@@ -954,6 +1186,7 @@ type
   TC40_Custom_VM_Service = class;
   TC40_Custom_VM_Client = class;
 
+  { Base class for virtual-machine services (standalone, not tied to physics service). }
   TC40_Custom_VM_Service = class(TCore_InterfacedObject_Intermediate)
   private
     FLastSafeCheckTime: TTimeTick;
@@ -983,6 +1216,7 @@ type
 
   TOn_VM_Client_Event = procedure(Sender: TC40_Custom_VM_Client) of object;
 
+  { Base class for virtual-machine clients. }
   TC40_Custom_VM_Client = class(TCore_InterfacedObject_Intermediate)
   private
     FLastSafeCheckTime: TTimeTick;
@@ -1015,114 +1249,121 @@ type
 {$ENDREGION 'VM_Templet_Define'}
 {$REGION 'C40-Console'}
 
+  {
+    * Interactive console help for C4 framework.
+    * Provides commands to inspect services, tunnels, registrations, instance states,
+    * HPC threads, ZNet instances, ZDB2 engines, and more.
+    * Can be used for debugging and administration.
+  }
   TC40_Console_Help = class(TCore_Object_Intermediate)
   private
-    Last_Instance_State: TInstance_State_Tool;
-    function Do_Build_Instance_State(var OP_Param: TOpParam): Variant;
-    function Do_Compare_Instance_State(var OP_Param: TOpParam): Variant;
+    Last_Instance_State: TInstance_State_Tool; { For comparing instance state snapshots. }
+    function Do_Build_Instance_State(var OP_Param: TOpParam): Variant; { Saves current instance state. }
+    function Do_Compare_Instance_State(var OP_Param: TOpParam): Variant; { Compares current state with saved snapshot. }
   private
-    procedure UpdateServiceInfo; overload;
-    procedure UpdateServiceInfo(phy_serv: TC40_PhysicsService); overload;
-    procedure UpdateTunnelInfo; overload;
-    procedure UpdateTunnelInfo(phy_tunnel: TC40_PhysicsTunnel); overload;
+    procedure UpdateServiceInfo; overload; { Prints summary of all physics services. }
+    procedure UpdateServiceInfo(phy_serv: TC40_PhysicsService); overload; { Prints detailed info of a specific service. }
+    procedure UpdateTunnelInfo; overload; { Prints summary of all physics tunnels. }
+    procedure UpdateTunnelInfo(phy_tunnel: TC40_PhysicsTunnel); overload; { Prints detailed info of a specific tunnel. }
   protected
-    function Do_Help(var OP_Param: TOpParam): Variant;
-    function Do_Exit(var OP_Param: TOpParam): Variant;
-    function Do_Service(var OP_Param: TOpParam): Variant;
-    function Do_Tunnel(var OP_Param: TOpParam): Variant;
-    function Do_Reg(var OP_Param: TOpParam): Variant;
-    function Do_KillNet(var OP_Param: TOpParam): Variant;
-    function Do_C4_Clean(var OP_Param: TOpParam): Variant;
-    function Do_SetQuiet(var OP_Param: TOpParam): Variant;
-    function Do_Save_All_C4Service_Config(var OP_Param: TOpParam): Variant;
-    function Do_Save_All_C4Client_Config(var OP_Param: TOpParam): Variant;
-    function Do_Instance_Info(var OP_Param: TOpParam): Variant;
-    function Do_Instance_Info_Sort_Update(var OP_Param: TOpParam): Variant;
-    function Do_Instance_Info_Sort_Time(var OP_Param: TOpParam): Variant;
-    function Do_HPC_Thread_Info(var OP_Param: TOpParam): Variant;
-    function Do_ZNet_Instance_Info(var OP_Param: TOpParam): Variant;
-    function Do_Enabled_Delay_Free_Info(var OP_Param: TOpParam): Variant;
-    function Do_Enabled_Intermediate_Instance_Info(var OP_Param: TOpParam): Variant;
-    function Do_Service_Cmd_Info(var OP_Param: TOpParam): Variant;
-    function Do_Client_Cmd_Info(var OP_Param: TOpParam): Variant;
-    function Do_Service_Statistics_Info(var OP_Param: TOpParam): Variant;
-    function Do_Client_Statistics_Info(var OP_Param: TOpParam): Variant;
-    function Do_ZDB2_Info(var OP_Param: TOpParam): Variant;
-    function Do_ZDB2_Flush(var OP_Param: TOpParam): Variant;
-    function Do_Custom_Console_Cmd(Sender: TOpCustomRunTime; OP_RT_Data: POpRTData; var OP_Param: TOpParam): Variant;
+    function Do_Help(var OP_Param: TOpParam): Variant; { Displays available commands. }
+    function Do_Exit(var OP_Param: TOpParam): Variant; { Exits the console. }
+    function Do_Service(var OP_Param: TOpParam): Variant; { Shows service info. }
+    function Do_Tunnel(var OP_Param: TOpParam): Variant; { Shows tunnel info. }
+    function Do_Reg(var OP_Param: TOpParam): Variant; { Shows registered C4 types. }
+    function Do_KillNet(var OP_Param: TOpParam): Variant; { Removes a physics network. }
+    function Do_C4_Clean(var OP_Param: TOpParam): Variant; { Cleans all C4 objects. }
+    function Do_SetQuiet(var OP_Param: TOpParam): Variant; { Sets quiet mode. }
+    function Do_Save_All_C4Service_Config(var OP_Param: TOpParam): Variant; { Saves all service configs. }
+    function Do_Save_All_C4Client_Config(var OP_Param: TOpParam): Variant; { Saves all client configs. }
+    function Do_Instance_Info(var OP_Param: TOpParam): Variant; { Prints instance tracking info. }
+    function Do_Instance_Info_Sort_Update(var OP_Param: TOpParam): Variant; { Sorts by update count. }
+    function Do_Instance_Info_Sort_Time(var OP_Param: TOpParam): Variant; { Sorts by update time. }
+    function Do_HPC_Thread_Info(var OP_Param: TOpParam): Variant; { Shows HPC thread status. }
+    function Do_ZNet_Instance_Info(var OP_Param: TOpParam): Variant; { Shows ZNet instance pool status. }
+    function Do_Enabled_Delay_Free_Info(var OP_Param: TOpParam): Variant; { Toggles delay-free tracking. }
+    function Do_Enabled_Intermediate_Instance_Info(var OP_Param: TOpParam): Variant; { Toggles intermediate instance tracking. }
+    function Do_Service_Cmd_Info(var OP_Param: TOpParam): Variant; { Shows service command statistics. }
+    function Do_Client_Cmd_Info(var OP_Param: TOpParam): Variant; { Shows client command statistics. }
+    function Do_Service_Statistics_Info(var OP_Param: TOpParam): Variant; { Shows service statistics. }
+    function Do_Client_Statistics_Info(var OP_Param: TOpParam): Variant; { Shows client statistics. }
+    function Do_ZDB2_Info(var OP_Param: TOpParam): Variant; { Shows ZDB2 thread engine info. }
+    function Do_ZDB2_Flush(var OP_Param: TOpParam): Variant; { Flushes all ZDB2 engines. }
+    function Do_Custom_Console_Cmd(Sender: TOpCustomRunTime; OP_RT_Data: POpRTData; var OP_Param: TOpParam): Variant; { Dispatches custom console commands. }
   public
-    opRT: TOpCustomRunTime;
-    HelpTextStyle: TTextStyle;
-    IsExit: Boolean;
+    opRT: TOpCustomRunTime; { Runtime for evaluating expressions. }
+    HelpTextStyle: TTextStyle; { Text style for expression parsing. }
+    IsExit: Boolean; { True when user requests exit. }
     constructor Create; virtual;
     destructor Destroy; override;
-    procedure Update_opRT; virtual;
-    procedure Run_HelpCmd(exp_: U_String);
+    procedure Update_opRT; virtual; { Registers all help commands in opRT. }
+    procedure Run_HelpCmd(exp_: U_String); { Executes a help command string. }
   end;
 {$ENDREGION 'C40-Console'}
 {$REGION 'Var'}
 
-
 var
-  C40_QuietMode: Boolean;
-  C40_SafeCheckTime: TTimeTick;
-  C40_PhysicsReconnectionDelayTime: Double;
-  C40_UpdateServiceInfoDelayTime: TTimeTick;
-  C40_PhysicsServiceTimeout: TTimeTick;
-  C40_PhysicsTunnelTimeout: TTimeTick;
-  C40_KillDeadPhysicsConnectionTimeout: TTimeTick;
-  C40_KillIDCFaultTimeout: TTimeTick;
-  C40_EnablePerServiceDirectory: Boolean;
-  C40_RootPath: U_String;
-  C40_Password: SystemString;
-  C40_PhysicsClientClass: TZNet_ClientClass;
-  C40_Registed: TC40_RegistedDataList;
-  C40_PhysicsServicePool: TC40_PhysicsServicePool;
-  C40_ServicePool: TC40_Custom_ServicePool;
-  C40_PhysicsTunnelPool: TC40_PhysicsTunnelPool;
-  C40_ClientPool: TC40_Custom_ClientPool;
-  C40_VM_Service_Pool: TC40_Custom_VM_Service_Pool;
-  C40_VM_Client_Pool: TC40_Custom_VM_Client_Pool;
-  C40_Cycle_Order_Seed: Int64 = 0;
-  C40_DefaultConfig: THashStringList;
-  Ignore_Command_Line: TPascalStringList;
+  C40_QuietMode: Boolean; { Global quiet mode for all C4 components. }
+  C40_SafeCheckTime: TTimeTick; { Default interval for SafeCheck calls. }
+  C40_PhysicsReconnectionDelayTime: Double; { Delay before reconnecting a physics tunnel (seconds). }
+  C40_UpdateServiceInfoDelayTime: TTimeTick; { Delay between service info updates. }
+  C40_PhysicsServiceTimeout: TTimeTick; { Timeout for physics service idle connections. }
+  C40_PhysicsTunnelTimeout: TTimeTick; { Timeout for physics tunnel connections. }
+  C40_KillDeadPhysicsConnectionTimeout: TTimeTick; { Timeout before killing dead physics connections. }
+  C40_KillIDCFaultTimeout: TTimeTick; { Timeout for killing IDC faulted tunnels. }
+  C40_EnablePerServiceDirectory: Boolean; { Default for per-service directories. }
+  C40_RootPath: U_String; { Root path for C4 storage. }
+  C40_Password: SystemString; { Global password for P2PVM authentication. }
+  C40_PhysicsClientClass: TZNet_ClientClass; { Default client class for physics tunnels. }
+  C40_Registed: TC40_RegistedDataList; { Global registry of C4 service/client types. }
+  C40_PhysicsServicePool: TC40_PhysicsServicePool; { Global pool of physics services. }
+  C40_ServicePool: TC40_Custom_ServicePool; { Global pool of custom services. }
+  C40_PhysicsTunnelPool: TC40_PhysicsTunnelPool; { Global pool of physics tunnels. }
+  C40_ClientPool: TC40_Custom_ClientPool; { Global pool of custom clients. }
+  C40_VM_Service_Pool: TC40_Custom_VM_Service_Pool; { Global pool of VM services. }
+  C40_VM_Client_Pool: TC40_Custom_VM_Client_Pool; { Global pool of VM clients. }
+  C40_Cycle_Order_Seed: Int64 = 0; { Seed for cycle anchor generation. }
+  C40_DefaultConfig: THashStringList; { Default configuration. }
+  Ignore_Command_Line: TPascalStringList; { Command lines to ignore. }
 {$ENDREGION 'Var'}
 {$REGION 'API'}
-procedure C40Progress(sleep_: TTimeTick); overload;
-procedure C40Progress; overload;
-function C40_Online_DP: TC40_Dispatch_Client;
-procedure C40SetQuietMode(QuietMode_: Boolean);
-procedure C40WriteConfig(HS: THashStringList);
-procedure C40ReadConfig(HS: THashStringList);
-procedure C40ResetDefaultConfig;
-procedure C40Clean;
-procedure C40Clean_Service;
-procedure C40Clean_Client;
-procedure C40PrintRegistation;
-function C40ExistsPhysicsNetwork(PhysicsAddr: U_String; PhysicsPort: Word): Boolean;
-function C40_Get_Physics_Connected_Num(): Integer;
-function C40_Get_Physics_Netowork_Is_Inited_Num(): Integer;
+
+procedure C40Progress(sleep_: TTimeTick); overload; { Drives all C4 progress with optional sleep. }
+procedure C40Progress; overload; { Drives all C4 progress with 1ms sleep. }
+function C40_Online_DP: TC40_Dispatch_Client; { Returns the first connected dispatch client. }
+procedure C40SetQuietMode(QuietMode_: Boolean); { Sets global quiet mode and propagates to all components. }
+procedure C40WriteConfig(HS: THashStringList); { Writes current C4 settings to a hash string list. }
+procedure C40ReadConfig(HS: THashStringList); { Reads C4 settings from a hash string list. }
+procedure C40ResetDefaultConfig; { Resets C4 settings to default. }
+procedure C40Clean; { Cleans all C4 objects (services, clients, tunnels, etc.). }
+procedure C40Clean_Service; { Cleans only service-side objects. }
+procedure C40Clean_Client; { Cleans only client-side objects. }
+procedure C40PrintRegistation; { Prints all registered service/client types. }
+function C40ExistsPhysicsNetwork(PhysicsAddr: U_String; PhysicsPort: Word): Boolean; { Checks if any physics network exists at address/port. }
+function C40_Get_Physics_Connected_Num(): Integer; { Returns total number of active physics connections. }
+function C40_Get_Physics_Netowork_Is_Inited_Num(): Integer; { Returns number of physics networks that have been initialized. }
 procedure C40RemovePhysics(PhysicsAddr: U_String; PhysicsPort: Word;
-  Remove_P2PVM_Client_, Remove_Physics_Client_, RemoveP2PVM_Service_, Remove_Physcis_Service_: Boolean); overload;
-procedure C40RemovePhysics(Tunnel_: TC40_PhysicsTunnel); overload;
-procedure C40RemovePhysics(Service_: TC40_PhysicsService); overload;
-procedure C40CheckAndKillDeadPhysicsTunnel();
-function RegisterC40(ServiceTyp: U_String; ServiceClass: TC40_Custom_Service_Class; ClientClass: TC40_Custom_Client_Class): Boolean;
-function FindRegistedC40(ServiceTyp: U_String): PC40_RegistedData;
-function GetRegisterClientTypFromClass(ClientClass: TC40_Custom_Client_Class): U_String; overload;
+  Remove_P2PVM_Client_, Remove_Physics_Client_, RemoveP2PVM_Service_, Remove_Physcis_Service_: Boolean); overload; { Removes physics network components. }
+procedure C40RemovePhysics(Tunnel_: TC40_PhysicsTunnel); overload; { Removes a physics tunnel and associated clients. }
+procedure C40RemovePhysics(Service_: TC40_PhysicsService); overload; { Removes a physics service and associated objects. }
+procedure C40CheckAndKillDeadPhysicsTunnel(); { Checks and removes dead physics tunnels. }
+function RegisterC40(ServiceTyp: U_String; ServiceClass: TC40_Custom_Service_Class; ClientClass: TC40_Custom_Client_Class): Boolean; { Registers a service type with its classes. }
+function FindRegistedC40(ServiceTyp: U_String): PC40_RegistedData; { Finds registered data for a service type. }
+function GetRegisterClientTypFromClass(ClientClass: TC40_Custom_Client_Class): U_String; overload; { Returns service type(s) for a client class. }
 function GetRegisterServiceTypFromClass(ClientClass: TC40_Custom_Client_Class): U_String; overload;
 function GetRegisterServiceTypFromClass(ServiceClass: TC40_Custom_Service_Class): U_String; overload;
-function Compare_C40_ServiceTyp(typ1, typ2: U_String): Boolean; overload;
-function Compare_C40_ServiceTyp(typ1, typ2, typ3: U_String): Boolean; overload;
-function ExtractDependInfo(info: TC40_DependNetworkInfoList): TC40_DependNetworkInfoArray; overload;
-function ExtractDependInfo(info: U_String): TC40_DependNetworkInfoArray; overload;
+function Compare_C40_ServiceTyp(typ1, typ2: U_String): Boolean; overload; { True if two service type strings have overlapping dependencies. }
+function Compare_C40_ServiceTyp(typ1, typ2, typ3: U_String): Boolean; overload; { True if all three have overlapping dependencies. }
+function ExtractDependInfo(info: TC40_DependNetworkInfoList): TC40_DependNetworkInfoArray; overload; { Converts a list to an array. }
+function ExtractDependInfo(info: U_String): TC40_DependNetworkInfoArray; overload; { Parses a dependency string. }
 function ExtractDependInfo(arry: TC40_DependNetworkString): TC40_DependNetworkInfoArray; overload;
-function ExtractDependInfoToL(info: U_String): TC40_DependNetworkInfoList; overload;
+function ExtractDependInfoToL(info: U_String): TC40_DependNetworkInfoList; overload; { Parses to a list. }
 function ExtractDependInfoToL(arry: TC40_DependNetworkString): TC40_DependNetworkInfoList; overload;
-procedure ResetDependInfoBuff(var arry: TC40_DependNetworkInfoArray);
-function Is_IPC_Addr(ListenAddr_Or_PhysicsAddr: U_String): Boolean;
-function Get_Physics_Server_Class(ListenAddr, PhysicsAddr: U_String): TZNet_ServerClass;
-function Get_Physics_Client_Class(PhysicsAddr: U_String): TZNet_ClientClass;
+procedure ResetDependInfoBuff(var arry: TC40_DependNetworkInfoArray); { Clears an array. }
+function Is_IPC_Addr(ListenAddr_Or_PhysicsAddr: U_String): Boolean; { True if the address is an IPC address (starts with 'ipc:'). }
+function Get_Physics_Server_Class(ListenAddr, PhysicsAddr: U_String): TZNet_ServerClass; { Returns the appropriate server class (IPC or Physics). }
+function Get_Physics_Client_Class(PhysicsAddr: U_String): TZNet_ClientClass; { Returns the appropriate client class. }
+
 {$ENDREGION 'API'}
 
 implementation
