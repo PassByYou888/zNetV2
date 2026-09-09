@@ -447,19 +447,19 @@ begin
 
   Core_Dispatch_Order_Activted__.V := False;
 
-  tk := GetTimeTick + 1000;
+  tk := GetTimeTick() + 1000;
   while not Core_Dispatch_Order_IsExit__.V do
     begin
       TCompute.Sleep(100);
-      if GetTimeTick > tk then
+      if GetTimeTick() > tk then
           Break;
     end;
 
-  tk := GetTimeTick + 1000;
+  tk := GetTimeTick() + 1000;
   while (TCompute.ActivtedTask() > 0) do
     begin
       Check_Soft_Thread_Synchronize(100);
-      if GetTimeTick > tk then
+      if GetTimeTick() > tk then
           Break;
     end;
 end;
@@ -483,27 +483,24 @@ var
   tk: TTimeTick;
 begin
 {$IFDEF DEBUG}
-  if IsConsole then
-      WriteLn('Free Compute Pool.');
+  if IsConsole then WriteLn('Free Compute Pool.');
 {$ENDIF DEBUG}
   if Core_Dispatch_Order_Activted__.V then
     begin
       Core_Dispatch_Order_Activted__.V := False;
 
-      tk := GetTimeTick + 1000;
+      tk := GetTimeTick() + 1000;
       while not Core_Dispatch_Order_IsExit__.V do
         begin
           TCompute.Sleep(100);
-          if GetTimeTick > tk then
-              Break;
+          if GetTimeTick() > tk then Break;
         end;
 
-      tk := GetTimeTick + 1000;
+      tk := GetTimeTick() + 1000;
       while (TCompute.ActivtedTask() > 0) do
         begin
           Check_Soft_Thread_Synchronize(100);
-          if GetTimeTick > tk then
-              Break;
+          if GetTimeTick() > tk then Break;
         end;
     end;
 
@@ -992,35 +989,6 @@ begin
   PostComputeDispatchData(Dispatch_);
 end;
 
-class procedure TCompute.RunC(const OnRun: TRun_Thread_C);
-var
-  Dispatch_: TComputeDispatch;
-begin
-  Dispatch_.Init;
-  Dispatch_.OnRun_C := OnRun;
-  Dispatch_.UserData := nil;
-  Dispatch_.UserObject := nil;
-  PostComputeDispatchData(Dispatch_);
-end;
-
-class procedure TCompute.RunC(const OnRun: TRun_Thread_C; IsRuning_, IsExit_: PBoolean);
-var
-  Dispatch_: TComputeDispatch;
-begin
-  if IsRuning_ <> nil then
-      IsRuning_^ := True;
-  if IsExit_ <> nil then
-      IsExit_^ := False;
-
-  Dispatch_.Init;
-  Dispatch_.OnRun_C := OnRun;
-  Dispatch_.UserData := nil;
-  Dispatch_.UserObject := nil;
-  Dispatch_.IsRuning_ := IsRuning_;
-  Dispatch_.IsExit_ := IsExit_;
-  PostComputeDispatchData(Dispatch_);
-end;
-
 class procedure TCompute.RunC_NP(const OnRun: TRun_Thread_C_NP);
 var
   Dispatch_: TComputeDispatch;
@@ -1110,35 +1078,6 @@ begin
   PostComputeDispatchData(Dispatch_);
 end;
 
-class procedure TCompute.RunM(const OnRun: TRun_Thread_M);
-var
-  Dispatch_: TComputeDispatch;
-begin
-  Dispatch_.Init;
-  Dispatch_.OnRun_M := OnRun;
-  Dispatch_.UserData := nil;
-  Dispatch_.UserObject := nil;
-  PostComputeDispatchData(Dispatch_);
-end;
-
-class procedure TCompute.RunM(const OnRun: TRun_Thread_M; IsRuning_, IsExit_: PBoolean);
-var
-  Dispatch_: TComputeDispatch;
-begin
-  if IsRuning_ <> nil then
-      IsRuning_^ := True;
-  if IsExit_ <> nil then
-      IsExit_^ := False;
-
-  Dispatch_.Init;
-  Dispatch_.OnRun_M := OnRun;
-  Dispatch_.UserData := nil;
-  Dispatch_.UserObject := nil;
-  Dispatch_.IsRuning_ := IsRuning_;
-  Dispatch_.IsExit_ := IsExit_;
-  PostComputeDispatchData(Dispatch_);
-end;
-
 class procedure TCompute.RunM_NP(const OnRun: TRun_Thread_M_NP);
 var
   Dispatch_: TComputeDispatch;
@@ -1223,35 +1162,6 @@ begin
   Dispatch_.OnRun_P := OnRun;
   Dispatch_.UserData := Data;
   Dispatch_.UserObject := Obj;
-  Dispatch_.IsRuning_ := IsRuning_;
-  Dispatch_.IsExit_ := IsExit_;
-  PostComputeDispatchData(Dispatch_);
-end;
-
-class procedure TCompute.RunP(const OnRun: TRun_Thread_P);
-var
-  Dispatch_: TComputeDispatch;
-begin
-  Dispatch_.Init;
-  Dispatch_.OnRun_P := OnRun;
-  Dispatch_.UserData := nil;
-  Dispatch_.UserObject := nil;
-  PostComputeDispatchData(Dispatch_);
-end;
-
-class procedure TCompute.RunP(const OnRun: TRun_Thread_P; IsRuning_, IsExit_: PBoolean);
-var
-  Dispatch_: TComputeDispatch;
-begin
-  if IsRuning_ <> nil then
-      IsRuning_^ := True;
-  if IsExit_ <> nil then
-      IsExit_^ := False;
-
-  Dispatch_.Init;
-  Dispatch_.OnRun_P := OnRun;
-  Dispatch_.UserData := nil;
-  Dispatch_.UserObject := nil;
   Dispatch_.IsRuning_ := IsRuning_;
   Dispatch_.IsExit_ := IsExit_;
   PostComputeDispatchData(Dispatch_);

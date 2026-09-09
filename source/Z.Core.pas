@@ -1788,8 +1788,6 @@ type
     class procedure RunC(const Data: Pointer; const Obj: TCore_Object; const OnRun, OnDone: TRun_Thread_C; IsRuning_, IsExit_: PBoolean); overload;
     class procedure RunC(const Data: Pointer; const Obj: TCore_Object; const OnRun: TRun_Thread_C); overload;
     class procedure RunC(const Data: Pointer; const Obj: TCore_Object; const OnRun: TRun_Thread_C; IsRuning_, IsExit_: PBoolean); overload;
-    class procedure RunC(const OnRun: TRun_Thread_C); overload;
-    class procedure RunC(const OnRun: TRun_Thread_C; IsRuning_, IsExit_: PBoolean); overload;
     class procedure RunC_NP(const OnRun: TRun_Thread_C_NP); overload;
     class procedure RunC_NP(const OnRun: TRun_Thread_C_NP; IsRuning_, IsExit_: PBoolean); overload;
 
@@ -1797,8 +1795,6 @@ type
     class procedure RunM(const Data: Pointer; const Obj: TCore_Object; const OnRun, OnDone: TRun_Thread_M; IsRuning_, IsExit_: PBoolean); overload;
     class procedure RunM(const Data: Pointer; const Obj: TCore_Object; const OnRun: TRun_Thread_M); overload;
     class procedure RunM(const Data: Pointer; const Obj: TCore_Object; const OnRun: TRun_Thread_M; IsRuning_, IsExit_: PBoolean); overload;
-    class procedure RunM(const OnRun: TRun_Thread_M); overload;
-    class procedure RunM(const OnRun: TRun_Thread_M; IsRuning_, IsExit_: PBoolean); overload;
     class procedure RunM_NP(const OnRun: TRun_Thread_M_NP); overload;
     class procedure RunM_NP(const OnRun: TRun_Thread_M_NP; IsRuning_, IsExit_: PBoolean); overload;
 
@@ -1806,8 +1802,6 @@ type
     class procedure RunP(const Data: Pointer; const Obj: TCore_Object; const OnRun, OnDone: TRun_Thread_P; IsRuning_, IsExit_: PBoolean); overload;
     class procedure RunP(const Data: Pointer; const Obj: TCore_Object; const OnRun: TRun_Thread_P); overload;
     class procedure RunP(const Data: Pointer; const Obj: TCore_Object; const OnRun: TRun_Thread_P; IsRuning_, IsExit_: PBoolean); overload;
-    class procedure RunP(const OnRun: TRun_Thread_P); overload;
-    class procedure RunP(const OnRun: TRun_Thread_P; IsRuning_, IsExit_: PBoolean); overload;
     class procedure RunP_NP(const OnRun: TRun_Thread_P_NP); overload;
     class procedure RunP_NP(const OnRun: TRun_Thread_P_NP; IsRuning_, IsExit_: PBoolean); overload;
 
@@ -2961,8 +2955,8 @@ finalization
   On_Raise_Info := nil;
   OnCheckThreadSynchronize := nil;
   Check_Soft_Thread_Synchronize(0);
-  Free_Core_Timer();
   FreeCoreThreadPool;
+  Free_Core_Timer();
   MainThreadProgress.Free;
   FreeMT19937Rand();
   Free_Critical_System;

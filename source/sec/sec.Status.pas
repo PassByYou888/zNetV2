@@ -978,16 +978,23 @@ begin
 end;
 
 { ------------------------------------------------------------------------------
-  ConsoleWrite – Write a string to the console without a trailing newline.
-  - Windows: uses WriteConsoleW (UTF-16) – ignores console codepage.
-  - Unix (Linux/BSD/macOS): writes raw UTF-8 bytes – terminals expect UTF-8.
-}
+  ConsoleWrite – Writes a string to standard output.
+
+  If the output handle is a real console, it uses WriteConsoleW for proper
+  Unicode rendering. If the handle is redirected (pipe/file), it uses WriteFile
+  to write UTF‑8 bytes, so that the parent process can capture the output via
+  a pipe.
+
+  This fixes the problem that WriteConsoleW bypasses stdout redirection.
+  ------------------------------------------------------------------------------ }
 procedure ConsoleWrite(const S: string);
 var
   UTF8Str: UTF8String;
 {$IFDEF MSWINDOWS}
   WStr: UnicodeString;
   Written: DWORD;
+  StdHandle: THandle;
+  ConsoleMode: DWORD;
 {$ENDIF}
 begin
   if not IsConsole then
@@ -996,27 +1003,37 @@ begin
   UTF8Str := ToUTF8(S);
 
 {$IFDEF MSWINDOWS}
-  WStr := UTF8Decode(UTF8Str);
-  WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE),
-    PWideChar(WStr),
-    Length(WStr),
-    Written,
-    nil);
+  StdHandle := GetStdHandle(STD_OUTPUT_HANDLE);
+  if StdHandle = INVALID_HANDLE_VALUE then
+      exit;
+
+  // Check if the handle is a console (GetConsoleMode succeeds for console handles)
+  if GetConsoleMode(StdHandle, ConsoleMode) then
+    begin
+      // Console: use WriteConsoleW for correct Unicode display
+      WStr := UTF8Decode(UTF8Str);
+      WriteConsoleW(StdHandle, PWideChar(WStr), Length(WStr), Written, nil);
+    end
+  else
+    begin
+      // Redirected (pipe/file): write raw UTF‑8 bytes
+      WriteFile(StdHandle, Pointer(UTF8Str)^, Length(UTF8Str), Written, nil);
+    end;
 {$ELSE}
   Write(UTF8Str);
 {$ENDIF}
 end;
 
-{
-  * ConsoleWriteLn – Write a string to the console followed by a line break.
-}
+{ ------------------------------------------------------------------------------
+  ConsoleWriteLn – Write a string to the console followed by a line break.
+  ------------------------------------------------------------------------------ }
 procedure ConsoleWriteLn(const S: string);
 begin
   ConsoleWrite(S);
 {$IFDEF MSWINDOWS}
-  ConsoleWrite(sLineBreak); // use the same wide‑API for newline
+  ConsoleWrite(sLineBreak); // Write line break as UTF-8
 {$ELSE}
-  WriteLn; // WriteLn appends the OS‑specific line ending
+  WriteLn(); // On Unix, WriteLn works fine
 {$ENDIF}
 end;
 
@@ -1063,7 +1080,11 @@ begin
     begin
       Status_Critical__.Acquire;
       try
-          ConsoleWriteLn(Text_); // safe writeln
+{$IFDEF FPC}
+        ConsoleWriteLn(Text_); // fpc safe writeln
+{$ELSE FPC}
+        WriteLn(Text_);
+{$ENDIF FPC}
       finally
           Status_Critical__.Release;
       end;

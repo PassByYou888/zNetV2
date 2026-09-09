@@ -466,7 +466,7 @@ begin
   n := if_(ThNum_ < 2, 1, ThNum_);
 
   for i := 0 to n - 1 do
-      TCompute.RunM(ThRun);
+      TCompute.RunM(nil, nil, ThRun);
   while FThNum < n do
       TCompute.Sleep(1);
 end;
@@ -493,7 +493,7 @@ begin
   ThEnd();
   FThNum := 0;
   for i := 0 to n - 1 do
-      TCompute.RunM(ThRun);
+      TCompute.RunM(nil, nil, ThRun);
   while FThNum < n do
       TCompute.Sleep(1);
 end;

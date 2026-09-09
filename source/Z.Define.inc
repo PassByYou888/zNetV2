@@ -417,10 +417,8 @@
 {$ENDIF Parallel}
 
 {$HINTS OFF}
-{$C+} { Assertions }
 {$M-} { Run-Time Type Information }
 {$H+} { long string }
-{$A+} { Word Align Data }
 {$Q-} { Overflow checking }
 {$B-} { Complete boolean evaluation }
 {$J-} { Writeable typed constants }
