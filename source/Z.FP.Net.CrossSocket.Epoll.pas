@@ -95,6 +95,9 @@ uses
   Z.FP.Net.SocketAPI,
   Z.FP.Net.CrossSocket.Base;
 
+const
+  C_CrossSocket_Epoll_Edition = '2.00';
+
 type
   TEpollCrossSocket = class;
   TIoEvent = (ieRead, ieWrite);

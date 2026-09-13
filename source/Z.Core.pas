@@ -81,6 +81,9 @@ uses
   {$ENDIF FPC}
   Math;
 
+const
+  C_Z_Core_Edition = '18.0';
+
 {$Region 'core defines + class'}
 
 {
@@ -366,7 +369,7 @@ type
   TCritical also provides convenience methods like Inc_ and Dec_ to atomically
   read‑modify‑write a variable while holding the lock.
 }
-  TCritical = class
+  TCritical = class sealed(TCore_Object)
   private
     FName: string;
     Instance__: TSystem_Critical;

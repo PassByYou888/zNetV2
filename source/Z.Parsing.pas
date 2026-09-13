@@ -187,7 +187,7 @@ type
   TTokenTypes = set of TTokenType; // Used for filtering in probing methods
 
   { TTokenStatistics – counts of each token type in the parsed text }
-  TTokenStatistics = array [TTokenType] of Integer;
+  TTokenStatistics = array [TTokenType] of integer;
 
   { ----------------------------------------------------------------------------
     TTextPos – describes a contiguous range (span) in the source text.
@@ -196,7 +196,7 @@ type
     - Text : the actual substring (cached for fast access).
   }
   TTextPos = record
-    bPos, ePos: Integer;
+    bPos, ePos: integer;
     Text: TP_String;
   end;
 
@@ -210,10 +210,10 @@ type
     - Index       : sequential position in the token list (0‑based).
   }
   TTokenData = record
-    bPos, ePos: Integer;
+    bPos, ePos: integer;
     Text: TP_String;
     tokenType: TTokenType;
-    Index: Integer;
+    Index: integer;
     procedure Init; // initialises all fields to default values
   end;
 
@@ -246,8 +246,8 @@ type
   TTextParsingData = record
     Cache: TTextParsingCache;
     Text: TP_String;
-    L: Integer;
-    property Len: Integer read L; // alias for L
+    L: integer;
+    property Len: integer read L; // alias for L
   end;
 
   { TSymbolVector – dynamic array of TP_String, used to represent a list of
@@ -275,7 +275,7 @@ type
     SymbolTable: TP_String; // Characters treated as single symbols (e.g., operators)
     TokenStatistics: TTokenStatistics; // Counts of each token type
     SpecialSymbol: TListPascalString; // List of multi‑character symbols (e.g., '>=', '<<')
-    RebuildCacheBusy: Boolean; // Internal flag to prevent re‑entrant cache rebuilds
+    RebuildCacheBusy: boolean; // Internal flag to prevent re‑entrant cache rebuilds
 
     { ==========================================================================
       Character classification helpers (class methods)
@@ -283,14 +283,14 @@ type
       These overloaded functions test whether a character belongs to a set
       of characters, a string, an ordinal category, or a combination.
     }
-    class function Char_is(c: TP_Char; SomeChars: array of TP_Char): Boolean; overload;
-    class function Char_is(c: TP_Char; SomeChar: TP_Char): Boolean; overload;
-    class function Char_is(c: TP_Char; s: TP_String): Boolean; overload;
-    class function Char_is(c: TP_Char; p: TP_PString): Boolean; overload;
-    class function Char_is(c: TP_Char; SomeCharsets: TP_OrdChars): Boolean; overload;
-    class function Char_is(c: TP_Char; SomeCharset: TP_OrdChar): Boolean; overload;
-    class function Char_is(c: TP_Char; SomeCharsets: TP_OrdChars; SomeChars: TP_String): Boolean; overload;
-    class function Char_is(c: TP_Char; SomeCharsets: TP_OrdChars; p: TP_PString): Boolean; overload;
+    class function Char_is(c: TP_Char; SomeChars: array of TP_Char): boolean; overload; static;
+    class function Char_is(c: TP_Char; SomeChar: TP_Char): boolean; overload; static;
+    class function Char_is(c: TP_Char; s: TP_String): boolean; overload; static;
+    class function Char_is(c: TP_Char; p: TP_PString): boolean; overload; static;
+    class function Char_is(c: TP_Char; SomeCharsets: TP_OrdChars): boolean; overload; static;
+    class function Char_is(c: TP_Char; SomeCharset: TP_OrdChar): boolean; overload; static;
+    class function Char_is(c: TP_Char; SomeCharsets: TP_OrdChars; SomeChars: TP_String): boolean; overload; static;
+    class function Char_is(c: TP_Char; SomeCharsets: TP_OrdChars; p: TP_PString): boolean; overload; static;
 
     { ==========================================================================
       Position‑based comparison
@@ -298,10 +298,10 @@ type
       These methods check if the text at a given offset (1‑based) matches a
       literal string or character. Useful during manual scanning.
     }
-    function ComparePosStr(cOffset: Integer; t: TP_String): Boolean; overload;
-    function ComparePosStr(cOffset: Integer; p: TP_PString): Boolean; overload;
-    function ComparePosChar(cOffset: Integer; c: TP_Char): Boolean; overload;
-    function ComparePosChar(cOffset: Integer; c: TP_Char; ignoreCase_: Boolean): Boolean; overload;
+    function ComparePosStr(cOffset: integer; t: TP_String): boolean; overload;
+    function ComparePosStr(cOffset: integer; p: TP_PString): boolean; overload;
+    function ComparePosChar(cOffset: integer; c: TP_Char): boolean; overload;
+    function ComparePosChar(cOffset: integer; c: TP_Char; ignoreCase_: boolean): boolean; overload;
 
     { ==========================================================================
       Comment and text declaration boundaries
@@ -310,8 +310,8 @@ type
       starting at the given offset. They use the cache if available, otherwise
       they perform a full scan.
     }
-    function CompareCommentGetEndPos(cOffset: Integer): Integer;
-    function CompareTextDeclGetEndPos(cOffset: Integer): Integer;
+    function CompareCommentGetEndPos(cOffset: integer): integer;
+    function CompareTextDeclGetEndPos(cOffset: integer): integer;
 
     { ==========================================================================
       Cache rebuilding
@@ -334,8 +334,8 @@ type
       GetContextBeginPos and GetContextEndPos return the start/end character
       positions of the token that contains the given offset.
     }
-    function GetContextBeginPos(cOffset: Integer): Integer;
-    function GetContextEndPos(cOffset: Integer): Integer;
+    function GetContextBeginPos(cOffset: integer): integer;
+    function GetContextEndPos(cOffset: integer): integer;
 
     { ==========================================================================
       Special symbol detection
@@ -344,9 +344,9 @@ type
       (e.g., '>=', ':=', '<<'). The overloaded version also returns the end
       position of that symbol.
     }
-    function isSpecialSymbol(cOffset: Integer): Boolean; overload;
-    function isSpecialSymbol(cOffset: Integer; var speicalSymbolEndPos: Integer): Boolean; overload;
-    function GetSpecialSymbolEndPos(cOffset: Integer): Integer; // returns end pos, or cOffset if not found
+    function isSpecialSymbol(cOffset: integer): boolean; overload;
+    function isSpecialSymbol(cOffset: integer; var speicalSymbolEndPos: integer): boolean; overload;
+    function GetSpecialSymbolEndPos(cOffset: integer): integer; // returns end pos, or cOffset if not found
 
     { ==========================================================================
       Number detection
@@ -356,9 +356,9 @@ type
       is hex and returns the start position (ignoring leading '+'/'-').
       GetNumberEndPos returns the exclusive end of the number.
     }
-    function isNumber(cOffset: Integer): Boolean; overload;
-    function isNumber(cOffset: Integer; var NumberBegin: Integer; var IsHex: Boolean): Boolean; overload;
-    function GetNumberEndPos(cOffset: Integer): Integer;
+    function isNumber(cOffset: integer): boolean; overload;
+    function isNumber(cOffset: integer; var NumberBegin: integer; var IsHex: boolean): boolean; overload;
+    function GetNumberEndPos(cOffset: integer): integer;
 
     { ==========================================================================
       String literal (text declaration) detection
@@ -370,11 +370,11 @@ type
       GetTextDeclPos : fills the begin/end positions of the literal containing
       the given offset; returns True if found.
     }
-    function isTextDecl(cOffset: Integer): Boolean;
-    function GetTextDeclEndPos(cOffset: Integer): Integer;
-    function GetTextDeclBeginPos(cOffset: Integer): Integer;
+    function isTextDecl(cOffset: integer): boolean;
+    function GetTextDeclEndPos(cOffset: integer): integer;
+    function GetTextDeclBeginPos(cOffset: integer): integer;
     function GetTextBody(Text_: TP_String): TP_String;
-    function GetTextDeclPos(cOffset: Integer; var charBeginPos, charEndPos: Integer): Boolean;
+    function GetTextDeclPos(cOffset: integer; var charBeginPos, charEndPos: integer): boolean;
 
     { ==========================================================================
       Single‑character symbol detection
@@ -382,8 +382,8 @@ type
       isSymbol checks if a position is a single‑character symbol (as defined
       in SymbolTable). GetSymbolEndPos returns the end (cOffset+1) if it is.
     }
-    function isSymbol(cOffset: Integer): Boolean;
-    function GetSymbolEndPos(cOffset: Integer): Integer;
+    function isSymbol(cOffset: integer): boolean;
+    function GetSymbolEndPos(cOffset: integer): integer;
 
     { ==========================================================================
       ASCII / identifier detection
@@ -392,9 +392,9 @@ type
       (not a comment, string, number, or symbol). GetAsciiBeginPos and
       GetAsciiEndPos return the boundaries of the identifier.
     }
-    function isAscii(cOffset: Integer): Boolean;
-    function GetAsciiBeginPos(cOffset: Integer): Integer;
-    function GetAsciiEndPos(cOffset: Integer): Integer;
+    function isAscii(cOffset: integer): boolean;
+    function GetAsciiBeginPos(cOffset: integer): integer;
+    function GetAsciiEndPos(cOffset: integer): integer;
 
     { ==========================================================================
       Comment detection
@@ -403,10 +403,10 @@ type
       GetCommentBeginPos, and GetCommentPos provide the boundaries.
       GetDeletedCommentText returns a copy of the source with all comments removed.
     }
-    function isComment(cOffset: Integer): Boolean;
-    function GetCommentEndPos(cOffset: Integer): Integer;
-    function GetCommentBeginPos(cOffset: Integer): Integer;
-    function GetCommentPos(cOffset: Integer; var charBeginPos, charEndPos: Integer): Boolean;
+    function isComment(cOffset: integer): boolean;
+    function GetCommentEndPos(cOffset: integer): integer;
+    function GetCommentBeginPos(cOffset: integer): integer;
+    function GetCommentPos(cOffset: integer; var charBeginPos, charEndPos: integer): boolean;
     function GetDeletedCommentText: TP_String;
 
     { ==========================================================================
@@ -415,8 +415,8 @@ type
       isTextOrComment   : checks if position is inside a string or comment.
       isCommentOrText   : same order (alias).
     }
-    function isTextOrComment(cOffset: Integer): Boolean;
-    function isCommentOrText(cOffset: Integer): Boolean;
+    function isTextOrComment(cOffset: integer): boolean;
+    function isCommentOrText(cOffset: integer): boolean;
 
     { ==========================================================================
       Word splitting helpers
@@ -427,16 +427,17 @@ type
       GetWordBeginPos and GetWordEndPos return the boundaries of the word
       (contiguous non‑separator characters) containing the given offset.
     }
-    class function isWordSplitChar(c: TP_Char): Boolean; overload;
-    class function isWordSplitChar(c: TP_Char; Split_Token_Char: TP_String): Boolean; overload;
-    class function isWordSplitChar(c: TP_Char; Include_C_0_to_32: Boolean; Split_Token_Char: TP_String): Boolean; overload;
-    function GetWordBeginPos(cOffset: Integer; Split_Token_Char: TP_String): Integer; overload;
-    function GetWordBeginPos(cOffset: Integer): Integer; overload;
-    function GetWordBeginPos(cOffset: Integer; Include_C_0_to_32: Boolean; Split_Token_Char: TP_String): Integer; overload;
-    function GetWordEndPos(cOffset: Integer; Split_Token_Char: TP_String): Integer; overload;
-    function GetWordEndPos(cOffset: Integer): Integer; overload;
-    function GetWordEndPos(cOffset: Integer; BeginSplitCharSet, EndSplitCharSet: TP_String): Integer; overload;
-    function GetWordEndPos(cOffset: Integer; Include_C_0_to_32: Boolean; BeginSplitCharSet: TP_String; EndDefaultChar: Boolean; EndSplitCharSet: TP_String): Integer; overload;
+    class function isWordSplitChar(c: TP_Char): boolean; overload;
+    class function isWordSplitChar(c: TP_Char; Split_Token_Char: TP_String): boolean; overload;
+    class function isWordSplitChar(c: TP_Char; Include_C_0_to_32: boolean; Split_Token_Char: TP_String): boolean; overload;
+    function GetWordBeginPos(cOffset: integer; Split_Token_Char: TP_String): integer; overload;
+    function GetWordBeginPos(cOffset: integer): integer; overload;
+    function GetWordBeginPos(cOffset: integer; Include_C_0_to_32: boolean; Split_Token_Char: TP_String): integer; overload;
+    function GetWordEndPos(cOffset: integer; Split_Token_Char: TP_String): integer; overload;
+    function GetWordEndPos(cOffset: integer): integer; overload;
+    function GetWordEndPos(cOffset: integer; BeginSplitCharSet, EndSplitCharSet: TP_String): integer; overload;
+    function GetWordEndPos(cOffset: integer; Include_C_0_to_32: boolean; BeginSplitCharSet: TP_String; EndDefaultChar: boolean;
+      EndSplitCharSet: TP_String): integer; overload;
 
     { ==========================================================================
       Sniffing – find the next occurrence of a specific character
@@ -445,8 +446,8 @@ type
       looks for a character that belongs to the given set. Returns True if found
       and sets OutPos to its position.
     }
-    function SniffingNextChar(cOffset: Integer; declChar: TP_String): Boolean; overload;
-    function SniffingNextChar(cOffset: Integer; declChar: TP_String; out OutPos: Integer): Boolean; overload;
+    function SniffingNextChar(cOffset: integer; declChar: TP_String): boolean; overload;
+    function SniffingNextChar(cOffset: integer; declChar: TP_String; out OutPos: integer): boolean; overload;
 
     { * =============================================================================
       * Splitting text into vectors — semantic-aware tokenisation
@@ -551,16 +552,13 @@ type
       *     // Note: 'e' is not included because split stopped at ';'
       *   end;
       * ============================================================================= }
-    function SplitChar(cOffset: Integer; var LastPos: Integer;
-      Include_C_0_to_32: Boolean; Split_Token_Char, Split_End_Token_Char: TP_String;
-      var SplitOutput: TSymbolVector): Integer; overload;
+    function SplitChar(cOffset: integer; var LastPos: integer; Include_C_0_to_32: boolean;
+      Split_Token_Char, Split_End_Token_Char: TP_String; var SplitOutput: TSymbolVector): integer; overload;
 
-    function SplitChar(cOffset: Integer; var LastPos: Integer;
-      Split_Token_Char, Split_End_Token_Char: TP_String;
-      var SplitOutput: TSymbolVector): Integer; overload;
+    function SplitChar(cOffset: integer; var LastPos: integer; Split_Token_Char, Split_End_Token_Char: TP_String;
+      var SplitOutput: TSymbolVector): integer; overload;
 
-    function SplitChar(cOffset: Integer; Split_Token_Char, Split_End_Token_Char: TP_String;
-      var SplitOutput: TSymbolVector): Integer; overload;
+    function SplitChar(cOffset: integer; Split_Token_Char, Split_End_Token_Char: TP_String; var SplitOutput: TSymbolVector): integer; overload;
 
     { * =============================================================================
       * SplitString – split by multi‑character string delimiters
@@ -615,10 +613,9 @@ type
       *   – Both are semantic-aware, skipping comments and strings.
       * ============================================================================= }
 
-    function SplitString(cOffset: Integer; var LastPos: Integer;
-      SplitTokenS, SplitEndTokenS: TP_String; var SplitOutput: TSymbolVector): Integer; overload;
-    function SplitString(cOffset: Integer; SplitTokenS, SplitEndTokenS: TP_String;
-      var SplitOutput: TSymbolVector): Integer; overload;
+    function SplitString(cOffset: integer; var LastPos: integer; SplitTokenS, SplitEndTokenS: TP_String;
+      var SplitOutput: TSymbolVector): integer; overload;
+    function SplitString(cOffset: integer; SplitTokenS, SplitEndTokenS: TP_String; var SplitOutput: TSymbolVector): integer; overload;
 
     { ==========================================================================
       Token access and manipulation
@@ -634,27 +631,27 @@ type
       TokenCombine (and Combine alias) concatenates tokens from a range,
       optionally filtering by token type.
     }
-    function CompareTokenText(cOffset: Integer; t: TP_String): Boolean;
-    function CompareTokenChar(cOffset: Integer; c: array of TP_Char): Boolean;
-    function GetToken(cOffset: Integer): PTokenData;
-    property TokenPos[cOffset: Integer]: PTokenData read GetToken;
-    property CharToken[cOffset: Integer]: PTokenData read GetToken;
-    function GetTokenIndex(t: TTokenType; idx: Integer): PTokenData;
-    property TokenIndex[t: TTokenType; idx: Integer]: PTokenData read GetTokenIndex;
-    function TokenCount: Integer; overload;
-    function TokenCountT(t: TTokenTypes): Integer; overload;
-    function GetTokens(idx: Integer): PTokenData;
-    property Tokens[idx: Integer]: PTokenData read GetTokens; default;
-    property Token[idx: Integer]: PTokenData read GetTokens;
-    property Count: Integer read TokenCount;
+    function CompareTokenText(cOffset: integer; t: TP_String): boolean;
+    function CompareTokenChar(cOffset: integer; c: array of TP_Char): boolean;
+    function GetToken(cOffset: integer): PTokenData;
+    property TokenPos[cOffset: integer]: PTokenData read GetToken;
+    property CharToken[cOffset: integer]: PTokenData read GetToken;
+    function GetTokenIndex(t: TTokenType; idx: integer): PTokenData;
+    property TokenIndex[t: TTokenType; idx: integer]: PTokenData read GetTokenIndex;
+    function TokenCount: integer; overload;
+    function TokenCountT(t: TTokenTypes): integer; overload;
+    function GetTokens(idx: integer): PTokenData;
+    property Tokens[idx: integer]: PTokenData read GetTokens; default;
+    property Token[idx: integer]: PTokenData read GetTokens;
+    property Count: integer read TokenCount;
     function FirstToken: PTokenData;
     function LastToken: PTokenData;
     function NextToken(p: PTokenData): PTokenData;
     function PrevToken(p: PTokenData): PTokenData;
-    function TokenCombine(bTokenI, eTokenI: Integer; acceptT: TTokenTypes): TP_String; overload;
-    function TokenCombine(bTokenI, eTokenI: Integer): TP_String; overload;
-    function Combine(bTokenI, eTokenI: Integer; acceptT: TTokenTypes): TP_String; overload;
-    function Combine(bTokenI, eTokenI: Integer): TP_String; overload;
+    function TokenCombine(bTokenI, eTokenI: integer; acceptT: TTokenTypes): TP_String; overload;
+    function TokenCombine(bTokenI, eTokenI: integer): TP_String; overload;
+    function Combine(bTokenI, eTokenI: integer; acceptT: TTokenTypes): TP_String; overload;
+    function Combine(bTokenI, eTokenI: integer): TP_String; overload;
 
     { ==========================================================================
       Token probing (left/right search)
@@ -664,57 +661,57 @@ type
       rightwards. Overloads allow multiple text options.
       Shorter aliases: ProbeL, LProbe, ProbeR, RProbe.
     }
-    function TokenProbeL(startI: Integer; acceptT: TTokenTypes): PTokenData; overload;
-    function TokenProbeL(startI: Integer; t: TP_String): PTokenData; overload;
-    function TokenProbeL(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData; overload;
-    function TokenProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData; overload;
-    function TokenProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData; overload;
-    function TokenProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData; overload;
-    function TokenProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData; overload;
-    function TokenProbeR(startI: Integer; acceptT: TTokenTypes): PTokenData; overload;
-    function TokenProbeR(startI: Integer; t: TP_String): PTokenData; overload;
-    function TokenProbeR(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData; overload;
-    function TokenProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData; overload;
-    function TokenProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData; overload;
-    function TokenProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData; overload;
-    function TokenProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData; overload;
+    function TokenProbeL(startI: integer; acceptT: TTokenTypes): PTokenData; overload;
+    function TokenProbeL(startI: integer; t: TP_String): PTokenData; overload;
+    function TokenProbeL(startI: integer; acceptT: TTokenTypes; t: TP_String): PTokenData; overload;
+    function TokenProbeL(startI: integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData; overload;
+    function TokenProbeL(startI: integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData; overload;
+    function TokenProbeL(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData; overload;
+    function TokenProbeL(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData; overload;
+    function TokenProbeR(startI: integer; acceptT: TTokenTypes): PTokenData; overload;
+    function TokenProbeR(startI: integer; t: TP_String): PTokenData; overload;
+    function TokenProbeR(startI: integer; acceptT: TTokenTypes; t: TP_String): PTokenData; overload;
+    function TokenProbeR(startI: integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData; overload;
+    function TokenProbeR(startI: integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData; overload;
+    function TokenProbeR(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData; overload;
+    function TokenProbeR(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData; overload;
 
-    function ProbeL(startI: Integer; acceptT: TTokenTypes): PTokenData; overload;
-    function ProbeL(startI: Integer; t: TP_String): PTokenData; overload;
-    function ProbeL(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData; overload;
-    function ProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData; overload;
-    function ProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData; overload;
-    function ProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData; overload;
-    function ProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData; overload;
-    function LProbe(startI: Integer; acceptT: TTokenTypes): PTokenData; overload;
-    function LProbe(startI: Integer; t: TP_String): PTokenData; overload;
-    function LProbe(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData; overload;
-    function LProbe(startI: Integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData; overload;
-    function LProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData; overload;
-    function LProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData; overload;
-    function LProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData; overload;
+    function ProbeL(startI: integer; acceptT: TTokenTypes): PTokenData; overload;
+    function ProbeL(startI: integer; t: TP_String): PTokenData; overload;
+    function ProbeL(startI: integer; acceptT: TTokenTypes; t: TP_String): PTokenData; overload;
+    function ProbeL(startI: integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData; overload;
+    function ProbeL(startI: integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData; overload;
+    function ProbeL(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData; overload;
+    function ProbeL(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData; overload;
+    function LProbe(startI: integer; acceptT: TTokenTypes): PTokenData; overload;
+    function LProbe(startI: integer; t: TP_String): PTokenData; overload;
+    function LProbe(startI: integer; acceptT: TTokenTypes; t: TP_String): PTokenData; overload;
+    function LProbe(startI: integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData; overload;
+    function LProbe(startI: integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData; overload;
+    function LProbe(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData; overload;
+    function LProbe(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData; overload;
 
-    function ProbeR(startI: Integer; acceptT: TTokenTypes): PTokenData; overload;
-    function ProbeR(startI: Integer; t: TP_String): PTokenData; overload;
-    function ProbeR(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData; overload;
-    function ProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData; overload;
-    function ProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData; overload;
-    function ProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData; overload;
-    function ProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData; overload;
-    function RProbe(startI: Integer; acceptT: TTokenTypes): PTokenData; overload;
-    function RProbe(startI: Integer; t: TP_String): PTokenData; overload;
-    function RProbe(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData; overload;
-    function RProbe(startI: Integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData; overload;
-    function RProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData; overload;
-    function RProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData; overload;
-    function RProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData; overload;
+    function ProbeR(startI: integer; acceptT: TTokenTypes): PTokenData; overload;
+    function ProbeR(startI: integer; t: TP_String): PTokenData; overload;
+    function ProbeR(startI: integer; acceptT: TTokenTypes; t: TP_String): PTokenData; overload;
+    function ProbeR(startI: integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData; overload;
+    function ProbeR(startI: integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData; overload;
+    function ProbeR(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData; overload;
+    function ProbeR(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData; overload;
+    function RProbe(startI: integer; acceptT: TTokenTypes): PTokenData; overload;
+    function RProbe(startI: integer; t: TP_String): PTokenData; overload;
+    function RProbe(startI: integer; acceptT: TTokenTypes; t: TP_String): PTokenData; overload;
+    function RProbe(startI: integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData; overload;
+    function RProbe(startI: integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData; overload;
+    function RProbe(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData; overload;
+    function RProbe(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData; overload;
 
     { ==========================================================================
       Extended probing – search for a token whose text starts with a given
       string (full‑string match). Useful for identifying prefixes.
     }
-    function TokenFullStringProbe(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
-    function StringProbe(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
+    function TokenFullStringProbe(startI: integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
+    function StringProbe(startI: integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
 
     { ==========================================================================
       Indent (parentheses/brackets) matching
@@ -722,8 +719,8 @@ type
       IndentSymbolEndProbeR finds the matching closing symbol for an opening
       symbol (e.g., ‘)’ for ‘(’). IndentSymbolBeginProbeL does the reverse.
     }
-    function IndentSymbolEndProbeR(startI: Integer; indent_begin_symbol, indent_end_symbol: TP_String): PTokenData;
-    function IndentSymbolBeginProbeL(startI: Integer; indent_begin_symbol, indent_end_symbol: TP_String): PTokenData;
+    function IndentSymbolEndProbeR(startI: integer; indent_begin_symbol, indent_end_symbol: TP_String): PTokenData;
+    function IndentSymbolBeginProbeL(startI: integer; indent_begin_symbol, indent_end_symbol: TP_String): PTokenData;
 
     { ==========================================================================
       Vector / matrix extraction
@@ -734,10 +731,10 @@ type
       or a dynamic array (TSymbolVector).
       FillSymbolMatrix fills a matrix (rows × columns) from a flat vector.
     }
-    function DetectSymbolVector: Boolean;
-    function Extract_Symbol_Vector(L: TPascalStringList): Boolean; overload;
+    function DetectSymbolVector: boolean;
+    function Extract_Symbol_Vector(L: TPascalStringList): boolean; overload;
     function Extract_Symbol_Vector: TSymbolVector; overload;
-    function FillSymbolMatrix(W, H: Integer; var symbolMatrix: TSymbolMatrix): Boolean;
+    function FillSymbolMatrix(W, H: integer; var symbolMatrix: TSymbolMatrix): boolean;
 
     { ==========================================================================
       Text extraction and editing
@@ -750,22 +747,22 @@ type
       DeletedComment removes all comments from the text.
       SearchWordBody searches for an exact word and returns its position.
     }
-    function GetText(bPos, ePos: Integer): TP_String; overload;
-    function GetStr(bPos, ePos: Integer): TP_String; overload;
+    function GetText(bPos, ePos: integer): TP_String; overload;
+    function GetStr(bPos, ePos: integer): TP_String; overload;
     function GetStr(tp: TTextPos): TP_String; overload;
-    function GetWord(cOffset: Integer): TP_String; overload;
-    function GetPoint(cOffset: Integer): TPoint;
-    function GetChar(cOffset: Integer): TP_Char;
-    property Len: Integer read ParsingData.L;
+    function GetWord(cOffset: integer): TP_String; overload;
+    function GetPoint(cOffset: integer): TPoint;
+    function GetChar(cOffset: integer): TP_Char;
+    property Len: integer read ParsingData.L;
     property ParseText: TP_String read ParsingData.Text;
     property Text: TP_String read ParsingData.Text;
 
-    procedure DeletePos(bPos, ePos: Integer); overload;
+    procedure DeletePos(bPos, ePos: integer); overload;
     procedure DeletePos(tp: TTextPos); overload;
     procedure DeletedComment;
-    procedure InsertTextBlock(bPos, ePos: Integer; InsertText_: TP_String); overload;
+    procedure InsertTextBlock(bPos, ePos: integer; InsertText_: TP_String); overload;
     procedure InsertTextBlock(tp: TTextPos; InsertText_: TP_String); overload;
-    function SearchWordBody(initPos: Integer; wordInfo: TP_String; var OutPos: TTextPos): Boolean;
+    function SearchWordBody(initPos: integer; wordInfo: TP_String; var OutPos: TTextPos): boolean;
 
     { ==========================================================================
       String declaration conversion (class methods)
@@ -805,10 +802,8 @@ type
       The constructor automatically builds the parsing cache.
       Destroy frees all internal resources.
     }
-    constructor Create(Text_: TP_String; Style_: TTextStyle;
-      SpecialSymbol_: TListPascalString; SpacerSymbol_: TP_SystemString); overload;
-    constructor Create(Text_: TP_String; Style_: TTextStyle;
-      SpecialSymbol_: TListPascalString); overload;
+    constructor Create(Text_: TP_String; Style_: TTextStyle; SpecialSymbol_: TListPascalString; SpacerSymbol_: TP_SystemString); overload;
+    constructor Create(Text_: TP_String; Style_: TTextStyle; SpecialSymbol_: TListPascalString); overload;
     constructor Create(Text_: TP_String; Style_: TTextStyle); overload;
     constructor Create(Text_: TP_String); overload;
     destructor Destroy; override;
@@ -820,7 +815,7 @@ type
       Parsing : override to implement custom parsing logic (returns True on success).
     }
     procedure Init; virtual;
-    function Parsing: Boolean; virtual;
+    function Parsing: boolean; virtual;
 
     { ==========================================================================
       Debug output
@@ -832,6 +827,53 @@ type
 
   { TTextParsingClass – meta‑class for dynamic creation of TTextParsing descendants }
   TTextParsingClass = class of TTextParsing;
+
+  {
+    * ---------------------------------------------------------------------------
+    * DetectSourceLanguage
+    * ---------------------------------------------------------------------------
+    * Automatically detect whether the given source text is Pascal or C
+    * using the TTextParsing lexer.
+    *
+    * How it works
+    * ------------
+    * 1) The same source is tokenised twice: once with tsPascal and once with tsC.
+    *    A dedicated SpecialSymbol list is supplied so that ':=' and '->' are
+    *    recognised as ttSpecialSymbol in both modes.
+    *
+    * 2) For each parse, four independent categories of evidence are collected:
+    *
+    *    Evidence A – Comment coverage (weight ×4 / ×1)
+    *       Only the correct lexer recognises the language‑specific comment style.
+    *       · Pascal parse: ttComment ....
+    *       · C parse:      ttComment ....
+    *       · '//' line comments exist in both languages → weak (×1)
+    *
+    *    Evidence B – String literal style (weight ×2)
+    *       Pascal uses single quotes, C uses double quotes.
+    *
+    *    Evidence C – Keyword hits (weight ×2)
+    *       ttAscii identifiers are matched against language‑specific keyword tables.
+    *
+    *    Evidence D – Strong operators (weight ×3)
+    *       · Pascal: ':='   · C: '->'
+    *
+    * 3) Scores are summed; the higher score wins.
+    *    · A perfect tie defaults to slPascal (the tool's primary ecosystem).
+    *    · Empty input returns slUnknown.
+    *
+    * Parameters
+    * ----------
+    *   Source : TP_String – the text to analyse.
+    *
+    * Returns
+    * -------
+    *   slPascal / slC / slUnknown
+    --------------------------------------------------------------------------- }
+type
+  TSourceLanguage = (slPascal, slC, slUnknown);
+
+function DetectSourceLanguage(const Source: TP_String): TSourceLanguage;
 
 const
   { C_SpacerSymbol – default set of single‑character symbols (operators and
@@ -894,51 +936,99 @@ end;
   depending on the compiler. These are thin wrappers that make the code
   easier to read.
   ============================================================================ }
-class function TTextParsing.Char_is(c: TP_Char; SomeChars: array of TP_Char): Boolean;
+class function TTextParsing.Char_is(c: TP_Char; SomeChars: array of TP_Char): boolean;
 begin
-  Result := {$IFDEF FPC}UCharIn{$ELSE FPC}CharIn{$ENDIF FPC}(c, SomeChars);
+  Result :=
+{$IFDEF FPC}
+    UCharIn
+{$ELSE FPC}
+    CharIn
+{$ENDIF FPC}
+    (c, SomeChars);
 end;
 
-class function TTextParsing.Char_is(c: TP_Char; SomeChar: TP_Char): Boolean;
+class function TTextParsing.Char_is(c: TP_Char; SomeChar: TP_Char): boolean;
 begin
-  Result := {$IFDEF FPC}UCharIn{$ELSE FPC}CharIn{$ENDIF FPC}(c, SomeChar);
+  Result :=
+{$IFDEF FPC}
+    UCharIn
+{$ELSE FPC}
+    CharIn
+{$ENDIF FPC}
+    (c, SomeChar);
 end;
 
-class function TTextParsing.Char_is(c: TP_Char; s: TP_String): Boolean;
+class function TTextParsing.Char_is(c: TP_Char; s: TP_String): boolean;
 begin
-  Result := {$IFDEF FPC}UCharIn{$ELSE FPC}CharIn{$ENDIF FPC}(c, s);
+  Result :=
+{$IFDEF FPC}
+    UCharIn
+{$ELSE FPC}
+    CharIn
+{$ENDIF FPC}
+    (c, s);
 end;
 
-class function TTextParsing.Char_is(c: TP_Char; p: TP_PString): Boolean;
+class function TTextParsing.Char_is(c: TP_Char; p: TP_PString): boolean;
 begin
-  Result := {$IFDEF FPC}UCharIn{$ELSE FPC}CharIn{$ENDIF FPC}(c, p);
+  Result :=
+{$IFDEF FPC}
+    UCharIn
+{$ELSE FPC}
+    CharIn
+{$ENDIF FPC}
+    (c, p);
 end;
 
-class function TTextParsing.Char_is(c: TP_Char; SomeCharsets: TP_OrdChars): Boolean;
+class function TTextParsing.Char_is(c: TP_Char; SomeCharsets: TP_OrdChars): boolean;
 begin
-  Result := {$IFDEF FPC}UCharIn{$ELSE FPC}CharIn{$ENDIF FPC}(c, SomeCharsets);
+  Result :=
+{$IFDEF FPC}
+    UCharIn
+{$ELSE FPC}
+    CharIn
+{$ENDIF FPC}
+    (c, SomeCharsets);
 end;
 
-class function TTextParsing.Char_is(c: TP_Char; SomeCharset: TP_OrdChar): Boolean;
+class function TTextParsing.Char_is(c: TP_Char; SomeCharset: TP_OrdChar): boolean;
 begin
-  Result := {$IFDEF FPC}UCharIn{$ELSE FPC}CharIn{$ENDIF FPC}(c, SomeCharset);
+  Result :=
+{$IFDEF FPC}
+    UCharIn
+{$ELSE FPC}
+    CharIn
+{$ENDIF FPC}
+    (c, SomeCharset);
 end;
 
-class function TTextParsing.Char_is(c: TP_Char; SomeCharsets: TP_OrdChars; SomeChars: TP_String): Boolean;
+class function TTextParsing.Char_is(c: TP_Char; SomeCharsets: TP_OrdChars; SomeChars: TP_String): boolean;
 begin
-  Result := {$IFDEF FPC}UCharIn{$ELSE FPC}CharIn{$ENDIF FPC}(c, SomeCharsets, SomeChars);
+  Result :=
+{$IFDEF FPC}
+    UCharIn
+{$ELSE FPC}
+    CharIn
+{$ENDIF FPC}
+    (c, SomeCharsets, SomeChars);
 end;
 
-class function TTextParsing.Char_is(c: TP_Char; SomeCharsets: TP_OrdChars; p: TP_PString): Boolean;
+class function TTextParsing.Char_is(c: TP_Char; SomeCharsets: TP_OrdChars; p: TP_PString): boolean;
 begin
-  Result := {$IFDEF FPC}UCharIn{$ELSE FPC}CharIn{$ENDIF FPC}(c, SomeCharsets, p);
+  Result :=
+{$IFDEF FPC}
+    UCharIn
+{$ELSE FPC}
+    CharIn
+{$ENDIF FPC}
+    (c, SomeCharsets, p);
 end;
 
 { ============================================================================
   Position‑based comparisons
   ============================================================================ }
 
-function TTextParsing.ComparePosStr(cOffset: Integer; t: TP_String): Boolean;
+function TTextParsing.ComparePosStr(cOffset: integer; t: TP_String): boolean;
 { * Compares the substring starting at cOffset with the given string t.
   * Uses the built‑in ComparePos method of TP_String.
   * @Param cOffset   : 1‑based start position.
@@ -951,21 +1041,21 @@ begin
   Result := ParsingData.Text.ComparePos(cOffset, t);
 end;
 
-function TTextParsing.ComparePosStr(cOffset: Integer; p: TP_PString): Boolean;
+function TTextParsing.ComparePosStr(cOffset: integer; p: TP_PString): boolean;
 { * Same as above, but takes a pointer to a TP_String.
 }
 begin
   Result := ParsingData.Text.ComparePos(cOffset, p);
 end;
 
-function TTextParsing.ComparePosChar(cOffset: Integer; c: TP_Char): Boolean;
+function TTextParsing.ComparePosChar(cOffset: integer; c: TP_Char): boolean;
 { * Compares the character at cOffset with the given character c.
 }
 begin
   Result := ParsingData.Text[cOffset] = c;
 end;
 
-function TTextParsing.ComparePosChar(cOffset: Integer; c: TP_Char; ignoreCase_: Boolean): Boolean;
+function TTextParsing.ComparePosChar(cOffset: integer; c: TP_Char; ignoreCase_: boolean): boolean;
 { * Compares the character at cOffset with c, optionally ignoring case.
   * When ignoreCase_ is True, uses ComparePosStr which does a case‑insensitive
   * comparison (depending on the TP_String implementation).
@@ -981,7 +1071,7 @@ end;
   Comment and text declaration boundaries
   ============================================================================ }
 
-function TTextParsing.CompareCommentGetEndPos(cOffset: Integer): Integer;
+function TTextParsing.CompareCommentGetEndPos(cOffset: integer): integer;
 { * Determines the end position of a comment that starts at or contains cOffset.
   * It first checks the cache; if not available, it performs a manual scan
   * based on the current TextStyle.
@@ -989,9 +1079,9 @@ function TTextParsing.CompareCommentGetEndPos(cOffset: Integer): Integer;
   * @Return The exclusive end position of the comment, or cOffset if no comment.
 }
 var
-  L: Integer;
-  cPos: Integer;
-  tmpPos: Integer;
+  L: integer;
+  cPos: integer;
+  tmpPos: integer;
   p: PTokenData;
 begin
   if not RebuildCacheBusy then
@@ -1020,66 +1110,66 @@ begin
   if (TextStyle in [tsPascal, tsC]) and (ComparePosStr(Result, '//')) then
     begin
       // Pascal/C++ style single‑line comment
-      inc(Result, 2);
+      Inc(Result, 2);
       while not Char_is(ParsingData.Text[Result], [#13, #10]) do
         begin
           if Result + 1 > L then
               Break;
-          inc(Result);
+          Inc(Result);
         end;
     end
   else if (TextStyle = tsC) and (ComparePosChar(Result, '#')) then
     begin
       // C preprocessor line (treated as comment)
-      inc(Result, 1);
+      Inc(Result, 1);
       while not Char_is(ParsingData.Text[Result], [#13, #10]) do
         begin
           if Result + 1 > L then
               Break;
-          inc(Result);
+          Inc(Result);
         end;
     end
   else if (TextStyle = tsC) and (ComparePosStr(Result, '/*')) then
     begin
       // C multi‑line comment
-      inc(Result, 2);
+      Inc(Result, 2);
       while not ComparePosStr(Result, '*/') do
         begin
           if Result + 1 > L then
               Break;
-          inc(Result);
+          Inc(Result);
         end;
-      inc(Result, 2);
+      Inc(Result, 2);
     end
   else if (TextStyle = tsPascal) and (ComparePosChar(Result, '{')) then
     begin
       // Pascal brace comment
-      inc(Result, 1);
+      Inc(Result, 1);
       while ParsingData.Text[Result] <> '}' do
         begin
           if Result + 1 > L then
               Break;
-          inc(Result);
+          Inc(Result);
         end;
-      inc(Result, 1);
+      Inc(Result, 1);
     end
   else if (TextStyle = tsPascal) and (ComparePosStr(Result, '(*')) then
     begin
       // Pascal (* ... *) comment
-      inc(Result, 2);
+      Inc(Result, 2);
       while not ComparePosStr(Result, '*)') do
         begin
           if Result + 1 > L then
               Break;
-          inc(Result);
+          Inc(Result);
         end;
-      inc(Result, 2);
+      Inc(Result, 2);
     end;
   if Result > L + 1 then
       Result := L + 1; // Ensure we don't go beyond the end
 end;
 
-function TTextParsing.CompareTextDeclGetEndPos(cOffset: Integer): Integer;
+function TTextParsing.CompareTextDeclGetEndPos(cOffset: integer): integer;
 { * Determines the end position of a string literal that starts at or contains
   * cOffset. Handles Pascal single‑quoted strings, C single‑ and double‑quoted
   * strings, and Pascal #‑encoded characters.
@@ -1088,9 +1178,9 @@ function TTextParsing.CompareTextDeclGetEndPos(cOffset: Integer): Integer;
   * @Return Exclusive end position of the literal.
 }
 var
-  L: Integer;
-  cPos: Integer;
-  tmpPos: Integer;
+  L: integer;
+  cPos: integer;
+  tmpPos: integer;
   p: PTokenData;
 begin
   if not RebuildCacheBusy then
@@ -1122,70 +1212,76 @@ begin
           cPos := CompareTextDeclGetEndPos(cPos + 4);
           exit(cPos);
         end;
-      inc(cPos, 1);
+      Inc(cPos, 1);
       while ParsingData.Text[cPos] <> #39 do
         begin
           if cPos + 1 > L then
               Break;
           if ParsingData.Text[cPos] = #10 then // line break inside string => error
               exit(cPos);
-          inc(cPos);
+          Inc(cPos);
         end;
-      inc(cPos, 1);
+      Inc(cPos, 1);
     end;
 
   // C single‑quoted character literal (can contain escapes)
   if (cPos + 1 < L) and (TextStyle = tsC) and (ParsingData.Text[cPos] = #39) then
     begin
-      inc(cPos, 1);
+      Inc(cPos, 1);
       while ParsingData.Text[cPos] <> #39 do
         begin
           if ComparePosStr(cPos, '\' + #39) then // escaped quote
-              inc(cPos, 1);
+              Inc(cPos, 1);
           if cPos + 1 > L then
               Break;
           if ParsingData.Text[cPos] = #10 then
               exit(cPos);
-          inc(cPos);
+          Inc(cPos);
         end;
-      inc(cPos, 1);
+      Inc(cPos, 1);
     end;
 
   // C double‑quoted string
   if (cPos + 1 < L) and (TextStyle = tsC) and (ParsingData.Text[cPos] = '"') then
     begin
-      inc(cPos, 1);
+      Inc(cPos, 1);
       while ParsingData.Text[cPos] <> '"' do
         begin
           if ComparePosStr(cPos, '\"') then // escaped quote
-              inc(cPos, 1);
+              Inc(cPos, 1);
           if cPos + 1 > L then
               Break;
           if ParsingData.Text[cPos] = #10 then
               exit(cPos);
-          inc(cPos);
+          Inc(cPos);
         end;
-      inc(cPos, 1);
+      Inc(cPos, 1);
     end;
 
   // Pascal #‑encoded characters (e.g., #65#66)
   if (cPos + 1 < L) and (TextStyle = tsPascal) and (ParsingData.Text[cPos] = '#') then
     begin
       repeat
-        inc(cPos, 1);
+        Inc(cPos, 1);
         // skip whitespace
         while isWordSplitChar(ParsingData.Text[cPos], True, SymbolTable) do
           begin
             if cPos + 1 > L then
                 exit(cPos);
-            inc(cPos);
+            Inc(cPos);
           end;
         // read hexadecimal or decimal number
-        while Char_is(ParsingData.Text[cPos], [{$IFDEF FPC}ucHex{$ELSE FPC}cHex{$ENDIF FPC}], '$') do
+        while Char_is(ParsingData.Text[cPos], [
+{$IFDEF FPC}
+            ucHex
+{$ELSE FPC}
+            cHex
+{$ENDIF FPC}
+          ], '$') do
           begin
             if cPos + 1 > L then
                 exit(cPos);
-            inc(cPos);
+            Inc(cPos);
           end;
         tmpPos := cPos;
         // skip whitespace after number
@@ -1193,7 +1289,7 @@ begin
           begin
             if cPos + 1 > L then
                 exit(cPos);
-            inc(cPos);
+            Inc(cPos);
           end;
       until not ComparePosStr(cPos, '#'); // continue if next is '#'
       cPos := CompareTextDeclGetEndPos(tmpPos); // recursively parse next part
@@ -1221,10 +1317,10 @@ procedure TTextParsing.RebuildParsingCache;
   * @Note This method is relatively expensive; avoid calling it repeatedly.
 }
 var
-  i, j: Integer;
-  L: Integer;
-  bPos: Integer;
-  ePos: Integer;
+  i, j: integer;
+  L: integer;
+  bPos: integer;
+  ePos: integer;
   textPosPtr: PTextPos;
   TokenDataPtr: PTokenData;
 begin
@@ -1300,7 +1396,7 @@ begin
             end
           else
             begin
-              inc(bPos);
+              Inc(bPos);
               ePos := bPos;
             end;
         end;
@@ -1322,8 +1418,8 @@ begin
           TokenDataPtr^.tokenType := ttSpecialSymbol;
           TokenDataPtr^.Index := ParsingData.Cache.TokenDataList.Count;
           ParsingData.Cache.TokenDataList.Add(TokenDataPtr);
-          inc(TokenStatistics[TokenDataPtr^.tokenType]);
-          bPos := ePos
+          Inc(TokenStatistics[TokenDataPtr^.tokenType]);
+          bPos := ePos;
         end
       else if isTextDecl(bPos) then
         begin
@@ -1336,8 +1432,8 @@ begin
           TokenDataPtr^.tokenType := ttTextDecl;
           TokenDataPtr^.Index := ParsingData.Cache.TokenDataList.Count;
           ParsingData.Cache.TokenDataList.Add(TokenDataPtr);
-          inc(TokenStatistics[TokenDataPtr^.tokenType]);
-          bPos := ePos
+          Inc(TokenStatistics[TokenDataPtr^.tokenType]);
+          bPos := ePos;
         end
       else if isComment(bPos) then
         begin
@@ -1350,7 +1446,7 @@ begin
           TokenDataPtr^.tokenType := ttComment;
           TokenDataPtr^.Index := ParsingData.Cache.TokenDataList.Count;
           ParsingData.Cache.TokenDataList.Add(TokenDataPtr);
-          inc(TokenStatistics[TokenDataPtr^.tokenType]);
+          Inc(TokenStatistics[TokenDataPtr^.tokenType]);
           bPos := ePos;
         end
       else if isNumber(bPos) then
@@ -1364,7 +1460,7 @@ begin
           TokenDataPtr^.tokenType := ttNumber;
           TokenDataPtr^.Index := ParsingData.Cache.TokenDataList.Count;
           ParsingData.Cache.TokenDataList.Add(TokenDataPtr);
-          inc(TokenStatistics[TokenDataPtr^.tokenType]);
+          Inc(TokenStatistics[TokenDataPtr^.tokenType]);
           bPos := ePos;
         end
       else if isSymbol(bPos) then
@@ -1378,7 +1474,7 @@ begin
           TokenDataPtr^.tokenType := ttSymbol;
           TokenDataPtr^.Index := ParsingData.Cache.TokenDataList.Count;
           ParsingData.Cache.TokenDataList.Add(TokenDataPtr);
-          inc(TokenStatistics[TokenDataPtr^.tokenType]);
+          Inc(TokenStatistics[TokenDataPtr^.tokenType]);
           bPos := ePos;
         end
       else if isAscii(bPos) then
@@ -1392,7 +1488,7 @@ begin
           TokenDataPtr^.tokenType := ttAscii;
           TokenDataPtr^.Index := ParsingData.Cache.TokenDataList.Count;
           ParsingData.Cache.TokenDataList.Add(TokenDataPtr);
-          inc(TokenStatistics[TokenDataPtr^.tokenType]);
+          Inc(TokenStatistics[TokenDataPtr^.tokenType]);
           bPos := ePos;
         end
       else
@@ -1409,7 +1505,7 @@ begin
               TokenDataPtr^.tokenType := ttUnknow;
               TokenDataPtr^.Index := ParsingData.Cache.TokenDataList.Count;
               ParsingData.Cache.TokenDataList.Add(TokenDataPtr);
-              inc(TokenStatistics[TokenDataPtr^.tokenType]);
+              Inc(TokenStatistics[TokenDataPtr^.tokenType]);
             end
           else
             begin
@@ -1440,9 +1536,9 @@ procedure TTextParsing.RebuildText;
   * It adjusts the positions of subsequent ranges and finally calls
   * RebuildParsingCache to refresh the token cache.
 }
-  procedure Recompute(bPos, d: Integer);
+  procedure Recompute(bPos, d: integer);
   var
-    i: Integer;
+    i: integer;
     p: PTextPos;
   begin
     // Shift all text positions that come after bPos by the delta d
@@ -1468,7 +1564,7 @@ procedure TTextParsing.RebuildText;
 
 var
   p: PTextPos;
-  i: Integer;
+  i: integer;
 begin
   // First, adjust positions for any length changes in text declarations
   for i := 0 to ParsingData.Cache.TextDecls.Count - 1 do
@@ -1505,7 +1601,7 @@ procedure TTextParsing.RebuildToken;
 }
 var
   p: PTokenData;
-  i, j: Integer;
+  i, j: integer;
 begin
   ParsingData.Text := '';
 
@@ -1513,7 +1609,7 @@ begin
   j := 0;
   for i := 0 to ParsingData.Cache.TokenDataList.Count - 1 do
     with ParsingData.Cache.TokenDataList[i]^ do
-        inc(j, Text.L);
+        Inc(j, Text.L);
 
   // Allocate and fill
   ParsingData.Text.L := j;
@@ -1524,7 +1620,7 @@ begin
       if p^.Text.L > 0 then
         begin
           CopyPtr(@p^.Text.buff[0], @ParsingData.Text.buff[j], p^.Text.L * SizeOf(TP_Char));
-          inc(j, p^.Text.L);
+          Inc(j, p^.Text.L);
         end;
     end;
   ParsingData.L := ParsingData.Text.L;
@@ -1538,14 +1634,14 @@ function TTextParsing.FastRebuildTokenTo(): TP_String;
 }
 var
   p: PTokenData;
-  i, j: Integer;
+  i, j: integer;
 begin
   Result := '';
 
   j := 0;
   for i := 0 to ParsingData.Cache.TokenDataList.Count - 1 do
     with ParsingData.Cache.TokenDataList[i]^ do
-        inc(j, Text.L);
+        Inc(j, Text.L);
 
   Result.L := j;
   j := 0;
@@ -1555,7 +1651,7 @@ begin
       if p^.Text.L > 0 then
         begin
           CopyPtr(@p^.Text.buff[0], @Result.buff[j], p^.Text.L * SizeOf(TP_Char));
-          inc(j, p^.Text.L);
+          Inc(j, p^.Text.L);
         end;
     end;
 end;
@@ -1564,7 +1660,7 @@ end;
   Context (token) boundaries
   ============================================================================ }
 
-function TTextParsing.GetContextBeginPos(cOffset: Integer): Integer;
+function TTextParsing.GetContextBeginPos(cOffset: integer): integer;
 { * Returns the start position of the token that contains the given offset.
   * If no token is found, returns the offset itself.
 }
@@ -1578,7 +1674,7 @@ begin
   Result := p^.bPos;
 end;
 
-function TTextParsing.GetContextEndPos(cOffset: Integer): Integer;
+function TTextParsing.GetContextEndPos(cOffset: integer): integer;
 { * Returns the exclusive end position of the token containing cOffset.
   * If none, returns cOffset.
 }
@@ -1596,20 +1692,20 @@ end;
   Special symbol detection
   ============================================================================ }
 
-function TTextParsing.isSpecialSymbol(cOffset: Integer): Boolean;
+function TTextParsing.isSpecialSymbol(cOffset: integer): boolean;
 var
-  ePos: Integer;
+  ePos: integer;
 begin
   Result := isSpecialSymbol(cOffset, ePos);
 end;
 
-function TTextParsing.isSpecialSymbol(cOffset: Integer; var speicalSymbolEndPos: Integer): Boolean;
+function TTextParsing.isSpecialSymbol(cOffset: integer; var speicalSymbolEndPos: integer): boolean;
 { * Checks whether the position cOffset starts a multi‑character special symbol
   * (listed in SpecialSymbol). If so, returns True and sets speicalSymbolEndPos
   * to the exclusive end of that symbol.
 }
 var
-  i, EP: Integer;
+  i, EP: integer;
   p: PTokenData;
 begin
   // Use cache if available
@@ -1648,7 +1744,7 @@ begin
       end;
 end;
 
-function TTextParsing.GetSpecialSymbolEndPos(cOffset: Integer): Integer;
+function TTextParsing.GetSpecialSymbolEndPos(cOffset: integer): integer;
 begin
   if not isSpecialSymbol(cOffset, Result) then
       Result := cOffset;
@@ -1658,15 +1754,15 @@ end;
   Number detection
   ============================================================================ }
 
-function TTextParsing.isNumber(cOffset: Integer): Boolean;
+function TTextParsing.isNumber(cOffset: integer): boolean;
 var
-  tmp: Integer;
-  IsHex: Boolean;
+  tmp: integer;
+  IsHex: boolean;
 begin
   Result := isNumber(cOffset, tmp, IsHex);
 end;
 
-function TTextParsing.isNumber(cOffset: Integer; var NumberBegin: Integer; var IsHex: Boolean): Boolean;
+function TTextParsing.isNumber(cOffset: integer; var NumberBegin: integer; var IsHex: boolean): boolean;
 { * Determines if the position cOffset begins a numeric literal.
   * It can detect decimal integers, floating‑point numbers, and hexadecimal
   * numbers (with '$' or '0x' prefix). On success, NumberBegin is set to the
@@ -1676,13 +1772,13 @@ function TTextParsing.isNumber(cOffset: Integer; var NumberBegin: Integer; var I
 }
 var
   c: TP_Char;
-  L: Integer;
-  cPos, bkPos: Integer;
-  nc: Integer;
-  dotNum: Integer;
-  eNum: Integer;
-  eSymNum: Integer;
-  pSym: Integer;
+  L: integer;
+  cPos, bkPos: integer;
+  nc: integer;
+  dotNum: integer;
+  eNum: integer;
+  eSymNum: integer;
+  pSym: integer;
   p: PTokenData;
 begin
   if not RebuildCacheBusy then
@@ -1718,7 +1814,7 @@ begin
       begin
         // Pascal hex: $ABCD
         IsHex := True;
-        inc(cPos);
+        Inc(cPos);
         if cPos > L then
             exit;
       end
@@ -1726,7 +1822,7 @@ begin
       begin
         // C hex: 0xABCD
         IsHex := True;
-        inc(cPos, 2);
+        Inc(cPos, 2);
         if cPos > L then
             exit;
       end;
@@ -1750,15 +1846,21 @@ begin
               if nc > 0 then
                   Break;
             end
-          else if Char_is(c, {$IFDEF FPC}ucHex{$ELSE FPC}cHex{$ENDIF FPC}) then
-              inc(nc)
+          else if Char_is(c,
+{$IFDEF FPC}
+            ucHex
+{$ELSE FPC}
+            cHex
+{$ENDIF FPC}
+            ) then
+              Inc(nc)
           else
             begin
               Result := False;
               exit;
             end;
 
-          inc(cPos);
+          Inc(cPos);
         end;
 
       Result := (nc > 0);
@@ -1767,7 +1869,13 @@ begin
     end;
 
   c := ParsingData.Text[cPos];
-  if Char_is(c, {$IFDEF FPC}uc0to9{$ELSE FPC}c0to9{$ENDIF FPC}) then
+  if Char_is(c,
+{$IFDEF FPC}
+    uc0to9
+{$ELSE FPC}
+    c0to9
+{$ENDIF FPC}
+    ) then
     begin
       bkPos := cPos;
       nc := 0;
@@ -1784,31 +1892,43 @@ begin
 
           if Char_is(c, '.') then
             begin
-              inc(dotNum);
+              Inc(dotNum);
               if dotNum > 1 then
                   Break;
             end
-          else if Char_is(c, {$IFDEF FPC}uc0to9{$ELSE FPC}c0to9{$ENDIF FPC}) then
-              inc(nc)
+          else if Char_is(c,
+{$IFDEF FPC}
+            uc0to9
+{$ELSE FPC}
+            c0to9
+{$ENDIF FPC}
+            ) then
+              Inc(nc)
           else if (nc > 0) and (eNum = 0) and Char_is(c, 'eE') then
             begin
-              inc(eNum);
+              Inc(eNum);
             end
           else if (nc > 0) and (eNum = 1) and Char_is(c, '-+') then
             begin
-              inc(eSymNum);
+              Inc(eSymNum);
             end
           else if isWordSplitChar(c, True, SymbolTable) then
             begin
               Break;
             end
-          else if Char_is(c, [{$IFDEF FPC}ucAtoZ, ucDoubleChar{$ELSE FPC}cAtoZ, cDoubleChar{$ENDIF FPC}]) then
+          else if Char_is(c, [
+{$IFDEF FPC}
+              ucAtoZ, ucDoubleChar
+{$ELSE FPC}
+              cAtoZ, cDoubleChar
+{$ENDIF FPC}
+            ]) then
             begin
               Result := False;
               exit;
             end;
 
-          inc(cPos);
+          Inc(cPos);
         end;
 
       Result := (nc > 0) and (dotNum <= 1);
@@ -1833,35 +1953,47 @@ begin
 
           if (nc = 0) and (eSymNum = 0) and (eNum = 0) and Char_is(c, '-+') then
             begin
-              inc(pSym);
+              Inc(pSym);
             end
           else if Char_is(c, '.') then
             begin
-              inc(dotNum);
+              Inc(dotNum);
               if dotNum > 1 then
                   Break;
             end
-          else if Char_is(c, {$IFDEF FPC}uc0to9{$ELSE FPC}c0to9{$ENDIF FPC}) then
-              inc(nc)
+          else if Char_is(c,
+{$IFDEF FPC}
+            uc0to9
+{$ELSE FPC}
+            c0to9
+{$ENDIF FPC}
+            ) then
+              Inc(nc)
           else if (nc > 0) and (eNum = 0) and Char_is(c, 'eE') then
             begin
-              inc(eNum);
+              Inc(eNum);
             end
           else if (nc > 0) and (eNum = 1) and Char_is(c, '-+') then
             begin
-              inc(eSymNum);
+              Inc(eSymNum);
             end
           else if isWordSplitChar(c, True, SymbolTable) then
             begin
-              Break
+              Break;
             end
-          else if Char_is(c, [{$IFDEF FPC}ucAtoZ, ucDoubleChar{$ELSE FPC}cAtoZ, cDoubleChar{$ENDIF FPC}]) then
+          else if Char_is(c, [
+{$IFDEF FPC}
+              ucAtoZ, ucDoubleChar
+{$ELSE FPC}
+              cAtoZ, cDoubleChar
+{$ENDIF FPC}
+            ]) then
             begin
               Result := False;
               exit;
             end;
 
-          inc(cPos);
+          Inc(cPos);
         end;
 
       Result := (nc > 0) and (dotNum <= 1);
@@ -1870,18 +2002,18 @@ begin
     end;
 end;
 
-function TTextParsing.GetNumberEndPos(cOffset: Integer): Integer;
+function TTextParsing.GetNumberEndPos(cOffset: integer): integer;
 { * Returns the exclusive end position of the number that starts at cOffset.
   * If no number is found, returns cOffset.
 }
 var
-  IsHex: Boolean;
-  L: Integer;
-  cPos: Integer;
+  IsHex: boolean;
+  L: integer;
+  cPos: integer;
   c: TP_Char;
-  nc: Integer;
-  dotNum: Integer;
-  eNum: Integer;
+  nc: integer;
+  dotNum: integer;
+  eNum: integer;
   p: PTokenData;
 begin
   if not RebuildCacheBusy then
@@ -1915,14 +2047,20 @@ begin
               Break;
           c := ParsingData.Text[Result];
 
-          if (not Char_is(c, [{$IFDEF FPC}uc0to9{$ELSE FPC}c0to9{$ENDIF FPC}])) then
+          if (not Char_is(c, [
+{$IFDEF FPC}
+                uc0to9
+{$ELSE FPC}
+                c0to9
+{$ENDIF FPC}
+              ])) then
             begin
               if Char_is(c, '+-') then
                 begin
                   if nc > 0 then
                     begin
                       if eNum = 1 then
-                          inc(eNum)
+                          Inc(eNum)
                       else
                           exit;
                     end;
@@ -1931,23 +2069,29 @@ begin
                 begin
                   if (dotNum > 1) then
                       exit;
-                  inc(dotNum);
+                  Inc(dotNum);
                 end
               else if (not IsHex) and Char_is(c, 'eE') then
                 begin
                   if (eNum > 1) then
                       exit;
-                  inc(eNum);
+                  Inc(eNum);
                 end
-              else if (IsHex and (Char_is(c, [{$IFDEF FPC}ucLoAtoF, ucHiAtoF{$ELSE FPC}cLoAtoF, cHiAtoF{$ENDIF FPC}]))) then
-                  inc(nc)
+              else if (IsHex and (Char_is(c, [
+{$IFDEF FPC}
+                      ucLoAtoF, ucHiAtoF
+{$ELSE FPC}
+                      cLoAtoF, cHiAtoF
+{$ENDIF FPC}
+                    ]))) then
+                  Inc(nc)
               else
                   exit;
             end
           else
-              inc(nc);
+              Inc(nc);
 
-          inc(Result);
+          Inc(Result);
           if Result > L then
               exit;
         end;
@@ -1960,16 +2104,16 @@ end;
   String literal (text declaration) detection
   ============================================================================ }
 
-function TTextParsing.isTextDecl(cOffset: Integer): Boolean;
+function TTextParsing.isTextDecl(cOffset: integer): boolean;
 var
-  bPos, ePos: Integer;
+  bPos, ePos: integer;
 begin
   Result := GetTextDeclPos(cOffset, bPos, ePos);
 end;
 
-function TTextParsing.GetTextDeclEndPos(cOffset: Integer): Integer;
+function TTextParsing.GetTextDeclEndPos(cOffset: integer): integer;
 var
-  bPos, ePos: Integer;
+  bPos, ePos: integer;
 begin
   if GetTextDeclPos(cOffset, bPos, ePos) then
       Result := ePos
@@ -1977,9 +2121,9 @@ begin
       Result := cOffset;
 end;
 
-function TTextParsing.GetTextDeclBeginPos(cOffset: Integer): Integer;
+function TTextParsing.GetTextDeclBeginPos(cOffset: integer): integer;
 var
-  bPos, ePos: Integer;
+  bPos, ePos: integer;
 begin
   if GetTextDeclPos(cOffset, bPos, ePos) then
       Result := bPos
@@ -2002,12 +2146,12 @@ begin
       Result := Text_;
 end;
 
-function TTextParsing.GetTextDeclPos(cOffset: Integer; var charBeginPos, charEndPos: Integer): Boolean;
+function TTextParsing.GetTextDeclPos(cOffset: integer; var charBeginPos, charEndPos: integer): boolean;
 { * Locates the string literal that contains the given offset.
   * Uses binary search on the TextDecls list.
   * @Return True if a literal is found, and fills charBeginPos/charEndPos.
 }
-  function CompLst(idx: Integer): Integer;
+  function CompLst(idx: integer): integer;
   begin
     with PTextPos(ParsingData.Cache.TextDecls[idx])^ do
       begin
@@ -2023,7 +2167,7 @@ function TTextParsing.GetTextDeclPos(cOffset: Integer; var charBeginPos, charEnd
   end;
 
 var
-  cPos, L, r, M: Integer;
+  cPos, L, r, M: integer;
   p: PTokenData;
 begin
   if not RebuildCacheBusy then
@@ -2079,7 +2223,7 @@ end;
   Single‑character symbol detection
   ============================================================================ }
 
-function TTextParsing.isSymbol(cOffset: Integer): Boolean;
+function TTextParsing.isSymbol(cOffset: integer): boolean;
 var
   p: PTokenData;
 begin
@@ -2092,10 +2236,10 @@ begin
           exit;
         end;
     end;
-  Result := Char_is(ParsingData.Text[cOffset], SymbolTable)
+  Result := Char_is(ParsingData.Text[cOffset], SymbolTable);
 end;
 
-function TTextParsing.GetSymbolEndPos(cOffset: Integer): Integer;
+function TTextParsing.GetSymbolEndPos(cOffset: integer): integer;
 begin
   if isSymbol(cOffset) then
       Result := cOffset + 1
@@ -2107,7 +2251,7 @@ end;
   ASCII / identifier detection
   ============================================================================ }
 
-function TTextParsing.isAscii(cOffset: Integer): Boolean;
+function TTextParsing.isAscii(cOffset: integer): boolean;
 { * Checks if the position is part of an identifier (alphanumeric sequence)
   * that is not a comment, string, number, or symbol.
   * It is essentially a word that consists only of alphanumeric characters
@@ -2139,7 +2283,7 @@ begin
   Result := (not isSymbol(cOffset)) and (not isWordSplitChar(ParsingData.Text[cOffset], True, SymbolTable)) and (not isNumber(cOffset));
 end;
 
-function TTextParsing.GetAsciiBeginPos(cOffset: Integer): Integer;
+function TTextParsing.GetAsciiBeginPos(cOffset: integer): integer;
 { * Returns the start of the identifier containing cOffset.
 }
 var
@@ -2160,7 +2304,7 @@ begin
   Result := GetWordBeginPos(cOffset, True, SymbolTable);
 end;
 
-function TTextParsing.GetAsciiEndPos(cOffset: Integer): Integer;
+function TTextParsing.GetAsciiEndPos(cOffset: integer): integer;
 var
   p: PTokenData;
 begin
@@ -2183,9 +2327,9 @@ end;
   Comment detection
   ============================================================================ }
 
-function TTextParsing.isComment(cOffset: Integer): Boolean;
+function TTextParsing.isComment(cOffset: integer): boolean;
 var
-  bPos, ePos: Integer;
+  bPos, ePos: integer;
   p: PTokenData;
 begin
   if not RebuildCacheBusy then
@@ -2200,9 +2344,9 @@ begin
   Result := GetCommentPos(cOffset, bPos, ePos);
 end;
 
-function TTextParsing.GetCommentEndPos(cOffset: Integer): Integer;
+function TTextParsing.GetCommentEndPos(cOffset: integer): integer;
 var
-  bPos, ePos: Integer;
+  bPos, ePos: integer;
   p: PTokenData;
 begin
   if not RebuildCacheBusy then
@@ -2224,9 +2368,9 @@ begin
       Result := cOffset;
 end;
 
-function TTextParsing.GetCommentBeginPos(cOffset: Integer): Integer;
+function TTextParsing.GetCommentBeginPos(cOffset: integer): integer;
 var
-  bPos, ePos: Integer;
+  bPos, ePos: integer;
   p: PTokenData;
 begin
   if not RebuildCacheBusy then
@@ -2248,11 +2392,11 @@ begin
       Result := cOffset;
 end;
 
-function TTextParsing.GetCommentPos(cOffset: Integer; var charBeginPos, charEndPos: Integer): Boolean;
+function TTextParsing.GetCommentPos(cOffset: integer; var charBeginPos, charEndPos: integer): boolean;
 { * Locates the comment that contains the given offset using binary search
   * on CommentDecls.
 }
-  function CompLst(idx: Integer): Integer;
+  function CompLst(idx: integer): integer;
   begin
     with PTextPos(ParsingData.Cache.CommentDecls[idx])^ do
       begin
@@ -2268,7 +2412,7 @@ function TTextParsing.GetCommentPos(cOffset: Integer; var charBeginPos, charEndP
   end;
 
 var
-  cPos, L, r, M: Integer;
+  cPos, L, r, M: integer;
   p: PTokenData;
 begin
   if not RebuildCacheBusy then
@@ -2325,7 +2469,7 @@ function TTextParsing.GetDeletedCommentText: TP_String;
   * It works by scanning the text and skipping comment ranges.
 }
 var
-  oriPos, cPos, nPos: Integer;
+  oriPos, cPos, nPos: integer;
 begin
   Result := '';
 
@@ -2343,7 +2487,7 @@ begin
         end
       else
         begin
-          inc(cPos);
+          Inc(cPos);
         end;
     end;
   if oriPos <= ParsingData.L then
@@ -2356,12 +2500,12 @@ end;
   Composite checks
   ============================================================================ }
 
-function TTextParsing.isTextOrComment(cOffset: Integer): Boolean;
+function TTextParsing.isTextOrComment(cOffset: integer): boolean;
 begin
   Result := isTextDecl(cOffset) or isComment(cOffset);
 end;
 
-function TTextParsing.isCommentOrText(cOffset: Integer): Boolean;
+function TTextParsing.isCommentOrText(cOffset: integer): boolean;
 begin
   Result := isComment(cOffset) or isTextDecl(cOffset);
 end;
@@ -2370,44 +2514,56 @@ end;
   Word splitting helpers
   ============================================================================ }
 
-class function TTextParsing.isWordSplitChar(c: TP_Char): Boolean;
+class function TTextParsing.isWordSplitChar(c: TP_Char): boolean;
 begin
-  Result := Char_is(c, [{$IFDEF FPC}uc0to32{$ELSE FPC}c0to32{$ENDIF FPC}]);
+  Result := Char_is(c, [
+{$IFDEF FPC}
+      uc0to32
+{$ELSE FPC}
+      c0to32
+{$ENDIF FPC}
+    ]);
 end;
 
-class function TTextParsing.isWordSplitChar(c: TP_Char; Split_Token_Char: TP_String): Boolean;
+class function TTextParsing.isWordSplitChar(c: TP_Char; Split_Token_Char: TP_String): boolean;
 begin
   Result := isWordSplitChar(c, True, Split_Token_Char);
 end;
 
-class function TTextParsing.isWordSplitChar(c: TP_Char; Include_C_0_to_32: Boolean; Split_Token_Char: TP_String): Boolean;
+class function TTextParsing.isWordSplitChar(c: TP_Char; Include_C_0_to_32: boolean; Split_Token_Char: TP_String): boolean;
 begin
   if Include_C_0_to_32 then
-      Result := Char_is(c, [{$IFDEF FPC}uc0to32{$ELSE FPC}c0to32{$ENDIF FPC}], Split_Token_Char)
+      Result := Char_is(c, [
+{$IFDEF FPC}
+        uc0to32
+{$ELSE FPC}
+        c0to32
+{$ENDIF FPC}
+      ], Split_Token_Char)
   else
       Result := Char_is(c, Split_Token_Char);
 end;
 
-function TTextParsing.GetWordBeginPos(cOffset: Integer; Split_Token_Char: TP_String): Integer;
+function TTextParsing.GetWordBeginPos(cOffset: integer; Split_Token_Char: TP_String): integer;
 begin
   Result := GetWordBeginPos(cOffset, True, Split_Token_Char);
 end;
 
-function TTextParsing.GetWordBeginPos(cOffset: Integer): Integer;
+function TTextParsing.GetWordBeginPos(cOffset: integer): integer;
 begin
   Result := GetWordBeginPos(cOffset, True, '');
 end;
 
-function TTextParsing.GetWordBeginPos(cOffset: Integer; Include_C_0_to_32: Boolean; Split_Token_Char: TP_String): Integer;
+function TTextParsing.GetWordBeginPos(cOffset: integer; Include_C_0_to_32: boolean; Split_Token_Char: TP_String): integer;
 { * Finds the start of the word (contiguous non‑separator characters) that
   * contains cOffset. Skips comments and string literals.
   * @Param Include_C_0_to_32 : if True, characters 0‑32 are considered separators.
   * @Param Split_Token_Char  : additional separator characters.
 }
 var
-  L: Integer;
-  cPos: Integer;
-  tbPos: Integer;
+  L: integer;
+  cPos: integer;
+  tbPos: integer;
 begin
   L := ParsingData.L;
   cPos := cOffset;
@@ -2427,7 +2583,7 @@ begin
       begin
         if cPos >= L then
             Break;
-        inc(cPos);
+        Inc(cPos);
       end;
   until not isComment(cPos);
 
@@ -2436,36 +2592,37 @@ begin
     begin
       if Result - 1 <= 0 then
           Break;
-      dec(Result);
+      Dec(Result);
     end;
 
   if isWordSplitChar(ParsingData.Text[Result], Split_Token_Char) then
-      inc(Result);
+      Inc(Result);
 end;
 
-function TTextParsing.GetWordEndPos(cOffset: Integer; Split_Token_Char: TP_String): Integer;
+function TTextParsing.GetWordEndPos(cOffset: integer; Split_Token_Char: TP_String): integer;
 begin
   Result := GetWordEndPos(cOffset, True, Split_Token_Char, True, Split_Token_Char);
 end;
 
-function TTextParsing.GetWordEndPos(cOffset: Integer): Integer;
+function TTextParsing.GetWordEndPos(cOffset: integer): integer;
 begin
   Result := GetWordEndPos(cOffset, True, '', True, '');
 end;
 
-function TTextParsing.GetWordEndPos(cOffset: Integer; BeginSplitCharSet, EndSplitCharSet: TP_String): Integer;
+function TTextParsing.GetWordEndPos(cOffset: integer; BeginSplitCharSet, EndSplitCharSet: TP_String): integer;
 begin
   Result := GetWordEndPos(cOffset, True, BeginSplitCharSet, True, EndSplitCharSet);
 end;
 
-function TTextParsing.GetWordEndPos(cOffset: Integer; Include_C_0_to_32: Boolean; BeginSplitCharSet: TP_String; EndDefaultChar: Boolean; EndSplitCharSet: TP_String): Integer;
+function TTextParsing.GetWordEndPos(cOffset: integer; Include_C_0_to_32: boolean; BeginSplitCharSet: TP_String;
+  EndDefaultChar: boolean; EndSplitCharSet: TP_String): integer;
 { * Finds the end of the word that contains cOffset.
   * @Param BeginSplitCharSet : characters that delimit the start of the word.
   * @Param EndDefaultChar    : if True, uses Include_C_0_to_32 to determine separators.
   * @Param EndSplitCharSet   : additional characters that delimit the end.
 }
 var
-  L: Integer;
+  L: integer;
 begin
   L := ParsingData.L;
   if cOffset < 1 then
@@ -2477,7 +2634,7 @@ begin
 
   while (not isWordSplitChar(ParsingData.Text[Result], EndDefaultChar, EndSplitCharSet)) do
     begin
-      inc(Result);
+      Inc(Result);
       if Result > L then
           Break;
     end;
@@ -2487,21 +2644,21 @@ end;
   Sniffing
   ============================================================================ }
 
-function TTextParsing.SniffingNextChar(cOffset: Integer; declChar: TP_String): Boolean;
+function TTextParsing.SniffingNextChar(cOffset: integer; declChar: TP_String): boolean;
 var
-  tmp: Integer;
+  tmp: integer;
 begin
   Result := SniffingNextChar(cOffset, declChar, tmp);
 end;
 
-function TTextParsing.SniffingNextChar(cOffset: Integer; declChar: TP_String; out OutPos: Integer): Boolean;
+function TTextParsing.SniffingNextChar(cOffset: integer; declChar: TP_String; out OutPos: integer): boolean;
 { * Scans forward from cOffset, skipping whitespace, comments, and string
   * literals, until it finds a character that belongs to the set declChar.
   * Returns True and sets OutPos to the position of that character.
 }
 var
-  L: Integer;
-  cPos: Integer;
+  L: integer;
+  cPos: integer;
 begin
   L := ParsingData.L;
   cPos := cOffset;
@@ -2512,7 +2669,7 @@ begin
 
   while isWordSplitChar(ParsingData.Text[cPos], True, '') or (isTextOrComment(cPos)) do
     begin
-      inc(cPos);
+      Inc(cPos);
       if cPos > L then
           exit(False);
     end;
@@ -2530,9 +2687,8 @@ end;
   Splitting text into a vector (character‑based)
   ============================================================================ }
 
-function TTextParsing.SplitChar(cOffset: Integer; var LastPos: Integer;
-  Include_C_0_to_32: Boolean; Split_Token_Char, Split_End_Token_Char: TP_String;
-  var SplitOutput: TSymbolVector): Integer;
+function TTextParsing.SplitChar(cOffset: integer; var LastPos: integer; Include_C_0_to_32: boolean;
+  Split_Token_Char, Split_End_Token_Char: TP_String; var SplitOutput: TSymbolVector): integer;
 { * Splits the text starting at cOffset using the characters in Split_Token_Char
   * as delimiters. Ignores comments and string literals. Optionally includes
   * control characters (0‑32) as delimiters. If Split_End_Token_Char is provided,
@@ -2544,7 +2700,7 @@ function TTextParsing.SplitChar(cOffset: Integer; var LastPos: Integer;
   procedure AddS(s: TP_String);
   var
     n: TP_String;
-    L: Integer;
+    L: integer;
   begin
     n := s.TrimChar(#32#0);
     if n.L = 0 then
@@ -2552,16 +2708,15 @@ function TTextParsing.SplitChar(cOffset: Integer; var LastPos: Integer;
     L := Length(SplitOutput);
     SetLength(SplitOutput, L + 1);
     SplitOutput[L] := n;
-    inc(Result);
+    Inc(Result);
   end;
 
 type
   TLastSym = (lsBody, lsNone);
-
 var
-  L: Integer;
+  L: integer;
   c: TP_Char;
-  cPos, bPos, ePos: Integer;
+  cPos, bPos, ePos: integer;
   LastSym: TLastSym;
 begin
   Result := 0;
@@ -2598,7 +2753,7 @@ begin
               AddS(GetStr(bPos, ePos));
               LastSym := lsNone;
             end;
-          inc(cPos);
+          Inc(cPos);
           Continue;
         end;
       if (Split_End_Token_Char <> '') and (isWordSplitChar(c, False, Split_End_Token_Char)) then
@@ -2618,7 +2773,7 @@ begin
           bPos := cPos;
           LastSym := lsBody;
         end;
-      inc(cPos);
+      Inc(cPos);
     end;
 
   if LastSym = lsBody then
@@ -2630,17 +2785,15 @@ begin
   LastPos := cPos;
 end;
 
-function TTextParsing.SplitChar(cOffset: Integer; var LastPos: Integer;
-  Split_Token_Char, Split_End_Token_Char: TP_String;
-  var SplitOutput: TSymbolVector): Integer;
+function TTextParsing.SplitChar(cOffset: integer; var LastPos: integer; Split_Token_Char, Split_End_Token_Char: TP_String;
+  var SplitOutput: TSymbolVector): integer;
 begin
   Result := SplitChar(cOffset, LastPos, False, Split_Token_Char, Split_End_Token_Char, SplitOutput);
 end;
 
-function TTextParsing.SplitChar(cOffset: Integer; Split_Token_Char, Split_End_Token_Char: TP_String;
-  var SplitOutput: TSymbolVector): Integer;
+function TTextParsing.SplitChar(cOffset: integer; Split_Token_Char, Split_End_Token_Char: TP_String; var SplitOutput: TSymbolVector): integer;
 var
-  t: Integer;
+  t: integer;
 begin
   Result := SplitChar(cOffset, t, Split_Token_Char, Split_End_Token_Char, SplitOutput);
 end;
@@ -2649,14 +2802,14 @@ end;
   Splitting text into a vector (string‑based)
   ============================================================================ }
 
-function TTextParsing.SplitString(cOffset: Integer; var LastPos: Integer;
-  SplitTokenS, SplitEndTokenS: TP_String; var SplitOutput: TSymbolVector): Integer;
+function TTextParsing.SplitString(cOffset: integer; var LastPos: integer; SplitTokenS, SplitEndTokenS: TP_String;
+  var SplitOutput: TSymbolVector): integer;
 { * Similar to SplitChar, but uses multi‑character strings as delimiters.
 }
   procedure AddS(s: TP_String);
   var
     n: TP_String;
-    L: Integer;
+    L: integer;
   begin
     n := s.TrimChar(#32#0);
     if n.L = 0 then
@@ -2664,16 +2817,15 @@ function TTextParsing.SplitString(cOffset: Integer; var LastPos: Integer;
     L := Length(SplitOutput);
     SetLength(SplitOutput, L + 1);
     SplitOutput[L] := n;
-    inc(Result);
+    Inc(Result);
   end;
 
 type
   TLastSym = (lsBody, lsNone);
-
 var
-  L: Integer;
+  L: integer;
   c: TP_Char;
-  cPos, bPos, ePos: Integer;
+  cPos, bPos, ePos: integer;
   LastSym: TLastSym;
 begin
   Result := 0;
@@ -2709,7 +2861,7 @@ begin
               AddS(GetStr(bPos, ePos));
               LastSym := lsNone;
             end;
-          inc(cPos, SplitTokenS.L);
+          Inc(cPos, SplitTokenS.L);
           Continue;
         end;
       if (SplitEndTokenS <> '') and ComparePosStr(cPos, SplitEndTokenS) then
@@ -2729,7 +2881,7 @@ begin
           bPos := cPos;
           LastSym := lsBody;
         end;
-      inc(cPos);
+      Inc(cPos);
     end;
 
   if LastSym = lsBody then
@@ -2741,10 +2893,9 @@ begin
   LastPos := cPos;
 end;
 
-function TTextParsing.SplitString(cOffset: Integer; SplitTokenS, SplitEndTokenS: TP_String;
-  var SplitOutput: TSymbolVector): Integer;
+function TTextParsing.SplitString(cOffset: integer; SplitTokenS, SplitEndTokenS: TP_String; var SplitOutput: TSymbolVector): integer;
 var
-  t: Integer;
+  t: integer;
 begin
   Result := SplitString(cOffset, t, SplitTokenS, SplitEndTokenS, SplitOutput);
 end;
@@ -2753,7 +2904,7 @@ end;
   Token access and manipulation
   ============================================================================ }
 
-function TTextParsing.CompareTokenText(cOffset: Integer; t: TP_String): Boolean;
+function TTextParsing.CompareTokenText(cOffset: integer; t: TP_String): boolean;
 { * Compares the token text at the given offset with t.
   * Uses case‑insensitive comparison (Same).
 }
@@ -2767,7 +2918,7 @@ begin
   Result := p^.Text.Same(t);
 end;
 
-function TTextParsing.CompareTokenChar(cOffset: Integer; c: array of TP_Char): Boolean;
+function TTextParsing.CompareTokenChar(cOffset: integer; c: array of TP_Char): boolean;
 { * Checks if the token at cOffset is a single character that matches any
   * of the characters in the array.
 }
@@ -2783,7 +2934,7 @@ begin
   Result := Char_is(p^.Text.First, c);
 end;
 
-function TTextParsing.GetToken(cOffset: Integer): PTokenData;
+function TTextParsing.GetToken(cOffset: integer): PTokenData;
 { * Returns the token that contains the character position cOffset.
   * Uses the precomputed CharToken array for O(1) lookup.
 }
@@ -2794,11 +2945,11 @@ begin
       Result := nil;
 end;
 
-function TTextParsing.GetTokenIndex(t: TTokenType; idx: Integer): PTokenData;
+function TTextParsing.GetTokenIndex(t: TTokenType; idx: integer): PTokenData;
 { * Returns the idx‑th token of the given type (0‑based).
 }
 var
-  i, c: Integer;
+  i, c: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -2811,29 +2962,29 @@ begin
           if c = idx then
               exit(p)
           else
-              inc(c);
+              Inc(c);
         end;
     end;
 end;
 
-function TTextParsing.TokenCount: Integer;
+function TTextParsing.TokenCount: integer;
 begin
   Result := ParsingData.Cache.TokenDataList.Count;
 end;
 
-function TTextParsing.TokenCountT(t: TTokenTypes): Integer;
+function TTextParsing.TokenCountT(t: TTokenTypes): integer;
 { * Counts how many tokens have a type that is a member of the set t.
 }
 var
-  i: Integer;
+  i: integer;
 begin
   Result := 0;
   for i := ParsingData.Cache.TokenDataList.Count - 1 downto 0 do
     if GetTokens(i)^.tokenType in t then
-        inc(Result);
+        Inc(Result);
 end;
 
-function TTextParsing.GetTokens(idx: Integer): PTokenData;
+function TTextParsing.GetTokens(idx: integer): PTokenData;
 begin
   Result := PTokenData(ParsingData.Cache.TokenDataList[idx]);
 end;
@@ -2868,13 +3019,13 @@ begin
   Result := Tokens[p^.Index - 1];
 end;
 
-function TTextParsing.TokenCombine(bTokenI, eTokenI: Integer; acceptT: TTokenTypes): TP_String;
+function TTextParsing.TokenCombine(bTokenI, eTokenI: integer; acceptT: TTokenTypes): TP_String;
 { * Concatenates the texts of tokens from index bTokenI to eTokenI (inclusive)
   * that have a token type in acceptT. The result is a single string.
   * Leading/trailing spaces are trimmed.
 }
 var
-  bi, ei: Integer;
+  bi, ei: integer;
   p: PTokenData;
 begin
   Result := '';
@@ -2898,7 +3049,7 @@ begin
       p := Tokens[bi];
       if p^.tokenType in acceptT then
           Result.Append(p^.Text);
-      inc(bi);
+      Inc(bi);
     end;
 
   if (bi >= TokenCount) then
@@ -2911,17 +3062,17 @@ begin
     end;
 end;
 
-function TTextParsing.TokenCombine(bTokenI, eTokenI: Integer): TP_String;
+function TTextParsing.TokenCombine(bTokenI, eTokenI: integer): TP_String;
 begin
   Result := TokenCombine(bTokenI, eTokenI, [ttTextDecl, ttComment, ttNumber, ttSymbol, ttAscii, ttSpecialSymbol, ttUnknow]);
 end;
 
-function TTextParsing.Combine(bTokenI, eTokenI: Integer; acceptT: TTokenTypes): TP_String;
+function TTextParsing.Combine(bTokenI, eTokenI: integer; acceptT: TTokenTypes): TP_String;
 begin
   Result := TokenCombine(bTokenI, eTokenI, acceptT);
 end;
 
-function TTextParsing.Combine(bTokenI, eTokenI: Integer): TP_String;
+function TTextParsing.Combine(bTokenI, eTokenI: integer): TP_String;
 begin
   Result := TokenCombine(bTokenI, eTokenI);
 end;
@@ -2930,12 +3081,12 @@ end;
   Token probing (left/right search)
   ============================================================================ }
 
-function TTextParsing.TokenProbeL(startI: Integer; acceptT: TTokenTypes): PTokenData;
+function TTextParsing.TokenProbeL(startI: integer; acceptT: TTokenTypes): PTokenData;
 { * Searches leftwards from startI (token index) for a token whose type is in
   * acceptT. Returns the first matching token, or nil.
 }
 var
-  idx: Integer;
+  idx: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -2951,15 +3102,15 @@ begin
           exit;
         end
       else
-          dec(idx);
+          Dec(idx);
     end;
 end;
 
-function TTextParsing.TokenProbeL(startI: Integer; t: TP_String): PTokenData;
+function TTextParsing.TokenProbeL(startI: integer; t: TP_String): PTokenData;
 { * Searches leftwards for a token whose text equals t (case‑insensitive).
 }
 var
-  idx: Integer;
+  idx: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -2975,15 +3126,15 @@ begin
           exit;
         end
       else
-          dec(idx);
+          Dec(idx);
     end;
 end;
 
-function TTextParsing.TokenProbeL(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
+function TTextParsing.TokenProbeL(startI: integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
 { * Searches leftwards for a token whose type is in acceptT and text equals t.
 }
 var
-  idx: Integer;
+  idx: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -2999,16 +3150,16 @@ begin
           exit;
         end
       else
-          dec(idx);
+          Dec(idx);
     end;
 end;
 
-function TTextParsing.TokenProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData;
+function TTextParsing.TokenProbeL(startI: integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData;
 { * Searches leftwards for a token whose type is in acceptT and text matches
   * any of t1 or t2.
 }
 var
-  idx: Integer;
+  idx: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -3024,14 +3175,14 @@ begin
           exit;
         end
       else
-          dec(idx);
+          Dec(idx);
     end;
 end;
 
 // Additional overloads for up to 5 strings are implemented similarly.
-function TTextParsing.TokenProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData;
+function TTextParsing.TokenProbeL(startI: integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData;
 var
-  idx: Integer;
+  idx: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -3047,13 +3198,13 @@ begin
           exit;
         end
       else
-          dec(idx);
+          Dec(idx);
     end;
 end;
 
-function TTextParsing.TokenProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData;
+function TTextParsing.TokenProbeL(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData;
 var
-  idx: Integer;
+  idx: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -3069,13 +3220,13 @@ begin
           exit;
         end
       else
-          dec(idx);
+          Dec(idx);
     end;
 end;
 
-function TTextParsing.TokenProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData;
+function TTextParsing.TokenProbeL(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData;
 var
-  idx: Integer;
+  idx: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -3091,15 +3242,15 @@ begin
           exit;
         end
       else
-          dec(idx);
+          Dec(idx);
     end;
 end;
 
-function TTextParsing.TokenProbeR(startI: Integer; acceptT: TTokenTypes): PTokenData;
+function TTextParsing.TokenProbeR(startI: integer; acceptT: TTokenTypes): PTokenData;
 { * Searches rightwards from startI for a token whose type is in acceptT.
 }
 var
-  idx: Integer;
+  idx: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -3115,13 +3266,13 @@ begin
           exit;
         end
       else
-          inc(idx);
+          Inc(idx);
     end;
 end;
 
-function TTextParsing.TokenProbeR(startI: Integer; t: TP_String): PTokenData;
+function TTextParsing.TokenProbeR(startI: integer; t: TP_String): PTokenData;
 var
-  idx: Integer;
+  idx: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -3137,13 +3288,13 @@ begin
           exit;
         end
       else
-          inc(idx);
+          Inc(idx);
     end;
 end;
 
-function TTextParsing.TokenProbeR(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
+function TTextParsing.TokenProbeR(startI: integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
 var
-  idx: Integer;
+  idx: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -3159,13 +3310,13 @@ begin
           exit;
         end
       else
-          inc(idx);
+          Inc(idx);
     end;
 end;
 
-function TTextParsing.TokenProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData;
+function TTextParsing.TokenProbeR(startI: integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData;
 var
-  idx: Integer;
+  idx: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -3181,13 +3332,13 @@ begin
           exit;
         end
       else
-          inc(idx);
+          Inc(idx);
     end;
 end;
 
-function TTextParsing.TokenProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData;
+function TTextParsing.TokenProbeR(startI: integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData;
 var
-  idx: Integer;
+  idx: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -3203,13 +3354,13 @@ begin
           exit;
         end
       else
-          inc(idx);
+          Inc(idx);
     end;
 end;
 
-function TTextParsing.TokenProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData;
+function TTextParsing.TokenProbeR(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData;
 var
-  idx: Integer;
+  idx: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -3225,13 +3376,13 @@ begin
           exit;
         end
       else
-          inc(idx);
+          Inc(idx);
     end;
 end;
 
-function TTextParsing.TokenProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData;
+function TTextParsing.TokenProbeR(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData;
 var
-  idx: Integer;
+  idx: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -3247,147 +3398,147 @@ begin
           exit;
         end
       else
-          inc(idx);
+          Inc(idx);
     end;
 end;
 
 // Short aliases (ProbeL, LProbe, ProbeR, RProbe) simply forward to the above.
-function TTextParsing.ProbeL(startI: Integer; acceptT: TTokenTypes): PTokenData;
+function TTextParsing.ProbeL(startI: integer; acceptT: TTokenTypes): PTokenData;
 begin
   Result := TokenProbeL(startI, acceptT);
 end;
 
-function TTextParsing.ProbeL(startI: Integer; t: TP_String): PTokenData;
+function TTextParsing.ProbeL(startI: integer; t: TP_String): PTokenData;
 begin
   Result := TokenProbeL(startI, t);
 end;
 
-function TTextParsing.ProbeL(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
+function TTextParsing.ProbeL(startI: integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
 begin
   Result := TokenProbeL(startI, acceptT, t);
 end;
 
-function TTextParsing.ProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData;
+function TTextParsing.ProbeL(startI: integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData;
 begin
   Result := TokenProbeL(startI, acceptT, t1, t2);
 end;
 
-function TTextParsing.ProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData;
+function TTextParsing.ProbeL(startI: integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData;
 begin
   Result := TokenProbeL(startI, acceptT, t1, t2, t3);
 end;
 
-function TTextParsing.ProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData;
+function TTextParsing.ProbeL(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData;
 begin
   Result := TokenProbeL(startI, acceptT, t1, t2, t3, t4);
 end;
 
-function TTextParsing.ProbeL(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData;
+function TTextParsing.ProbeL(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData;
 begin
   Result := TokenProbeL(startI, acceptT, t1, t2, t3, t4, t5);
 end;
 
-function TTextParsing.LProbe(startI: Integer; acceptT: TTokenTypes): PTokenData;
+function TTextParsing.LProbe(startI: integer; acceptT: TTokenTypes): PTokenData;
 begin
   Result := TokenProbeL(startI, acceptT);
 end;
 
-function TTextParsing.LProbe(startI: Integer; t: TP_String): PTokenData;
+function TTextParsing.LProbe(startI: integer; t: TP_String): PTokenData;
 begin
   Result := TokenProbeL(startI, t);
 end;
 
-function TTextParsing.LProbe(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
+function TTextParsing.LProbe(startI: integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
 begin
   Result := TokenProbeL(startI, acceptT, t);
 end;
 
-function TTextParsing.LProbe(startI: Integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData;
+function TTextParsing.LProbe(startI: integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData;
 begin
   Result := TokenProbeL(startI, acceptT, t1, t2);
 end;
 
-function TTextParsing.LProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData;
+function TTextParsing.LProbe(startI: integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData;
 begin
   Result := TokenProbeL(startI, acceptT, t1, t2, t3);
 end;
 
-function TTextParsing.LProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData;
+function TTextParsing.LProbe(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData;
 begin
   Result := TokenProbeL(startI, acceptT, t1, t2, t3, t4);
 end;
 
-function TTextParsing.LProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData;
+function TTextParsing.LProbe(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData;
 begin
   Result := TokenProbeL(startI, acceptT, t1, t2, t3, t4, t5);
 end;
 
-function TTextParsing.ProbeR(startI: Integer; acceptT: TTokenTypes): PTokenData;
+function TTextParsing.ProbeR(startI: integer; acceptT: TTokenTypes): PTokenData;
 begin
   Result := TokenProbeR(startI, acceptT);
 end;
 
-function TTextParsing.ProbeR(startI: Integer; t: TP_String): PTokenData;
+function TTextParsing.ProbeR(startI: integer; t: TP_String): PTokenData;
 begin
   Result := TokenProbeR(startI, t);
 end;
 
-function TTextParsing.ProbeR(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
+function TTextParsing.ProbeR(startI: integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
 begin
   Result := TokenProbeR(startI, acceptT, t);
 end;
 
-function TTextParsing.ProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData;
+function TTextParsing.ProbeR(startI: integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData;
 begin
   Result := TokenProbeR(startI, acceptT, t1, t2);
 end;
 
-function TTextParsing.ProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData;
+function TTextParsing.ProbeR(startI: integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData;
 begin
   Result := TokenProbeR(startI, acceptT, t1, t2, t3);
 end;
 
-function TTextParsing.ProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData;
+function TTextParsing.ProbeR(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData;
 begin
   Result := TokenProbeR(startI, acceptT, t1, t2, t3, t4);
 end;
 
-function TTextParsing.ProbeR(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData;
+function TTextParsing.ProbeR(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData;
 begin
   Result := TokenProbeR(startI, acceptT, t1, t2, t3, t4, t5);
 end;
 
-function TTextParsing.RProbe(startI: Integer; acceptT: TTokenTypes): PTokenData;
+function TTextParsing.RProbe(startI: integer; acceptT: TTokenTypes): PTokenData;
 begin
   Result := TokenProbeR(startI, acceptT);
 end;
 
-function TTextParsing.RProbe(startI: Integer; t: TP_String): PTokenData;
+function TTextParsing.RProbe(startI: integer; t: TP_String): PTokenData;
 begin
   Result := TokenProbeR(startI, t);
 end;
 
-function TTextParsing.RProbe(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
+function TTextParsing.RProbe(startI: integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
 begin
   Result := TokenProbeR(startI, acceptT, t);
 end;
 
-function TTextParsing.RProbe(startI: Integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData;
+function TTextParsing.RProbe(startI: integer; acceptT: TTokenTypes; t1, t2: TP_String): PTokenData;
 begin
   Result := TokenProbeR(startI, acceptT, t1, t2);
 end;
 
-function TTextParsing.RProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData;
+function TTextParsing.RProbe(startI: integer; acceptT: TTokenTypes; t1, t2, t3: TP_String): PTokenData;
 begin
   Result := TokenProbeR(startI, acceptT, t1, t2, t3);
 end;
 
-function TTextParsing.RProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData;
+function TTextParsing.RProbe(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4: TP_String): PTokenData;
 begin
   Result := TokenProbeR(startI, acceptT, t1, t2, t3, t4);
 end;
 
-function TTextParsing.RProbe(startI: Integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData;
+function TTextParsing.RProbe(startI: integer; acceptT: TTokenTypes; t1, t2, t3, t4, t5: TP_String): PTokenData;
 begin
   Result := TokenProbeR(startI, acceptT, t1, t2, t3, t4, t5);
 end;
@@ -3396,18 +3547,18 @@ end;
   Extended probing (full‑string match)
   ============================================================================ }
 
-function TTextParsing.TokenFullStringProbe(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
+function TTextParsing.TokenFullStringProbe(startI: integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
 begin
   Result := StringProbe(startI, acceptT, t);
 end;
 
-function TTextParsing.StringProbe(startI: Integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
+function TTextParsing.StringProbe(startI: integer; acceptT: TTokenTypes; t: TP_String): PTokenData;
 { * Searches rightwards from startI for a token whose text starts with t
   * (not necessarily equal). Uses ComparePosStr to test if the token's text
   * begins with t.
 }
 var
-  idx: Integer;
+  idx: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -3423,7 +3574,7 @@ begin
           exit;
         end
       else
-          inc(idx);
+          Inc(idx);
     end;
 end;
 
@@ -3431,7 +3582,7 @@ end;
   Indent (parentheses/brackets) matching
   ============================================================================ }
 
-function TTextParsing.IndentSymbolEndProbeR(startI: Integer; indent_begin_symbol, indent_end_symbol: TP_String): PTokenData;
+function TTextParsing.IndentSymbolEndProbeR(startI: integer; indent_begin_symbol, indent_end_symbol: TP_String): PTokenData;
 { * Finds the matching closing token for an opening indent symbol.
   * For example, given '(' and ')', it returns the token ')' that matches
   * the '(' token at startI. It handles nesting.
@@ -3441,7 +3592,7 @@ function TTextParsing.IndentSymbolEndProbeR(startI: Integer; indent_begin_symbol
   * @Return the matching closing token, or nil if not found.
 }
 var
-  idx, bC, eC: Integer;
+  idx, bC, eC: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -3455,9 +3606,9 @@ begin
       p := PTokenData(ParsingData.Cache.TokenDataList[idx]);
 
       if indent_begin_symbol.Exists(p^.Text.buff) then
-          inc(bC)
+          Inc(bC)
       else if indent_end_symbol.Exists(p^.Text.buff) then
-          inc(eC);
+          Inc(eC);
 
       if (bC > 0) and (eC = bC) then
         begin
@@ -3465,16 +3616,16 @@ begin
           exit;
         end;
 
-      inc(idx);
+      Inc(idx);
     end;
 end;
 
-function TTextParsing.IndentSymbolBeginProbeL(startI: Integer; indent_begin_symbol, indent_end_symbol: TP_String): PTokenData;
+function TTextParsing.IndentSymbolBeginProbeL(startI: integer; indent_begin_symbol, indent_end_symbol: TP_String): PTokenData;
 { * Finds the matching opening token for a closing indent symbol.
   * Works similarly but searches leftwards.
 }
 var
-  idx, bC, eC: Integer;
+  idx, bC, eC: integer;
   p: PTokenData;
 begin
   Result := nil;
@@ -3488,9 +3639,9 @@ begin
       p := PTokenData(ParsingData.Cache.TokenDataList[idx]);
 
       if indent_begin_symbol.Exists(p^.Text.buff) then
-          inc(bC)
+          Inc(bC)
       else if indent_end_symbol.Exists(p^.Text.buff) then
-          inc(eC);
+          Inc(eC);
 
       if (eC > 0) and (eC = bC) then
         begin
@@ -3498,7 +3649,7 @@ begin
           exit;
         end;
 
-      dec(idx);
+      Dec(idx);
     end;
 end;
 
@@ -3506,17 +3657,17 @@ end;
   Vector / matrix extraction
   ============================================================================ }
 
-function TTextParsing.DetectSymbolVector: Boolean;
+function TTextParsing.DetectSymbolVector: boolean;
 { * Determines whether the parsed text contains a top‑level comma‑ or
   * semicolon‑separated vector. It scans for symbols that are not inside
   * parentheses or brackets.
   * @Return True if at least two elements are found.
 }
 var
-  i: Integer;
+  i: integer;
   p1, p2, paramB, paramE: PTokenData;
   vExp: TP_String;
-  VectorNum: Integer;
+  VectorNum: integer;
 begin
   Result := False;
 
@@ -3532,13 +3683,13 @@ begin
       p1 := TokenProbeR(i, [ttSymbol]);
       if p1 = nil then
         begin
-          inc(VectorNum);
+          Inc(VectorNum);
           Break;
         end;
       if p1^.Text.Same(',', ';') then
         begin
           paramE := p1;
-          inc(VectorNum);
+          Inc(VectorNum);
           paramB := NextToken(paramE);
           if paramB = nil then
               Break;
@@ -3559,18 +3710,18 @@ begin
           i := p2^.Index + 1;
         end
       else
-          inc(i);
+          Inc(i);
     end;
 
   Result := VectorNum > 1;
 end;
 
-function TTextParsing.Extract_Symbol_Vector(L: TPascalStringList): Boolean;
+function TTextParsing.Extract_Symbol_Vector(L: TPascalStringList): boolean;
 { * Extracts the top‑level vector elements into a TPascalStringList.
   * Each element is the text of a sub‑expression between delimiters.
 }
 var
-  i: Integer;
+  i: integer;
   p1, p2, paramB, paramE: PTokenData;
   vExp: TP_String;
 begin
@@ -3619,7 +3770,7 @@ begin
           i := p2^.Index + 1;
         end
       else
-          inc(i);
+          Inc(i);
     end;
 
   Result := True;
@@ -3630,7 +3781,7 @@ function TTextParsing.Extract_Symbol_Vector: TSymbolVector;
 }
 var
   L: TPascalStringList;
-  i: Integer;
+  i: integer;
 begin
   L := TPascalStringList.Create;
   if Extract_Symbol_Vector(L) then
@@ -3644,13 +3795,13 @@ begin
   DisposeObject(L);
 end;
 
-function TTextParsing.FillSymbolMatrix(W, H: Integer; var symbolMatrix: TSymbolMatrix): Boolean;
+function TTextParsing.FillSymbolMatrix(W, H: integer; var symbolMatrix: TSymbolMatrix): boolean;
 { * Fills a 2D matrix (rows × columns) from a flat vector extracted from the text.
   * The vector must have at least W*H elements.
 }
 var
   L: TPascalStringList;
-  i, j, k: Integer;
+  i, j, k: integer;
 begin
   SetLength(symbolMatrix, 0, 0);
   L := TPascalStringList.Create;
@@ -3663,7 +3814,7 @@ begin
         for i := 0 to W - 1 do
           begin
             symbolMatrix[j, i] := L[k];
-            inc(k);
+            Inc(k);
           end;
     end;
   DisposeObject(L);
@@ -3673,12 +3824,12 @@ end;
   Text extraction and editing
   ============================================================================ }
 
-function TTextParsing.GetText(bPos, ePos: Integer): TP_String;
+function TTextParsing.GetText(bPos, ePos: integer): TP_String;
 begin
   Result := GetStr(bPos, ePos);
 end;
 
-function TTextParsing.GetStr(bPos, ePos: Integer): TP_String;
+function TTextParsing.GetStr(bPos, ePos: integer): TP_String;
 { * Returns the substring from bPos (inclusive) to ePos (exclusive).
   * If ePos is beyond the text length, it adjusts to include up to the end.
 }
@@ -3700,18 +3851,18 @@ begin
   Result := GetStr(tp.bPos, tp.ePos);
 end;
 
-function TTextParsing.GetWord(cOffset: Integer): TP_String;
+function TTextParsing.GetWord(cOffset: integer): TP_String;
 begin
   Result := GetStr(GetAsciiBeginPos(cOffset), GetAsciiEndPos(cOffset));
 end;
 
-function TTextParsing.GetPoint(cOffset: Integer): TPoint;
+function TTextParsing.GetPoint(cOffset: integer): TPoint;
 { * Converts a character position to a TPoint (X = column, Y = line).
   * Both are 1‑based.
 }
 var
-  i: Integer;
-  cPos: Integer;
+  i: integer;
+  cPos: integer;
 begin
   cPos := cOffset;
   Result := Point(1, 1);
@@ -3721,20 +3872,20 @@ begin
     begin
       if ParsingData.Text[i] = #10 then
         begin
-          inc(Result.y);
+          Inc(Result.y);
           Result.x := 0;
         end
       else if not Char_is(ParsingData.Text[i], [#13]) then
-          inc(Result.x);
+          Inc(Result.x);
     end;
 end;
 
-function TTextParsing.GetChar(cOffset: Integer): TP_Char;
+function TTextParsing.GetChar(cOffset: integer): TP_Char;
 begin
   Result := ParsingData.Text[cOffset];
 end;
 
-procedure TTextParsing.DeletePos(bPos, ePos: Integer);
+procedure TTextParsing.DeletePos(bPos, ePos: integer);
 { * Deletes the range from bPos (inclusive) to ePos (exclusive).
   * Rebuilds the cache after modification.
 }
@@ -3758,7 +3909,7 @@ begin
   RebuildParsingCache;
 end;
 
-procedure TTextParsing.InsertTextBlock(bPos, ePos: Integer; InsertText_: TP_String);
+procedure TTextParsing.InsertTextBlock(bPos, ePos: integer; InsertText_: TP_String);
 { * Inserts InsertText_ at the given range (replaces the range).
 }
 begin
@@ -3772,13 +3923,13 @@ begin
   InsertTextBlock(tp.bPos, tp.ePos, InsertText_);
 end;
 
-function TTextParsing.SearchWordBody(initPos: Integer; wordInfo: TP_String; var OutPos: TTextPos): Boolean;
+function TTextParsing.SearchWordBody(initPos: integer; wordInfo: TP_String; var OutPos: TTextPos): boolean;
 { * Searches for an exact word (identifier) that equals wordInfo, starting
   * from initPos. Returns True and fills OutPos if found.
 }
 var
-  cp: Integer;
-  ePos: Integer;
+  cp: integer;
+  ePos: integer;
 begin
   Result := False;
 
@@ -3826,7 +3977,7 @@ begin
           cp := ePos;
         end
       else
-          inc(cp);
+          Inc(cp);
     end;
 end;
 
@@ -3842,8 +3993,8 @@ class function TTextParsing.Translate_Pascal_Decl_To_Text(Decl: TP_String): TP_S
   *   - concatenation of adjacent literals.
 }
 var
-  cPos: Integer;
-  VIsTextDecl: Boolean;
+  cPos: integer;
+  VIsTextDecl: boolean;
   nText: TP_String;
 begin
   cPos := 1;
@@ -3854,30 +4005,36 @@ begin
       if Decl.ComparePos(cPos, #39#39#39#39) then
         begin
           Result.Append(#39);
-          inc(cPos, 4);
+          Inc(cPos, 4);
         end
       else if Decl[cPos] = #39 then
         begin
           VIsTextDecl := not VIsTextDecl;
-          inc(cPos);
+          Inc(cPos);
         end
       else
         begin
           if VIsTextDecl then
             begin
               Result.Append(Decl[cPos]);
-              inc(cPos);
+              Inc(cPos);
             end
           else if Decl[cPos] = '#' then
             begin
               nText := '';
-              inc(cPos);
+              Inc(cPos);
               while cPos <= Decl.L do
                 begin
-                  if Char_is(Decl[cPos], [{$IFDEF FPC}ucHex{$ELSE FPC}cHex{$ENDIF FPC}], '$') then
+                  if Char_is(Decl[cPos], [
+{$IFDEF FPC}
+                      ucHex
+{$ELSE FPC}
+                      cHex
+{$ENDIF FPC}
+                    ], '$') then
                     begin
                       nText.Append(Decl[cPos]);
-                      inc(cPos);
+                      Inc(cPos);
                     end
                   else
                       Break;
@@ -3885,7 +4042,7 @@ begin
               Result.Append(TP_Char(umlStrToInt(nText, 0)));
             end
           else
-              inc(cPos);
+              Inc(cPos);
         end;
     end;
 end;
@@ -3896,9 +4053,9 @@ class function TTextParsing.Translate_Text_To_Pascal_Decl(Decl: TP_String): TP_S
   * All other characters are placed inside quotes.
 }
 var
-  cPos: Integer;
+  cPos: integer;
   c: TP_Char;
-  LastIsOrdChar: Boolean;
+  LastIsOrdChar: boolean;
   ordCharInfo: TP_String;
 begin
   if Decl.L = 0 then
@@ -3949,9 +4106,9 @@ class function TTextParsing.Translate_Text_To_Pascal_Decl_With_Unicode(Decl: TP_
   * with ordinal >= $80 as #... to avoid Unicode issues in Pascal source.
 }
 var
-  cPos: Integer;
+  cPos: integer;
   c: TP_Char;
-  LastIsOrdChar: Boolean;
+  LastIsOrdChar: boolean;
   ordCharInfo: TP_String;
 begin
   if Decl.L = 0 then
@@ -4002,12 +4159,12 @@ class function TTextParsing.Translate_C_Decl_To_Text(Decl: TP_String): TP_String
   * Handles the standard escape sequences listed in CTranslateTable.
 }
 var
-  cPos: Integer;
-  i: Integer;
-  VIsCharDecl: Boolean;
-  VIsTextDecl: Boolean;
+  cPos: integer;
+  i: integer;
+  VIsCharDecl: boolean;
+  VIsTextDecl: boolean;
   nText: TP_String;
-  wasC: Boolean;
+  wasC: boolean;
 begin
   cPos := 1;
   VIsCharDecl := False;
@@ -4018,12 +4175,12 @@ begin
       if Decl[cPos] = #39 then
         begin
           VIsCharDecl := not VIsCharDecl;
-          inc(cPos);
+          Inc(cPos);
         end
       else if Decl[cPos] = '"' then
         begin
           VIsTextDecl := not VIsTextDecl;
-          inc(cPos);
+          Inc(cPos);
         end
       else
         begin
@@ -4032,7 +4189,7 @@ begin
             begin
               if Decl.ComparePos(cPos, CTranslateTable[i].c) then
                 begin
-                  inc(cPos, Length(CTranslateTable[i].c));
+                  Inc(cPos, Length(CTranslateTable[i].c));
                   Result.Append(CTranslateTable[i].s);
                   wasC := True;
                   Break;
@@ -4042,7 +4199,7 @@ begin
             begin
               if VIsTextDecl or VIsCharDecl then
                   Result.Append(Decl[cPos]);
-              inc(cPos);
+              Inc(cPos);
             end;
         end;
     end;
@@ -4054,7 +4211,7 @@ class function TTextParsing.Translate_Text_To_C_Decl(Decl: TP_String): TP_String
 }
   function GetCStyle(c: TP_Char): TP_SystemString;
   var
-    i: Integer;
+    i: integer;
   begin
     Result := '';
     for i := low(CTranslateTable) to high(CTranslateTable) do
@@ -4066,9 +4223,9 @@ class function TTextParsing.Translate_Text_To_C_Decl(Decl: TP_String): TP_String
   end;
 
 var
-  cPos: Integer;
+  cPos: integer;
   c: TP_Char;
-  LastIsOrdChar: Boolean;
+  LastIsOrdChar: boolean;
   n: TP_SystemString;
 begin
   if Decl.L = 0 then
@@ -4217,8 +4374,7 @@ end;
   Constructors and destructor
   ============================================================================ }
 
-constructor TTextParsing.Create(Text_: TP_String; Style_: TTextStyle;
-  SpecialSymbol_: TListPascalString; SpacerSymbol_: TP_SystemString);
+constructor TTextParsing.Create(Text_: TP_String; Style_: TTextStyle; SpecialSymbol_: TListPascalString; SpacerSymbol_: TP_SystemString);
 begin
   inherited Create;
   ParsingData.Cache.CommentDecls := nil;
@@ -4262,7 +4418,7 @@ destructor TTextParsing.Destroy;
 { * Releases all cached structures and owned objects.
 }
 var
-  i: Integer;
+  i: integer;
 begin
   if ParsingData.Cache.CommentDecls <> nil then
     begin
@@ -4314,7 +4470,7 @@ procedure TTextParsing.Init;
 begin
 end;
 
-function TTextParsing.Parsing: Boolean;
+function TTextParsing.Parsing: boolean;
 { * Override to implement custom parsing logic. Should return True on success.
   * By default returns False.
 }
@@ -4331,7 +4487,7 @@ procedure TTextParsing.Print;
   * Useful for debugging.
 }
 var
-  i: Integer;
+  i: integer;
   pt: PTokenData;
 begin
   for i := 0 to ParsingData.Cache.TokenDataList.Count - 1 do
@@ -4341,23 +4497,238 @@ begin
     end;
 end;
 
-{ ============================================================================
-  Test helper (internal)
-  ============================================================================ }
+function DetectSourceLanguage(const Source: TP_String): TSourceLanguage;
+const
+  { Pascal keywords that do NOT collide with C. }
+  PascalKeywords: array [0 .. 22] of string = (
+    'unit', 'interface', 'implementation', 'begin', 'end',
+    'procedure', 'function', 'uses', 'program', 'library',
+    'type', 'var', 'const', 'record', 'class', 'object',
+    'property', 'published', 'private', 'protected', 'public',
+    'inline', 'overload'
+    );
+  { C keywords that do NOT collide with Pascal. }
+  CKeywords: array [0 .. 29] of string = (
+    'void', 'int', 'char', 'float', 'double',
+    'struct', 'union', 'enum', 'typedef',
+    'unsigned', 'signed', 'static', 'extern',
+    'volatile', 'register', 'sizeof', 'long', 'short',
+    'return', 'if', 'else', 'while', 'for',
+    'switch', 'case', 'break', 'continue', 'goto', 'do', 'default'
+    );
+  { Markers that identify C code hidden inside a Pascal comment. }
+  CBlockMarkers: array [0 .. 6] of string = (
+    'return', 'switch', 'goto', 'sizeof', 'typedef', 'struct', 'union'
+    );
 
-procedure FillSymbol_Test_;
 var
-  t: TTextParsing;
-  SM: TSymbolMatrix;
-begin
-  t := TTextParsing.Create('1,2,3,4,5,6,7,8,9', tsPascal);
-  t.FillSymbolMatrix(3, 2, SM);
-  DisposeObject(t);
-end;
+  SpecialSymbols: TListPascalString;
+  ParserP, ParserC: TTextParsing;
+  i: integer;
+  tp, TC: PTokenData;
+  ScoreP, ScoreC: integer;
 
-{ ============================================================================
-  Unit initialisation and finalisation
-  ============================================================================ }
+  { True if S starts with the given prefix. }
+  function StartsWith(const s: TP_String; const Prefix: TP_String): boolean;
+  begin
+    Result := s.ComparePos(1, Prefix);
+  end;
+
+{ True if the token is an identifier matching any of the given keywords. }
+  function MatchKeyword(const Tok: PTokenData;
+    const Keywords: array of string): boolean;
+  var
+    k: integer;
+  begin
+    Result := False;
+    if Tok = nil then exit;
+    if Tok^.tokenType <> ttAscii then exit;
+    for k := Low(Keywords) to High(Keywords) do
+      if Tok^.Text.Same(Keywords[k]) then
+          exit(True);
+  end;
+
+{ True if Word appears in Text with non-identifier characters (or string
+  boundaries) on both sides.  Prevents "returnValue" from matching "return". }
+  function HasWord(const Text, Word: TP_String): boolean;
+  var
+    p, W: integer;
+    BeforeC, AfterC: TP_Char;
+
+    function IsIdentChar(c: TP_Char): boolean;
+    begin
+      Result := TTextParsing.Char_is(c,
+{$IFDEF FPC}
+        [uc0to9, ucAtoZ]
+{$ELSE FPC}
+        [c0to9, cAtoZ]
+{$ENDIF FPC}
+        , '_');
+    end;
+
+  begin
+    Result := False;
+    if (Text.L = 0) or (Word.L = 0) then exit;
+    W := Word.L;
+    p := 1;
+    while p <= Text.L do
+      begin
+        p := Text.GetPos(Word, p);
+        if p <= 0 then exit;
+        if (p > 1) and IsIdentChar(Text[p - 1]) then
+          begin
+            Inc(p);
+            Continue;
+          end;
+        if (p + W <= Text.L) and IsIdentChar(Text[p + W]) then
+          begin
+            Inc(p);
+            Continue;
+          end;
+        exit(True);
+      end;
+  end;
+
+{ Strip delimiters, return the inner text. }
+  function StripCommentDelimiters(const c: TP_String): TP_String;
+  begin
+    Result := c;
+    if StartsWith(Result, '{') then
+        Result := Result.GetString(2, Result.L + 1)
+    else if StartsWith(Result, '(*') then
+        Result := Result.GetString(3, Result.L + 1);
+    while (Result.L > 0) and CharIn(Result.Last, ['}', ')']) do
+        Result.DeleteLast;
+  end;
+
+{ True if a Pascal-style comment body actually contains C code. }
+  function LooksLikeCCode(const CommentText: TP_String): boolean;
+  var
+    Body: TP_String;
+    k: integer;
+  begin
+    Result := False;
+    Body := StripCommentDelimiters(CommentText);
+    if Body.L = 0 then exit;
+    for k := Low(CBlockMarkers) to High(CBlockMarkers) do
+      if HasWord(Body, CBlockMarkers[k]) then
+          exit(True);
+  end;
+
+begin
+  Result := slUnknown;
+  if (Source = '') or (Source.L = 0) then
+      exit;
+
+  ScoreP := 0;
+  ScoreC := 0;
+
+  { Use a dedicated SpecialSymbol list so that ':=' and '->' are
+    recognised as ttSpecialSymbol in both parsing modes. }
+  SpecialSymbols := TListPascalString.Create;
+  try
+    SpecialSymbols.Add(':='); // Pascal assignment
+    SpecialSymbols.Add('->'); // C pointer member access
+    SpecialSymbols.Add('::'); // Scope resolution (harmless in both)
+
+    { ================================================================ }
+    { Step 1: Parse with Pascal mode. }
+    { ================================================================ }
+    ParserP := TTextParsing.Create(Source, tsPascal, SpecialSymbols);
+    try
+      for i := 0 to ParserP.TokenCount - 1 do
+        begin
+          tp := ParserP.Tokens[i];
+          case tp^.tokenType of
+            ttComment:
+              begin
+                if StartsWith(tp^.Text, '{') or StartsWith(tp^.Text, '(*') then
+                  begin
+                    { A Pascal comment that actually contains C code should be
+                      attributed to C, not to Pascal. }
+                    if LooksLikeCCode(tp^.Text) then
+                        Inc(ScoreC, 4)
+                    else
+                        Inc(ScoreP, 4);
+                  end
+                else if StartsWith(tp^.Text, '//') then
+                    Inc(ScoreP, 1); // weak: both languages use //
+              end;
+
+            ttTextDecl:
+              if StartsWith(tp^.Text, '''') then
+                  Inc(ScoreP, 2);
+
+            ttAscii:
+              if MatchKeyword(tp, PascalKeywords) then
+                  Inc(ScoreP, 2);
+
+            ttSpecialSymbol:
+              if tp^.Text.Same(':=') then
+                  Inc(ScoreP, 3);
+          end;
+        end;
+    finally
+        ParserP.Free;
+    end;
+
+    { ================================================================ }
+    { Step 2: Parse with C mode. }
+    { ================================================================ }
+    ParserC := TTextParsing.Create(Source, tsC, SpecialSymbols);
+    try
+      for i := 0 to ParserC.TokenCount - 1 do
+        begin
+          TC := ParserC.Tokens[i];
+          case TC^.tokenType of
+            ttComment:
+              begin
+                if StartsWith(TC^.Text, '/*') then
+                    Inc(ScoreC, 4)
+                else if StartsWith(TC^.Text, '#') then
+                    Inc(ScoreC, 4)
+                else if StartsWith(TC^.Text, '//') then
+                    Inc(ScoreC, 1);
+              end;
+
+            ttTextDecl:
+              if StartsWith(TC^.Text, '"') then
+                  Inc(ScoreC, 2);
+
+            ttAscii:
+              if MatchKeyword(TC, CKeywords) then
+                  Inc(ScoreC, 2);
+
+            ttSpecialSymbol:
+              if TC^.Text.Same('->') then
+                  Inc(ScoreC, 3);
+
+            { Counter-balance: C code blocks that Pascal mode would misread as comments should give C at least some credit. }
+            ttSymbol:
+              if TC^.Text.Same('{') then
+                  Inc(ScoreC, 1);
+          end;
+        end;
+    finally
+        ParserC.Free;
+    end;
+
+  finally
+      SpecialSymbols.Free;
+  end;
+
+  { ================================================================ }
+  { Step 3: Decision. }
+  { ================================================================ }
+  if (ScoreP = 0) and (ScoreC = 0) then
+      Result := slUnknown
+  else if ScoreP > ScoreC then
+      Result := slPascal
+  else if ScoreC > ScoreP then
+      Result := slC
+  else
+      Result := slUnknown; // Tie: refuse to guess.
+end;
 
 initialization
 

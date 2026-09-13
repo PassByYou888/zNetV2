@@ -164,7 +164,7 @@ type
     intermediate representation (IR) between the parser and the code generator.
     It can represent a simple value, a complex formula, or a function call tree.
   }
-  TSymbolExpression = class sealed(TCore_Object_Intermediate)
+  TSymbolExpression = class sealed(TCore_Object)
   protected
     FList: TExpressionData_Pool;
     FTextStyle: TTextStyle; { Defines string quoting and comment styles }

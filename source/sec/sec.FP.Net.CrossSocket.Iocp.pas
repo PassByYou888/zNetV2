@@ -72,6 +72,9 @@ uses
   sec.FP.Net.SocketAPI,
   sec.FP.Net.CrossSocket.Base;
 
+const
+  C_CrossSocket_IOCP_Edition = '2.00';
+
 type
   TIocpListen = class(TAbstractCrossListen)
     // No additional fields – IOCP handles listeners via AcceptEx.

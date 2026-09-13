@@ -576,7 +576,7 @@ type
     *     mem.Free;
     *   end;
   }
-  TMem64 = class(TCore_Object_Intermediate)
+  TMem64 = class(TCore_Object)
   private
     FDelta: NativeInt; // growth step
     FMemory: Pointer; // pointer to buffer

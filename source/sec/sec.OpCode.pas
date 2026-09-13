@@ -154,7 +154,7 @@ type
     (runtime, opcode, data) and invokes it via the thread synchronization
     mechanism.
   }
-  TOpRT_Sync_Bridge = class(TCore_Object_Intermediate)
+  TOpRT_Sync_Bridge = class sealed(TCore_Object)
   public
     opRT: TOpCustomRunTime;
     OC: TOpCode;
@@ -170,7 +170,7 @@ type
     mathematical, string, bitwise, and conversion functions (Sin, Cos, Int,
     Random, ToHex, etc.) with the global system runtime.
   }
-  TOpSystemAPI = class(TCore_Object_Intermediate)
+  TOpSystemAPI = class(TCore_Object)
   private
     function DoNop(var OP_Param: TOpParam): Variant; // Returns 0 (no operation).
     function DoInt(var OP_Param: TOpParam): Variant; // Sums all parameters and returns the integer part (truncates toward zero).
@@ -256,7 +256,7 @@ type
     runtime can have its own set of functions, enabling isolated sandboxes
     or different execution environments.
   }
-  TOpCustomRunTime = class(TCore_Object_Intermediate)
+  TOpCustomRunTime = class(TCore_Object)
   protected
     procedure FreeNotifyProc(p: Pointer);
   public
@@ -396,7 +396,7 @@ type
     - Serialization: Save/Load to/from a binary stream (using DFE).
     - AutoFreeLink: Controls whether child nodes are automatically freed.
   }
-  TOpCode = class(TCore_Object_Intermediate)
+  TOpCode = class(TCore_Object)
   protected
     FOwner: TOpCode; { Parent OpCode in the tree }
     FParam: TOpData_List; { List of parameters (children) }

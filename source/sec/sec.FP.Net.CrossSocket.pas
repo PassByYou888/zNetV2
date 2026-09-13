@@ -49,41 +49,51 @@ interface
 
 uses
   sec.FP.Net.CrossSocket.Base,
-  {$IF defined(MSWINDOWS)}
+{$IF defined(MSWINDOWS)}
   sec.FP.Net.CrossSocket.Iocp
-  {$ELSEIF defined(LINUX) or defined(ANDROID)}
+{$ELSEIF defined(LINUX) or defined(ANDROID)}
   sec.FP.Net.CrossSocket.Epoll
-  {$ELSEIF defined(BSD) or defined(MACOS) or defined(IOS)}
+{$ELSEIF defined(BSD) or defined(MACOS) or defined(IOS)}
   sec.FP.Net.CrossSocket.Kqueue
-  {$ENDIF};
+{$ENDIF};
+
+const
+  C_Cross_Edition =
+{$IF defined(MSWINDOWS)}
+    'IOCP-v' + C_CrossSocket_IOCP_Edition
+{$ELSEIF defined(LINUX) or defined(ANDROID)}
+    'EPoll-v' + C_CrossSocket_Epoll_Edition
+{$ELSEIF defined(BSD) or defined(MACOS) or defined(IOS)}
+    'KQueue-v' + C_CrossSocket_Kqueue_Edition
+{$ENDIF};
 
 type
   TCrossListen =
-    {$IF defined(MSWINDOWS)}
+{$IF defined(MSWINDOWS)}
     TIocpListen
-    {$ELSEIF defined(LINUX) or defined(ANDROID)}
+{$ELSEIF defined(LINUX) or defined(ANDROID)}
     TEpollListen
-    {$ELSEIF defined(BSD) or defined(MACOS) or defined(IOS)}
+{$ELSEIF defined(BSD) or defined(MACOS) or defined(IOS)}
     TKqueueListen
-    {$ENDIF};
+{$ENDIF};
 
   TCrossConnection =
-    {$IF defined(MSWINDOWS)}
+{$IF defined(MSWINDOWS)}
     TIocpConnection
-    {$ELSEIF defined(LINUX) or defined(ANDROID)}
+{$ELSEIF defined(LINUX) or defined(ANDROID)}
     TEpollConnection
-    {$ELSEIF defined(BSD) or defined(MACOS) or defined(IOS)}
+{$ELSEIF defined(BSD) or defined(MACOS) or defined(IOS)}
     TKqueueConnection
-    {$ENDIF};
+{$ENDIF};
 
   TCrossSocket =
-    {$IF defined(MSWINDOWS)}
+{$IF defined(MSWINDOWS)}
     TIocpCrossSocket
-    {$ELSEIF defined(LINUX) or defined(ANDROID)}
+{$ELSEIF defined(LINUX) or defined(ANDROID)}
     TEpollCrossSocket
-    {$ELSEIF defined(BSD) or defined(MACOS) or defined(IOS)}
+{$ELSEIF defined(BSD) or defined(MACOS) or defined(IOS)}
     TKqueueCrossSocket
-    {$ENDIF};
+{$ENDIF};
 
 implementation
 

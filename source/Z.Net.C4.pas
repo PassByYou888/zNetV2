@@ -44,6 +44,9 @@ uses
   Z.Net.Client.IPC, Z.Net.Server.IPC,
   Z.Instance.Tool;
 
+const
+  C_C4_Edition = '4.01';
+
 type
   TC40_PhysicsService = class;
   TC40_PhysicsServicePool = class;

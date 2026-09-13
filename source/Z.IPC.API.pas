@@ -53,6 +53,9 @@ unit Z.IPC.API;
 
 interface
 
+const
+  C_Z_IPC_Edition = '1.05';
+
 (* ============================================================================
    Error codes returned by all IPC functions.
    Negative values indicate an error; IPC_OK (0) means success.

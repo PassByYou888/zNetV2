@@ -44,6 +44,9 @@ uses
   sec.Net.Client.IPC, sec.Net.Server.IPC,
   sec.Instance.Tool;
 
+const
+  C_C4_Edition = '4.01';
+
 type
   TC40_PhysicsService = class;
   TC40_PhysicsServicePool = class;

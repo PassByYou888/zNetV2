@@ -100,8 +100,7 @@ type
   { * Global state for the thread pool and dispatch system. }
 var
   Core_Dispatch_Order__: TCompute_Dispatch_Order; // task queue for new tasks
-  Core_Dispatch_Order_Activted__,
-    Core_Dispatch_Order_IsExit__: TAtomBool; // dispatcher status flags
+  Core_Dispatch_Order_Activted__, Core_Dispatch_Order_IsExit__: TAtomBool; // dispatcher status flags
   Core_Thread_Pool__: TCoreCompute_Thread_Pool; // pool of worker threads
   Core_Thread_Dispatch_Critical__: TCritical; // protects shared data
   Core_Thread_Task_Runing__: TAtomInt; // number of active workers
@@ -444,7 +443,6 @@ begin
       exit;
   if Core_Dispatch_Order_IsExit__.V then
       exit;
-
   Core_Dispatch_Order_Activted__.V := False;
 
   tk := GetTimeTick() + 1000;
@@ -462,11 +460,14 @@ begin
       if GetTimeTick() > tk then
           Break;
     end;
+
+  // force reset Core_Dispatch_Order_IsExit__.V
+  Core_Dispatch_Order_IsExit__.V := True;
 end;
 
 function Core_Dispatch_Order_Activted: Boolean;
 begin
-  Result := Core_Dispatch_Order_Activted__.V;
+  Result := Core_Dispatch_Order_Activted__.V and Core_Dispatch_Order_IsExit__.V;
 end;
 
 { * FreeCoreThreadPool – final cleanup.
@@ -502,6 +503,9 @@ begin
           Check_Soft_Thread_Synchronize(100);
           if GetTimeTick() > tk then Break;
         end;
+
+      // force reset Core_Dispatch_Order_IsExit__.V
+      Core_Dispatch_Order_IsExit__.V := True;
     end;
 
   Core_Thread_Pool__.Free;

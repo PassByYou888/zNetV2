@@ -79,7 +79,7 @@ type
     Each frame has a unique ID byte that identifies its data type.
     Derived classes implement serialization, JSON conversion, and size computation.
   }
-  TDF_Base = class(TCore_Object_Intermediate)
+  TDF_Base = class(TCore_Object)
   protected
     FID: Byte; { Type identifier for this frame }
   public
@@ -103,7 +103,7 @@ type
   end;
 
   { Concrete frame types for various data kinds }
-  TDF_String = class(TDF_Base) { UTF-8 string }
+  TDF_String = class sealed(TDF_Base) { UTF-8 string }
   public
     Buffer: TBytes; { Raw UTF-8 bytes }
     constructor Create(ID: Byte);
@@ -115,7 +115,7 @@ type
     function ComputeEncodeSize: Int64; override;
   end;
 
-  TDF_Integer = class(TDF_Base) { 32-bit signed integer }
+  TDF_Integer = class sealed(TDF_Base) { 32-bit signed integer }
   protected
     FBuffer: Integer;
   public
@@ -129,7 +129,7 @@ type
     property Buffer: Integer read FBuffer write FBuffer;
   end;
 
-  TDF_Cardinal = class(TDF_Base) { 32-bit unsigned integer }
+  TDF_Cardinal = class sealed(TDF_Base) { 32-bit unsigned integer }
   protected
     FBuffer: Cardinal;
   public
@@ -143,7 +143,7 @@ type
     property Buffer: Cardinal read FBuffer write FBuffer;
   end;
 
-  TDF_Word = class(TDF_Base) { 16-bit unsigned integer }
+  TDF_Word = class sealed(TDF_Base) { 16-bit unsigned integer }
   protected
     FBuffer: Word;
   public
@@ -157,7 +157,7 @@ type
     property Buffer: Word read FBuffer write FBuffer;
   end;
 
-  TDF_Byte = class(TDF_Base) { 8-bit unsigned integer }
+  TDF_Byte = class sealed(TDF_Base) { 8-bit unsigned integer }
   protected
     FBuffer: Byte;
   public
@@ -171,7 +171,7 @@ type
     property Buffer: Byte read FBuffer write FBuffer;
   end;
 
-  TDF_Single = class(TDF_Base) { 32-bit floating point }
+  TDF_Single = class sealed(TDF_Base) { 32-bit floating point }
   protected
     FBuffer: Single;
   public
@@ -185,7 +185,7 @@ type
     property Buffer: Single read FBuffer write FBuffer;
   end;
 
-  TDF_Double = class(TDF_Base) { 64-bit floating point }
+  TDF_Double = class sealed(TDF_Base) { 64-bit floating point }
   protected
     FBuffer: Double;
   public
@@ -199,7 +199,7 @@ type
     property Buffer: Double read FBuffer write FBuffer;
   end;
 
-  TDF_ArrayInteger = class(TDF_Base) { Dynamic array of 32-bit signed integers }
+  TDF_ArrayInteger = class sealed(TDF_Base) { Dynamic array of 32-bit signed integers }
   protected
     FBuffer: TMS64; { Internal memory stream storing the array }
   public
@@ -220,7 +220,7 @@ type
     property Buffer__: TMS64 read FBuffer;
   end;
 
-  TDF_ArrayShortInt = class(TDF_Base) { Dynamic array of 8-bit signed integers }
+  TDF_ArrayShortInt = class sealed(TDF_Base) { Dynamic array of 8-bit signed integers }
   protected
     FBuffer: TMS64;
   public
@@ -241,7 +241,7 @@ type
     property Buffer__: TMS64 read FBuffer;
   end;
 
-  TDF_ArrayByte = class(TDF_Base) { Dynamic byte array (raw binary) }
+  TDF_ArrayByte = class sealed(TDF_Base) { Dynamic byte array (raw binary) }
   protected
     FBuffer: TMS64;
   public
@@ -271,7 +271,7 @@ type
     property Buffer__: TMS64 read FBuffer;
   end;
 
-  TDF_ArraySingle = class(TDF_Base) { Dynamic array of 32-bit floats }
+  TDF_ArraySingle = class sealed(TDF_Base) { Dynamic array of 32-bit floats }
   protected
     FBuffer: TMS64;
   public
@@ -292,7 +292,7 @@ type
     property Buffer__: TMS64 read FBuffer;
   end;
 
-  TDF_ArrayDouble = class(TDF_Base) { Dynamic array of 64-bit floats }
+  TDF_ArrayDouble = class sealed(TDF_Base) { Dynamic array of 64-bit floats }
   protected
     FBuffer: TMS64;
   public
@@ -313,7 +313,7 @@ type
     property Buffer__: TMS64 read FBuffer;
   end;
 
-  TDF_ArrayInt64 = class(TDF_Base) { Dynamic array of 64-bit signed integers }
+  TDF_ArrayInt64 = class sealed(TDF_Base) { Dynamic array of 64-bit signed integers }
   protected
     FBuffer: TMS64;
   public
@@ -334,7 +334,7 @@ type
     property Buffer__: TMS64 read FBuffer;
   end;
 
-  TDF_ArrayInt128 = class(TDF_Base) { Dynamic array of 128-bit signed integers }
+  TDF_ArrayInt128 = class sealed(TDF_Base) { Dynamic array of 128-bit signed integers }
   protected
     FBuffer: TMS64;
   public
@@ -355,7 +355,7 @@ type
     property Buffer__: TMS64 read FBuffer;
   end;
 
-  TDF_Stream = class(TDF_Base) { Arbitrary binary stream (raw bytes) }
+  TDF_Stream = class sealed(TDF_Base) { Arbitrary binary stream (raw bytes) }
   protected
     FBuffer: TMS64; { Internal memory stream }
   public
@@ -373,7 +373,7 @@ type
     property Buffer64: TMS64 read FBuffer;
   end;
 
-  TDF_Variant = class(TDF_Base) { Delphi/FPC Variant type }
+  TDF_Variant = class sealed(TDF_Base) { Delphi/FPC Variant type }
   protected
     FBuffer: Variant;
   public
@@ -387,7 +387,7 @@ type
     property Buffer: Variant read FBuffer write FBuffer;
   end;
 
-  TDF_Int64 = class(TDF_Base) { 64-bit signed integer }
+  TDF_Int64 = class sealed(TDF_Base) { 64-bit signed integer }
   protected
     FBuffer: Int64;
   public
@@ -401,7 +401,7 @@ type
     property Buffer: Int64 read FBuffer write FBuffer;
   end;
 
-  TDF_UInt64 = class(TDF_Base) { 64-bit unsigned integer }
+  TDF_UInt64 = class sealed(TDF_Base) { 64-bit unsigned integer }
   protected
     FBuffer: UInt64;
   public
@@ -415,7 +415,7 @@ type
     property Buffer: UInt64 read FBuffer write FBuffer;
   end;
 
-  TDF_Int128 = class(TDF_Base) { 128-bit signed integer }
+  TDF_Int128 = class sealed(TDF_Base) { 128-bit signed integer }
   protected
     FBuffer: Int128;
   public
@@ -429,7 +429,7 @@ type
     property Buffer: Int128 read FBuffer write FBuffer;
   end;
 
-  TDF_UInt128 = class(TDF_Base) { 128-bit unsigned integer }
+  TDF_UInt128 = class sealed(TDF_Base) { 128-bit unsigned integer }
   protected
     FBuffer: UInt128;
   public
@@ -448,7 +448,7 @@ type
     It maintains an internal index and provides methods to read each frame
     in order, automatically advancing the index.
   }
-  TDFE_Reader = class(TCore_Object_Intermediate)
+  TDFE_Reader = class sealed(TCore_Object)
   private
     FOwner: TDFE;
     FIndex: Integer;
@@ -560,7 +560,7 @@ type
     - Compute MD5, compare, clone, append, delete, etc.
     - Load/save from/to files.
   }
-  TDFE = class(TCore_Object_Intermediate)
+  TDFE = class(TCore_Object)
   private
     FBit_64_Condition: Int64; { Threshold: if encoded size > this, use 64-bit header }
     FDataList: TDFE_DataList; { The actual frame list }
@@ -833,7 +833,7 @@ type
     It internally builds a TDFE, then writes it to the target stream on destruction.
     The stream format includes a version flag, compression flag, size, and the DFE data.
   }
-  TDataWriter = class(TCore_Object_Intermediate)
+  TDataWriter = class sealed(TCore_Object)
   private
     FEngine: TDFE;
     FStream: TCore_Stream;
@@ -906,7 +906,7 @@ type
     TDataReader is a helper class that reads a DFE from a stream.
     It decodes the stream header and provides read methods for the frames.
   }
-  TDataReader = class(TCore_Object_Intermediate)
+  TDataReader = class sealed(TCore_Object)
   private
     FEngine: TDFE;
   public
@@ -7138,5 +7138,4 @@ begin
 end;
 
 end.
- 
  

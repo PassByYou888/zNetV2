@@ -1827,7 +1827,7 @@ type
 
 
 type
-  TCipher_Base = class(TCore_Object_Intermediate)
+  TCipher_Base = class(TCore_Object)
   protected
     FCipherSecurity: TCipherSecurity;
     FLastGenerateKey: TCipherKeyBuffer;

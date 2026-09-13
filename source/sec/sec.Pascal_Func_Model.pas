@@ -284,16 +284,22 @@ type
     * @note This model is designed to be used by code generators like
     *       pas_mcp_generator_tool to produce LingoFuse tool providers.
     * }
+
+  TTyp_Normalize_Func = (tnf_Json, tnf_ABI);
+
   TPascal_Func_Model = class(TCore_Object_Intermediate)
   private
     FUnitName: TP_String;
+    FTyp_Normalize_Func: TTyp_Normalize_Func;
     FFuncs: TFunctionList;
     function GetFuncCount: integer;
+    function Do_Normalize_Type(const Typ: TP_String): TP_String;
   public
     constructor Create;
     destructor Destroy; override;
     procedure Clear;
 
+    property Typ_Normalize_Func: TTyp_Normalize_Func read FTyp_Normalize_Func write FTyp_Normalize_Func;
     property UnitName: TP_String read FUnitName write FUnitName;
     property Funcs: TFunctionList read FFuncs;
     property FuncCount: integer read GetFuncCount;
@@ -326,6 +332,20 @@ type
       * }
     function SaveToJson: TP_String;
   end;
+
+  { *
+    * NormalizeType – Converts a Pascal type TP_String to a canonical type name.
+    *
+    * Recognises integer types (Integer, Int64, Cardinal, …) -> 'Int64'
+    * Recognises floating point types (Double, Single, Extended, …) -> 'Double'
+    * Recognises string types (string, TP_String, AnsiString, UnicodeString) -> 'string'
+    * All other types return an empty TP_String (unsupported).
+    *
+    * @param Typ  The raw type TP_String (e.g. 'Integer', 'TColor').
+    * @return     Normalised type name, or empty if not supported.
+    * }
+function Normalize_Json_Type(const Typ: TP_String): TP_String;
+function Normalize_ABI_Type(const Typ: TP_String): TP_String;
 
 var
   { * Global flag to enable/disable logging within this unit. }
@@ -398,12 +418,22 @@ begin
       Result.Params[i] := Self.Params[i]; // TParamStructure is a record, direct copy
 end;
 
+function TPascal_Func_Model.Do_Normalize_Type(const Typ: TP_String): TP_String;
+begin
+  case FTyp_Normalize_Func of
+    tnf_Json: Result := Normalize_Json_Type(Typ);
+    tnf_ABI: Result := Normalize_ABI_Type(Typ);
+    else RaiseInfo('error');
+  end;
+end;
+
 { TPascal_Func_Model }
 { * Constructor: initialises the function list and logs creation. }
 constructor TPascal_Func_Model.Create;
 begin
   inherited Create;
   FUnitName := '';
+  FTyp_Normalize_Func := TTyp_Normalize_Func.tnf_Json;
   FFuncs := TFunctionList.Create;
   Log('TPascal_Func_Model created.');
 end;
@@ -435,18 +465,7 @@ begin
   Result := FFuncs.Count;
 end;
 
-{ *
-  * NormalizeType – Converts a Pascal type TP_String to a canonical type name.
-  *
-  * Recognises integer types (Integer, Int64, Cardinal, …) -> 'Int64'
-  * Recognises floating point types (Double, Single, Extended, …) -> 'Double'
-  * Recognises string types (string, TP_String, AnsiString, UnicodeString) -> 'string'
-  * All other types return an empty TP_String (unsupported).
-  *
-  * @param Typ  The raw type TP_String (e.g. 'Integer', 'TColor').
-  * @return     Normalised type name, or empty if not supported.
-  * }
-function NormalizeType(const Typ: TP_String): TP_String;
+function Normalize_Json_Type(const Typ: TP_String): TP_String;
 var
   lowTyp: TP_String;
 begin
@@ -458,6 +477,22 @@ begin
   else if lowTyp.Same('tpascalstring', 'tupascalstring', 'tp_string', 'string', 'ansistring', 'unicodestring') or
     lowTyp.Same('pchar', 'pansichar', 'pwidechar') then
       Result := 'string'
+  else
+      Result := '';
+end;
+
+function Normalize_ABI_Type(const Typ: TP_String): TP_String;
+var
+  lowTyp: TP_String;
+begin
+  lowTyp := Typ.TrimChar(#32#9).LowerText;
+  if lowTyp.Same('integer', 'int64', 'cardinal', 'longint', 'dword') or lowTyp.Same('word', 'smallint', 'byte', 'uint64', 'longword') then
+      Result := lowTyp
+  else if lowTyp.Same('double', 'single', 'extended', 'real') then
+      Result := lowTyp
+  else if lowTyp.Same('tpascalstring', 'tupascalstring', 'tp_string', 'string', 'ansistring', 'unicodestring') or
+    lowTyp.Same('pchar', 'pansichar', 'pwidechar') then
+      Result := lowTyp
   else
       Result := '';
 end;
@@ -788,7 +823,7 @@ begin
                 Break;
               end;
 
-            normTyp := NormalizeType(paramDecl.param_typ);
+            normTyp := Do_Normalize_Type(paramDecl.param_typ);
             if normTyp = '' then
               begin
                 SkipReason := 'Parameter "' + paramDecl.param_name + '" has unsupported type "' + paramDecl.param_typ + '"';
@@ -818,7 +853,7 @@ begin
 
       if f.IsFunction then
         begin
-          f.ReturnType := NormalizeType(decl^.ResultDecl);
+          f.ReturnType := Do_Normalize_Type(decl^.ResultDecl);
           if f.ReturnType = '' then
             begin
               SkipReason := 'Return type "' + decl^.ResultDecl + '" is unsupported';

@@ -4998,12 +4998,12 @@ end;
 
 function PointInCircle(const pt, cp: TVec2; radius: TGeoFloat): Boolean;
 begin
-  Result := (PointDistance(pt, cp) <= (radius + radius));
+  Result := (PointDistance(pt, cp) <= radius);
 end;
 
 function Vec2InCircle(const pt, cp: TVec2; radius: TGeoFloat): Boolean;
 begin
-  Result := (PointDistance(pt, cp) <= (radius + radius));
+  Result := (PointDistance(pt, cp) <= radius);
 end;
 
 function PointInTriangle(const Px, Py, x1, y1, x2, y2, x3, y3: TGeoFloat): Boolean;

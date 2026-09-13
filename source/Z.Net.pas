@@ -140,6 +140,9 @@ uses Classes, SysUtils, Variants, TypInfo,
   Z.Core, Z.PascalStrings, Z.UPascalStrings, Z.HashList.Templet, Z.ListEngine, Z.UnicodeMixedLib, Z.Status,
   Z.DFE, Z.MemoryStream, Z.Cipher, Z.Notify, Z.Cadencer, Z.ZDB2;
 
+const
+  C_ZNet_Edition = '5.01';
+
 {$REGION 'base Decl'}
 
 

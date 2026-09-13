@@ -89,6 +89,9 @@ uses
   sec.FP.Net.SocketAPI,
   sec.FP.Net.CrossSocket.Base;
 
+const
+  C_CrossSocket_Kqueue_Edition = '2.00';
+
 {$ifdef fpc}
 type
   TPipeDescriptors = packed record
@@ -97,7 +100,6 @@ type
   end;
   PPipeDescriptors = ^TPipeDescriptors;
 
-const
   clib = 'c';
   EV_DISPATCH     = $0080;
   SO_NOSIGPIPE    = $1022;

@@ -57,8 +57,7 @@ SOFTWARE.
   *     // Assume 'dst' contains compressed data from previous example
   *     decompressedSize := 100; // or any large enough buffer; function returns actual size
   *     SetLength(decompressed, decompressedSize);
-  *     decompressedSize := LZ4_decompress_safe(dst[0], compressedSize,
-  *                                              decompressed[0], Length(decompressed));
+  *     decompressedSize := LZ4_decompress_safe(dst[0], compressedSize, decompressed[0], Length(decompressed));
   *     if decompressedSize > 0 then SetLength(decompressed, decompressedSize);
   *   end;
   *
