@@ -1,4 +1,4 @@
-(*
+ï»¿(*
 MIT License
 
 Copyright (c) 2026 by.LaoZhang qq600585
@@ -22,63 +22,63 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 *)
 { *
-  ZDB2 Core ¨C Next-Generation Block Storage Engine for the Z-Series Framework
-  This unit defines the fundamental storage kernel for all Z-Series structured
-  data systems. It is completely independent from the legacy ZDB (ObjectData_LIB)
-  and serves as the foundational layer for future database, file system, and
-  object storage extensions built on the Z platform.
-  Architecture Overview:
-  -----------------------
-  ZDB2 manages a linear address space (typically a file or memory stream) as a
-  pool of fixed-size blocks. Each block is described by a TZDB2_Block record
-  containing its file position, total size, used size, and links to previous/
-  next blocks in a chain. Variable-length data objects are represented as
-  linked lists of blocks (TZDB2_BlockHandle), enabling efficient storage of
-  large, streaming, or fragmented data.
-  The space table (list of all block descriptors) is stored persistently in
-  the file as a chain of self-describing chunks (TZDB2_Block_File_Data_Instance).
-  Each chunk is protected by MD5 checksums to ensure integrity. The table is
-  loaded entirely into memory (FBlockBuffer) for fast access, but can be
-  reconstituted from disk on open.
-  Key Features:
-  -------------
-  *   Encryption support via IZDB2_Cipher interface (AES, Rijndael, etc.) with
-      per-block encryption/decryption.
-  *   Two-level caching: read cache and write cache, configurable by operation
-      mode (smBigData, smNormal, smFast) to balance memory usage and I/O.
-  *   Incremental write optimization: space table chunks are written only when
-      changed, and block data is written via cache to reduce disk activity.
-  *   Fast space build and append: allocate new blocks without zero-filling for
-      performance; safe build uses zero-fill for security.
-  *   Optimized copy (defragmentation): can compact a space to a new storage
-      stream, eliminating fragmentation.
-  *   Positional reads: read arbitrary sub-ranges of a data chain efficiently.
-  *   CRC16 integrity checks (TZDB2_CRC16) for whole-space or handle-specific
-      verification.
-  *   Built-in progress and no-space callbacks for user feedback.
-  *   Atomic flush and crash recovery via the 'Modification' flag in the header.
-  Design Goals:
-  -------------
-  - High performance with minimal overhead; suitable for large-scale storage
-    (up to 130 TB and billions of blocks).
-  - Low memory footprint: read cache is optional; block buffer holds only
-    metadata, not data.
-  - Extensibility: the block handle concept allows upper layers to build
-    complex structures (e.g., hierarchical DB, key-value stores, archival
-    formats) without reinventing block management.
-  - Portability: works with any TCore_Stream (file, memory, network) via IOHnd.
-  Relationship to Other Units:
-  ----------------------------
-  This unit is the direct back-end for Z.ZDB (hierarchical database) and can
-  also be used independently by any project requiring a reliable, encrypted,
-  and cached block storage engine. It is the strategic foundation for future
-  Z-Series storage developments.
-  Important Note:
-  ---------------
-  ZDB2 does *not* provide a filesystem or hierarchical structure. It is a
-  raw block store. All semantic organization (directories, files, metadata,
-  etc.) is implemented in higher-level layers. This separation ensures
-  maximum flexibility and performance.
+  * ZDB2 Core Per Next-Generation Block Storage Engine for the Z-Series Framework
+  * This unit defines the fundamental storage kernel for all Z-Series structured
+  * data systems. It is completely independent from the legacy ZDB (ObjectData_LIB)
+  * and serves as the foundational layer for future database, file system, and
+  * object storage extensions built on the Z platform.
+  * Architecture Overview:
+  * -----------------------
+  * ZDB2 manages a linear address space (typically a file or memory stream) as a
+  * pool of fixed-size blocks. Each block is described by a TZDB2_Block record
+  * containing its file position, total size, used size, and links to previous/
+  * next blocks in a chain. Variable-length data objects are represented as
+  * linked lists of blocks (TZDB2_BlockHandle), enabling efficient storage of
+  * large, streaming, or fragmented data.
+  * The space table (list of all block descriptors) is stored persistently in
+  * the file as a chain of self-describing chunks (TZDB2_Block_File_Data_Instance).
+  * Each chunk is protected by MD5 checksums to ensure integrity. The table is
+  * loaded entirely into memory (FBlockBuffer) for fast access, but can be
+  * reconstituted from disk on open.
+  * Key Features:
+  * -------------
+  * *   Encryption support via IZDB2_Cipher interface (AES, Rijndael, etc.) with
+  *     per-block encryption/decryption.
+  * *   Two-level caching: read cache and write cache, configurable by operation
+  *     mode (smBigData, smNormal, smFast) to balance memory usage and I/O.
+  * *   Incremental write optimization: space table chunks are written only when
+  *     changed, and block data is written via cache to reduce disk activity.
+  * *   Fast space build and append: allocate new blocks without zero-filling for
+  *     performance; safe build uses zero-fill for security.
+  * *   Optimized copy (defragmentation): can compact a space to a new storage
+  *     stream, eliminating fragmentation.
+  * *   Positional reads: read arbitrary sub-ranges of a data chain efficiently.
+  * *   CRC16 integrity checks (TZDB2_CRC16) for whole-space or handle-specific
+  *     verification.
+  * *   Built-in progress and no-space callbacks for user feedback.
+  * *   Atomic flush and crash recovery via the 'Modification' flag in the header.
+  * Design Goals:
+  * -------------
+  * - High performance with minimal overhead; suitable for large-scale storage
+  *   (up to 130 TB and billions of blocks).
+  * - Low memory footprint: read cache is optional; block buffer holds only
+  *   metadata, not data.
+  * - Extensibility: the block handle concept allows upper layers to build
+  *   complex structures (e.g., hierarchical DB, key-value stores, archival
+  *   formats) without reinventing block management.
+  * - Portability: works with any TCore_Stream (file, memory, network) via IOHnd.
+  * Relationship to Other Units:
+  * ----------------------------
+  * This unit is the direct back-end for Z.ZDB (hierarchical database) and can
+  * also be used independently by any project requiring a reliable, encrypted,
+  * and cached block storage engine. It is the strategic foundation for future
+  * Z-Series storage developments.
+  * Important Note:
+  * ---------------
+  * ZDB2 does *not* provide a filesystem or hierarchical structure. It is a
+  * raw block store. All semantic organization (directories, files, metadata,
+  * etc.) is implemented in higher-level layers. This separation ensures
+  * maximum flexibility and performance.
  * }
 unit sec.ZDB2;
 
@@ -102,7 +102,7 @@ type
   TZDB2_Core_Space = class;
   // Memory buffer type (64-bit capable)
   TZDB2_Mem = TMem64;
-  // User-defined custom header data (253 bytes) ¨C stored in the file header
+  // User-defined custom header data (253 bytes) - stored in the file header
   TZDB2_UserCustomHeader = array [0 .. 253] of Byte;
   PZDB2_UserCustomHeader = ^TZDB2_UserCustomHeader;
 
@@ -193,15 +193,15 @@ type
   // An instance representing one chunk of the space table (a contiguous group of block records)
   TZDB2_Block_File_Data_Instance = class(TCore_Object_Intermediate)
   private
-    Position: Int64; // File position of this chunk ¨C set by Read/Write
-    NextPosition: Int64; // Position of next chunk ¨C set by Read/Write
-    Count: Integer; // Number of block records in Buffer ¨C set by Read/BuildBlockBuffer
-    Buffer: TZDB2_Block_File_Buffer; // Array of block records (persistent format) ¨C set by Read/BuildBlockBuffer
+    Position: Int64; // File position of this chunk - set by Read/Write
+    NextPosition: Int64; // Position of next chunk - set by Read/Write
+    Count: Integer; // Number of block records in Buffer - set by Read/BuildBlockBuffer
+    Buffer: TZDB2_Block_File_Buffer; // Array of block records (persistent format) - set by Read/BuildBlockBuffer
     // Cached MD5 values for incremental writing optimization
-    Last_Update_Head_MD5: TMD5; // MD5 of header when last written ¨C set by Write
-    Last_Update_Buffer_MD5: TMD5; // MD5 of buffer when last written ¨C set by Write
-    Last_Update_Encrypt_Buffer_Copy: TMem64; // Copy of encrypted buffer for diff comparison ¨C set by Write
-    Last_Update_Tail_MD5: TMD5; // MD5 of tail when last written ¨C set by Write
+    Last_Update_Head_MD5: TMD5; // MD5 of header when last written - set by Write
+    Last_Update_Buffer_MD5: TMD5; // MD5 of buffer when last written - set by Write
+    Last_Update_Encrypt_Buffer_Copy: TMem64; // Copy of encrypted buffer for diff comparison - set by Write
+    Last_Update_Tail_MD5: TMD5; // MD5 of tail when last written - set by Write
   public
     constructor Create;
     destructor Destroy; override;
@@ -242,9 +242,9 @@ type
   // Planner for writing data streams into the space (creates new block chains and appends to space table)
   TZDB2_Space_Planner = class(TCore_Object_Intermediate)
   private
-    FCore: TZDB2_Core_Space; // Reference to the core space ¨C set by constructor
-    FStruct: TZDB2_Block_File_Data_Instance_List; // List of new chunks to be written ¨C set by constructor
-    FWriteID: Integer; // Next available block ID (starting from current block count) ¨C set by constructor
+    FCore: TZDB2_Core_Space; // Reference to the core space - set by constructor
+    FStruct: TZDB2_Block_File_Data_Instance_List; // List of new chunks to be written - set by constructor
+    FWriteID: Integer; // Next available block ID (starting from current block count) - set by constructor
   public
     constructor Create(Core_: TZDB2_Core_Space);
     destructor Destroy; override;
@@ -261,7 +261,7 @@ type
   // Utility class to compute CRC16 of all blocks (or a given handle) for integrity checking
   TZDB2_CRC16 = class(TCore_Object_Intermediate)
   public
-    CRC16Buffer: array of WORD; // CRC16 per block ¨C set by Build
+    CRC16Buffer: array of WORD; // CRC16 per block - set by Build
     constructor Create;
     destructor Destroy; override;
     // Compute CRC16 for all blocks in the core space
@@ -278,7 +278,7 @@ type
   // Implementation of IZDB2_Cipher using TCipher_Base from Z.Cipher
   TZDB2_Cipher = class(TCore_InterfacedObject_Intermediate, IZDB2_Cipher)
   private
-    FCipher_: TCipher_Base; // Underlying cipher object ¨C set by constructor
+    FCipher_: TCipher_Base; // Underlying cipher object - set by constructor
   public
     class function GetCipherSecurity(CipherSecurityString_: U_String): TCipherSecurity;
     constructor Create(CipherSecurity_: TCipherSecurity; password_: U_String; Level_: Integer; Tail_, CBC_: Boolean); overload;
@@ -330,28 +330,28 @@ type
   // The main core space manager class
   TZDB2_Core_Space = class(TCore_Object_Intermediate)
   private
-    FHeader: TZDB2_FileHeader; // File header ¨C read from disk on Open, written on Flush
-    FFault_Shutdown: Boolean; // True if previous shutdown was unclean (Modification flag set) ¨C set by Open
-    FAutoCloseIOHnd: Boolean; // If true, close IOHnd on destroy ¨C set by user
-    FAutoFreeIOHnd: Boolean; // If true, free IOHnd pointer on destroy ¨C set by user
-    FSpace_IOHnd: PIOHnd; // I/O handle to the underlying storage ¨C set by constructor
-    FFreeSpaceIndexProbe: Integer; // Cached index for fast free block search ¨C set by ScanSpace and modified on writes
-    FBlockCount: Integer; // Total number of blocks ¨C set by Open/Append/Build
-    FBlockBuffer: TZDB2_BlockBuffer; // In-memory array of all block descriptors ¨C set by Open/Append/Build
-    FBlock_File_Data_Instance_List: TZDB2_Block_File_Data_Instance_List; // Chain of space table chunks ¨C set by Open
-    FMaxCacheMemory: Int64; // Maximum cache memory in bytes ¨C set by user (default 32MB)
-    FUsedReadCache: Boolean; // Enable read cache ¨C set by Mode or user
-    FUsedWriteCache: Boolean; // Enable write cache ¨C set by Mode or user
-    FBlockWriteCache: TZDB2_BlockWriteCache; // Per-block write cache array ¨C set by PrepareCacheBlock
-    FMode: TZDB2_SpaceMode; // Current operation mode ¨C set by user or SetMode
-    FCipher: IZDB2_Cipher; // Encryption interface ¨C set by user
-    FCipherMem: TMem64; // Temporary buffer for encryption ¨C set by constructor
-    FState: TZDB2_SpaceState; // Runtime statistics ¨C updated by various operations
-    FLast_Modification: TTimeTick; // Time of last modification (0 if none) ¨C set by Do_Modification
-    FLast_Error_Info: TZDB2_Core_Space_Error_Info; // Last error messages ¨C set by ErrorInfo
-    FLast_Warning_Info: TZDB2_Core_Space_Warning_Info; // Last warnings ¨C set by WarningInfo
-    FOnProgress: TZDB2_OnProgress; // Progress callback ¨C set by user
-    FOnNoSpace: TZDB2_OnNoSpace; // No-space callback ¨C set by user
+    FHeader: TZDB2_FileHeader; // File header - read from disk on Open, written on Flush
+    FFault_Shutdown: Boolean; // True if previous shutdown was unclean (Modification flag set) - set by Open
+    FAutoCloseIOHnd: Boolean; // If true, close IOHnd on destroy - set by user
+    FAutoFreeIOHnd: Boolean; // If true, free IOHnd pointer on destroy - set by user
+    FSpace_IOHnd: PIOHnd; // I/O handle to the underlying storage - set by constructor
+    FFreeSpaceIndexProbe: Integer; // Cached index for fast free block search - set by ScanSpace and modified on writes
+    FBlockCount: Integer; // Total number of blocks - set by Open/Append/Build
+    FBlockBuffer: TZDB2_BlockBuffer; // In-memory array of all block descriptors - set by Open/Append/Build
+    FBlock_File_Data_Instance_List: TZDB2_Block_File_Data_Instance_List; // Chain of space table chunks - set by Open
+    FMaxCacheMemory: Int64; // Maximum cache memory in bytes - set by user (default 32MB)
+    FUsedReadCache: Boolean; // Enable read cache - set by Mode or user
+    FUsedWriteCache: Boolean; // Enable write cache - set by Mode or user
+    FBlockWriteCache: TZDB2_BlockWriteCache; // Per-block write cache array - set by PrepareCacheBlock
+    FMode: TZDB2_SpaceMode; // Current operation mode - set by user or SetMode
+    FCipher: IZDB2_Cipher; // Encryption interface - set by user
+    FCipherMem: TMem64; // Temporary buffer for encryption - set by constructor
+    FState: TZDB2_SpaceState; // Runtime statistics - updated by various operations
+    FLast_Modification: TTimeTick; // Time of last modification (0 if none) - set by Do_Modification
+    FLast_Error_Info: TZDB2_Core_Space_Error_Info; // Last error messages - set by ErrorInfo
+    FLast_Warning_Info: TZDB2_Core_Space_Warning_Info; // Last warnings - set by WarningInfo
+    FOnProgress: TZDB2_OnProgress; // Progress callback - set by user
+    FOnNoSpace: TZDB2_OnNoSpace; // No-space callback - set by user
 
     // Internal helper methods
     function Check_ReadCache(ID: Integer): Boolean; // Check if block ID is in read cache
@@ -402,7 +402,7 @@ type
     // Scan the space to update free space and probe index
     procedure ScanSpace;
 
-    // Fast build: allocate space without zero-filling (uses natural data) ¨C faster but less secure
+    // Fast build: allocate space without zero-filling (uses natural data) - faster but less secure
     function Fast_BuildSpace(PhySpaceSize: Int64; BlockSize_: WORD): Boolean;
     // Fast append: extend space without zero-filling
     function Fast_AppendSpace(NewSpaceSize_: Int64; DestBlockSize_: WORD): Boolean;
@@ -505,7 +505,7 @@ type
     class procedure Test_Write_Combine();
   end;
 
-  { ZDB2 extract swap define ¨C global functions for handling extraction file names }
+  { ZDB2 extract swap define - global functions for handling extraction file names }
 function Get_New_ZDB2_Extract_FileName(F: U_String): U_String;
 procedure Check_And_Replace_ZDB2_Extract_FileName(F: U_String);
 

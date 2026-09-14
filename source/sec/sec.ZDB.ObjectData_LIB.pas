@@ -1,4 +1,4 @@
-(*
+ï»¿(*
 MIT License
 
 Copyright (c) 2026 by.LaoZhang qq600585
@@ -23,80 +23,64 @@ SOFTWARE.
 *)
 (*
   ******************************************************************************
-  * ObjectData Library ¨C a lightweight embedded database engine with directory *
-  * structure, file storage, and block-level data management.                  *
+  * Unit: Z.ZDB.ObjectData_LIB                                                 *
+  * Purpose: Lightweight embedded database engine for the Z-Series framework.  *
   *                                                                            *
-  * What is this?                                                              *
-  * This is a small but powerful database that lives inside your application   *
-  * files. Think of it as a hierarchical storage system similar to a file      *
-  * system, but all data is stored in a single file with fast access.          *
+  * Overview:                                                                  *
+  *   This unit implements a small, self-contained database that stores        *
+  *   hierarchical data inside a single file or stream. It is conceptually     *
+  *   similar to a file system:                                                *
   *                                                                            *
-  * How it's structured:                                                       *
-  *   ¨C Field:  Works like a folder or directory ¨C it groups and organizes     *
-  *              items (files). You can nest fields to create any depth of     *
-  *              hierarchy you need.                                           *
-  *   ¨C Item:   Works like a file ¨C it holds your actual data (text, binary,   *
-  *              whatever you want). Each item has a name, description, and    *
-  *              a unique ID that you can use for categorization.              *
-  *   ¨C Block:  Items are split into blocks. Each block holds a chunk of the   *
-  *              item's data. Blocks are linked together like a chain, so      *
-  *              items can grow as large as you need without fragmentation     *
-  *              issues.                                                       *
+  *     - Field : a directory/folder that groups items and other fields.       *
+  *     - Item  : a file that holds arbitrary binary data.                     *
+  *     - Block : a chunk of an item's data. Items are stored as linked lists  *
+  *               of blocks, so they can grow without fragmentation issues.    *
   *                                                                            *
-  * What makes it tick?                                                        *
-  *   ¨C Everything is linked by 64-bit file positions (pointers). This is      *
-  *     similar to how filesystems work under the hood.                        *
-  *   ¨C You can traverse forward (Next) and backward (Prev) using doubly       *
-  *     linked lists ¨C great for iterating through records in any direction.   *
-  *   ¨C Record types are identified by IDs: Field = 21, Item = 22. This makes  *
-  *     it easy to tell what kind of record you're dealing with.               *
-  *   ¨C Each list position has a PositionID (First/Medium/Last/1) so you       *
-  *     always know where you are in a list.                                   *
-  *   ¨C Fixed-length strings (FixedStringL) make storage more predictable and  *
-  *     retrieval faster (no length prefixes to parse).                        *
+  * Key Features:                                                              *
+  *   - Hierarchical directory structure (nested Field records).               *
+  *   - Doubly linked lists for Fields, Items, and Blocks (Next/Prev links).   *
+  *   - 64-bit file positions (pointers) for all records.                      *
+  *   - Fixed-length strings (FixedStringL) for predictable storage.           *
+  *   - Wildcard search  and  for header and item names.                       *
+  *   - Recursive traversal of the entire database tree.                       *
+  *   - Copy/move items and fields within or across databases.                 *
+  *   - Full event callback system (22 hooks) for read/write interception.     *
+  *   - Works with both disk files and memory streams.                         *
   *                                                                            *
-  * Meet the key players:                                                      *
-  *   ¨C THeader:  The common header every record shares. It holds the links    *
-  *               (Next/Prev), ID, name, and timestamps. Think of it as the    *
-  *               "business card" of every record.                             *
-  *   ¨C TField:   The folder/directory structure. It keeps track of how many   *
-  *               children it has and where they start and end in the list.    *
-  *   ¨C TItem:    The file that holds your data. It tracks the first and       *
-  *               last block positions, total size, and block count.           *
-  *   ¨C TItemBlock: A chunk of an item's data. Each block knows where its      *
-  *               data lives, how big it is, and where the next/previous       *
-  *               blocks are.                                                  *
+  * Core Types:                                                                *
+  *   THeader         - common header shared by every record.                  *
+  *   TField          - directory structure (Field).                           *
+  *   TItem           - file/data entry (Item).                                *
+  *   TItemBlock      - data block of an Item.                                 *
+  *   TObjectDataHandle - main database handle.                                *
+  *   TItemHandle_    - runtime handle for an open Item.                       *
+  *   TSearchHeader_ / TSearchItem_ / TSearchField_ - search state/result.     *
+  *   TRecursionSearch_ - state for recursive traversal.                       *
   *                                                                            *
-  * How do you use it? (A typical session)                                     *
-  *   1. db_CreateNew / db_Open ¨C Create a new database or open an existing    *
-  *      one from disk or memory.                                              *
-  *   2. db_CreateField ¨C Create a folder (field) to organize your data.       *
-  *   3. db_ItemCreate / db_ItemOpen ¨C Create a new file (item) or open an     *
-  *      existing one for reading/writing.                                     *
-  *   4. db_ItemWrite / db_ItemRead ¨C Write data to or read data from the      *
-  *      current position in the item.                                         *
-  *   5. db_ItemClose ¨C Close the item handle to save changes.                 *
-  *   6. db_ClosePack ¨C Close the database and flush everything to disk.       *
+  * Record IDs:                                                                *
+  *   DB_Header_Field_ID = 21  (Field)                                         *
+  *   DB_Header_Item_ID  = 22  (Item)                                          *
   *                                                                            *
-  * Where would you use this?                                                  *
-  *   ¨C Configuration management: Store application settings in a structured   *
-  *     way, with folders for different components.                            *
-  *   ¨C Game saves / user profiles: Keep player data, game progress, and       *
-  *     achievements organized in one file.                                    *
-  *   ¨C Embedded systems: When you need a small, fast database with no         *
-  *     external dependencies.                                                 *
-  *   ¨C Application metadata: Store indexes, caches, or other metadata that    *
-  *     needs to survive restarts.                                             *
-  *   ¨C Database prototypes: Use this as a building block for your own         *
-  *     database engine or storage system.                                     *
-  *   ¨C Document management: Store documents and their metadata in a           *
-  *     hierarchical structure.                                                *
-  *   ¨C IoT device storage: Lightweight persistent storage for sensor data     *
-  *     and device state.                                                      *
+  * Typical Usage:                                                             *
+  *   1. Init_TTMDB(DB);                                                       *
+  *   2. db_CreateNew / db_Open  - create or open a database.                  *
+  *   3. db_CreateField         - create a directory (Field).                  *
+  *   4. db_ItemCreate / db_ItemOpen - create or open a file (Item).           *
+  *   5. db_ItemWrite / db_ItemRead  - write/read data at the current position.*
+  *   6. db_ItemClose           - close the item handle.                       *
+  *   7. db_ClosePack           - close the database and flush changes.        *
   *                                                                            *
-  * This library is the foundation of the ZDB2 storage engine and is used      *
-  * extensively throughout the Z-framework for metadata and configuration      *
-  * storage. It's battle-tested and ready for your next project!               *
+  * Version: ObjectDataV2.3 (Major=2, Minor=3)                                 *
+  *                                                                            *
+  * Notes:                                                                     *
+  *   - Not thread-safe. External locking is required for concurrent access.   *
+  *   - Not transactional. There is no rollback support.                       *
+  *   - Data is stored raw (no compression or encryption at this layer).       *
+  *   - FixedStringL is a byte count; for UTF-16 strings one character is 2    *
+  *     bytes, so the default FixedStringL = 65 holds at most 32 characters.   *
+  *   - Always call Init_TTMDB before any other API.                           *
+  *   - Always check return codes; use TranslateReturnCode for human-readable  *
+  *     error messages.                                                        *
   ******************************************************************************
 *)
 unit sec.ZDB.ObjectData_LIB;
@@ -109,7 +93,7 @@ interface
 uses sec.Core, sec.PascalStrings, sec.UPascalStrings, sec.UnicodeMixedLib;
 
 const
-  { * Field sizes in bytes ¨C each constant defines the storage size of a        * }
+  { * Field sizes in bytes - each constant defines the storage size of a        * }
   { * primitive type in the database file. These are used for record layout     * }
   { * calculations.                                                             * }
   DB_Version_Size = C_Word_Size; { Size of version numbers (2 bytes). }
@@ -133,11 +117,11 @@ const
 
   DB_Path_Delimiter = '/'; { Path separator for field/item names. }
 
-  { * Header ID constants ¨C identify the type of a header record. * }
+  { * Header ID constants - identify the type of a header record. * }
   DB_Header_Field_ID = 21; { Header ID for a Field (directory). }
   DB_Header_Item_ID = 22; { Header ID for an Item (file). }
 
-  { * Position ID constants ¨C identify where a header sits in its linked list. * }
+  { * Position ID constants - identify where a header sits in its linked list. * }
   DB_Header_First = 11; { Position ID for the first node in a linked list. }
   DB_Header_Medium = 12; { Position ID for a middle node in a linked list. }
   DB_Header_Last = 13; { Position ID for the last node in a linked list. }
@@ -150,7 +134,7 @@ const
   DB_Item_Last = 36; { Block ID for the last block in a linked list. }
 
 {$REGION 'State Code'}
-  { * Return codes ¨C indicate success or specific error conditions for each    * }
+  { * Return codes - indicate success or specific error conditions for each    * }
   { * operation. Positive values indicate success; negative values indicate    * }
   { * specific errors.                                                         * }
   DB_Header_ok = 300; { Header operation succeeded. }
@@ -270,7 +254,7 @@ const
 
 
 type
-  { * THeader ¨C common header record for all database entries.                 * }
+  { * THeader - common header record for all database entries.                 * }
   { * Every Field and Item has a THeader that stores linking information,      * }
   { * identification, timestamps, and the entry name.                          * }
   THeader = record
@@ -286,7 +270,7 @@ type
 
   PHeader = ^THeader;
 
-  { * TItemBlock ¨C a single data block within an Item.                         * }
+  { * TItemBlock - a single data block within an Item.                         * }
   { * Items are stored as a linked list of blocks. Each block holds a portion  * }
   { * of the Item's total data.                                                * }
   TItemBlock = record
@@ -298,7 +282,7 @@ type
 
   PItemBlock = ^TItemBlock;
 
-  { * TItem ¨C represents a file/data entry in the database.                   * }
+  { * TItem - represents a file/data entry in the database.                   * }
   { * Contains the header, description, and block list management fields.     * }
   TItem = record
     RHeader: THeader; { Header for this item. Stored in file. }
@@ -316,7 +300,7 @@ type
 
   PItem = ^TItem;
 
-  { * TField ¨C represents a directory/field in the database.                   * }
+  { * TField - represents a directory/field in the database.                   * }
   { * Fields contain other Fields and Items, forming a hierarchical structure. * }
   TField = record
     RHeader: THeader; { Header for this field. Stored in file. }
@@ -329,7 +313,7 @@ type
 
   PField = ^TField;
 
-  { * TFieldSearch ¨C internal search state for enumerating headers within a   * }
+  { * TFieldSearch - internal search state for enumerating headers within a   * }
   { * field. Used by the FindFirst/FindNext family of functions.              * }
   TFieldSearch = record
     RHeader: THeader; { Current header during search. Set by search functions. }
@@ -343,7 +327,7 @@ type
 
   PObjectDataHandle = ^TObjectDataHandle;
 
-  { * Callback types ¨C event hooks for database operations. * }
+  { * Callback types - event hooks for database operations. * }
   TObjectDataErrorProc = procedure(error: U_String; error_code: Integer) of object; { Error callback. Set by user. }
   TObjectDataHeaderDeleteProc = procedure(fPos: Int64) of object; { Called when a header is deleted. Set by user. }
   TObjectDataHeaderWriteBeforeProc = procedure(fPos: Int64; var wVal: THeader; var Done: Boolean) of object; { Before header write. Set by user. }
@@ -362,7 +346,7 @@ type
   TObjectDataTMDBWriteAfterProc = procedure(fPos: Int64; const wVal: PObjectDataHandle) of object; { After database write. Set by user. }
   TObjectDataTMDBReadProc = procedure(fPos: Int64; const rVal: PObjectDataHandle; var Done: Boolean) of object; { Before database read. Set by user. }
 
-  { * TObjectDataHandle ¨C the main database handle. Contains file I/O state,  * }
+  { * TObjectDataHandle - the main database handle. Contains file I/O state,  * }
   { * version information, root field management, and all event callbacks.    * }
   TObjectDataHandle_Reserved_Data = array [0 .. DB_ReservedData_Size - 1] of Byte; { Reserved data area in file header. }
 
@@ -406,7 +390,7 @@ type
     OnReadTMDB: TObjectDataTMDBReadProc; { Pre-read callback for database header. Set by user. }
   end;
 
-  { * TItemHandle_ ¨C runtime handle for an open Item.                        * }
+  { * TItemHandle_ - runtime handle for an open Item.                        * }
   { * Holds the item data and state for active read/write operations.        * }
   TItemHandle_ = record
     Item: TItem; { The underlying item record. Set by Create/Open. }
@@ -417,7 +401,7 @@ type
     OpenFlags: Boolean; { True if the item handle is actively open. Set by Create/Open, cleared by Close. }
   end;
 
-  { * TSearchHeader_ ¨C search result for a header enumeration. * }
+  { * TSearchHeader_ - search result for a header enumeration. * }
   TSearchHeader_ = record
     Name: U_String; { Name of the found header. Set by FindFirst/Next. }
     ID: Byte; { Header ID (Field or Item). Set by FindFirst/Next. }
@@ -427,7 +411,7 @@ type
     FieldSearch: TFieldSearch; { Internal search state. Set by FindFirst/Next. }
   end;
 
-  { * TSearchItem_ ¨C search result for an Item enumeration. * }
+  { * TSearchItem_ - search result for an Item enumeration. * }
   TSearchItem_ = record
     Name: U_String; { Item name. Set by FindFirst/Next. }
     Description: U_String; { Item description. Set by FindFirst/Next. }
@@ -438,7 +422,7 @@ type
     FieldSearch: TFieldSearch; { Internal search state. Set by FindFirst/Next. }
   end;
 
-  { * TSearchField_ ¨C search result for a Field enumeration. * }
+  { * TSearchField_ - search result for a Field enumeration. * }
   TSearchField_ = record
     Name: U_String; { Field name. Set by FindFirst/Next. }
     Description: U_String; { Field description. Set by FindFirst/Next. }
@@ -448,7 +432,7 @@ type
     FieldSearch: TFieldSearch; { Internal search state. Set by FindFirst/Next. }
   end;
 
-  { * TRecursionSearch_ ¨C state for recursive traversal of the entire database * }
+  { * TRecursionSearch_ - state for recursive traversal of the entire database * }
   { * tree. Used by db_RecursionSearchFirst/Next.                              * }
   TRecursionSearch_ = record
     ReturnHeader: THeader; { Current header found. Set by search functions. }
@@ -459,7 +443,7 @@ type
     SearchBuff: array [0 .. DB_Max_Secursion_Level] of TFieldSearch; { Stack of search states for each recursion level. Set by search functions. }
   end;
 
-  { * Internal helper functions ¨C calculate record sizes and manage low-level * }
+  { * Internal helper functions - calculate record sizes and manage low-level * }
   { * I/O operations. These are used internally by the library.               * }
 function Get_DB_StringL(var IOHnd: TIOHnd): Integer; { * Returns the fixed string length configured for the I/O handle. * }
 function Get_DB_HeaderL(var IOHnd: TIOHnd): Integer; { * Returns the total size in bytes of a THeader record. * }
@@ -468,13 +452,13 @@ function Get_DB_BlockL(var IOHnd: TIOHnd): Integer; { * Returns the total size i
 function Get_DB_FieldL(var IOHnd: TIOHnd): Integer; { * Returns the total size in bytes of a TField record (without its header). * }
 function Get_DB_L(var IOHnd: TIOHnd): Integer; { * Returns the total size in bytes of the database header. * }
 
-{ * Utility functions ¨C error translation, string/reserved data conversion. * }
+{ * Utility functions - error translation, string/reserved data conversion. * }
 function TranslateReturnCode(const ReturnCode: Integer): U_String; { * Translates a numeric return code to a human-readable string. * }
 function Test_Reserved_String(S: U_String): Boolean; { * Tests if a string can fit into the reserved data area. * }
 function String_To_Reserved(S: U_String): TObjectDataHandle_Reserved_Data; { * Converts a Pascal string to the fixed-size reserved data buffer. * }
 function Reserved_To_String(Reserved: TObjectDataHandle_Reserved_Data): U_String; { * Converts the reserved data buffer back to a Pascal string. * }
 
-{ * Initialisation functions ¨C set default values for all record types.    * }
+{ * Initialisation functions - set default values for all record types.    * }
 procedure Init_THeader(var Header_: THeader); { * Initialises a THeader to default values. * }
 procedure Init_TItemBlock(var Block_: TItemBlock); { * Initialises a TItemBlock to default values. * }
 procedure Init_TItem(var Item_: TItem); { * Initialises a TItem to default values. * }
@@ -490,7 +474,7 @@ procedure Init_TTMDBSearchItem(var SearchItem_: TSearchItem_); { * Initialises a
 procedure Init_TTMDBSearchField(var SearchField_: TSearchField_); { * Initialises a TSearchField_. * }
 procedure Init_TTMDBRecursionSearch(var RecursionSearch_: TRecursionSearch_); { * Initialises a TRecursionSearch_ state. * }
 
-{ * Low-level record I/O functions ¨C read/write individual records to/from  * }
+{ * Low-level record I/O functions - read/write individual records to/from  * }
 { * the file at specified positions. All these functions are internal and   * }
 { * used by the higher-level API.                                           * }
 function dbHeader_WriteRec(const fPos: Int64; var IOHnd: TIOHnd; var Header_: THeader): Boolean; { * Writes a THeader record at position fPos. * }
@@ -509,12 +493,12 @@ function dbItem_OnlyReadItemRec(const fPos: Int64; var IOHnd: TIOHnd; var Item_:
 function dbField_OnlyWriteFieldRec(const fPos: Int64; var IOHnd: TIOHnd; var Field_: TField): Boolean; { * Writes the field record data only (without the header). * }
 function dbField_OnlyReadFieldRec(const fPos: Int64; var IOHnd: TIOHnd; var Field_: TField): Boolean; { * Reads the field record data only (without the header). * }
 
-{ * Search and matching functions ¨C internal helpers for finding entries.  * }
+{ * Search and matching functions - internal helpers for finding entries.  * }
 function dbMultipleMatch(const SourStr, DestStr: U_String): Boolean; { * Performs wildcard matching on header names. Uses ZDB_Header_Multiple_* globals. * }
 function dbHeader_FindNext(const Name: U_String; const FirstHeaderPOS, LastHeaderPOS: Int64; var IOHnd: TIOHnd; var Header_: THeader): Boolean; { * Finds the next header matching a name pattern within a linked list range. * }
 function dbHeader_FindPrev(const Name: U_String; const LastHeaderPOS, FirstHeaderPOS: Int64; var IOHnd: TIOHnd; var Header_: THeader): Boolean; { * Finds the previous header matching a name pattern within a linked list range. * }
 
-{ * Item block management ¨C low-level block operations. * }
+{ * Item block management - low-level block operations. * }
 function dbItem_BlockCreate(var IOHnd: TIOHnd; var Item_: TItem): Boolean; { * Creates a new block for an item. * }
 function dbItem_BlockInit(var IOHnd: TIOHnd; var Item_: TItem): Boolean; { * Initialises the block system for an item (reads first block). * }
 function dbItem_BlockReadData(var IOHnd: TIOHnd; var Item_: TItem; var Buff_; const _Size: Int64): Boolean; { * Reads data from the current block position. * }
@@ -525,7 +509,7 @@ function dbItem_BlockGetPOS(var IOHnd: TIOHnd; var Item_: TItem): Int64; { * Ret
 function dbItem_BlockSeekStartPOS(var IOHnd: TIOHnd; var Item_: TItem): Boolean; { * Seeks to the start of the item's data. * }
 function dbItem_BlockSeekLastPOS(var IOHnd: TIOHnd; var Item_: TItem): Boolean; { * Seeks to the end of the item's data. * }
 
-{ * Field-level operations ¨C internal functions for field and header        * }
+{ * Field-level operations - internal functions for field and header        * }
 { * management within fields.                                               * }
 function dbField_GetPOSField(const fPos: Int64; var IOHnd: TIOHnd): TField; { * Reads a field at a given position. * }
 function dbField_GetFirstHeader(const fPos: Int64; var IOHnd: TIOHnd): THeader; { * Reads the first header in a field. * }
@@ -539,7 +523,7 @@ function dbField_FindNext(var IOHnd: TIOHnd; var FieldS_: TFieldSearch): Boolean
 function dbField_FindLast(const Name: U_String; const ID: Byte; const fPos: Int64; var IOHnd: TIOHnd; var FieldS_: TFieldSearch): Boolean; { * Finds the last header matching name and ID in a field. * }
 function dbField_FindPrev(var IOHnd: TIOHnd; var FieldS_: TFieldSearch): Boolean; { * Finds the previous header in a search (with ID filtering). * }
 
-{ * Item search functions ¨C find items within fields. * }
+{ * Item search functions - find items within fields. * }
 function dbField_FindFirstItem(const Name: U_String; const ItemExtID: Byte; const fPos: Int64; var IOHnd: TIOHnd; var FieldS_: TFieldSearch; var Item_: TItem): Boolean; overload; { * Finds the first item matching a name pattern and ExtID. * }
 function dbField_FindNextItem(const ItemExtID: Byte; var IOHnd: TIOHnd; var FieldS_: TFieldSearch; var Item_: TItem): Boolean; overload; { * Finds the next item in a search. * }
 function dbField_FindLastItem(const Name: U_String; const ItemExtID: Byte; const fPos: Int64; var IOHnd: TIOHnd; var FieldS_: TFieldSearch; var Item_: TItem): Boolean; overload; { * Finds the last item matching a name pattern and ExtID. * }
@@ -564,14 +548,14 @@ function dbField_CopyItem(var Item_: TItem; var IOHnd: TIOHnd; const DestFieldPo
 function dbField_CopyItemBuffer(var Item_: TItem; var IOHnd: TIOHnd; var DestItem_: TItem; var DestIOHnd: TIOHnd): Boolean; { * Copies an Item's data buffer to another Item. * }
 function dbField_CopyAllTo(const FilterName: U_String; const FieldPos: Int64; var IOHnd: TIOHnd; const DestFieldPos: Int64; var DestIOHnd: TIOHnd): Boolean; { * Copies all items and sub-fields matching a filter from one field to another. * }
 
-{ * Database API ¨C public interface for database management. * }
+{ * Database API - public interface for database management. * }
 function db_CreateNew(const FileName: U_String; var DB_: TObjectDataHandle): Boolean; { * Creates a new database file on disk. * }
 function db_Open(const FileName: U_String; var DB_: TObjectDataHandle; _OnlyRead: Boolean): Boolean; { * Opens an existing database file. * }
 function db_CreateAsStream(stream: U_Stream; const Name, Description: U_String; var DB_: TObjectDataHandle): Boolean; { * Creates a database from an existing stream. * }
 function db_OpenAsStream(stream: U_Stream; const Name: U_String; var DB_: TObjectDataHandle; _OnlyRead: Boolean): Boolean; { * Opens a database from an existing stream. * }
 function db_ClosePack(var DB_: TObjectDataHandle): Boolean; { * Closes the database and flushes all changes. * }
 
-{ * Database copy functions ¨C copy data between databases. * }
+{ * Database copy functions - copy data between databases. * }
 function db_CopyFieldTo(const FilterName: U_String; var DB_: TObjectDataHandle; const SourceFieldPos: Int64; var DestTMDB: TObjectDataHandle; const DestFieldPos: Int64): Boolean; { * Copies a filtered set of data from one field to another database. * }
 function db_CopyAllTo(var DB_: TObjectDataHandle; var DestTMDB: TObjectDataHandle): Boolean; { * Copies all data from one database to another. * }
 function db_CopyAllToDestPath(var DB_: TObjectDataHandle; var DestTMDB: TObjectDataHandle; destPath: U_String): Boolean; { * Copies all data to a specific path in the destination database. * }
@@ -582,7 +566,7 @@ function db_Update(var DB_: TObjectDataHandle): Boolean; { * Flushes and updates
 { * Name validation. * }
 function db_TestName(const Name: U_String): Boolean; { * Tests if a name is valid (non-empty and contains no path separators). * }
 
-{ * Field management API ¨C create, delete, rename, and navigate fields.  * }
+{ * Field management API - create, delete, rename, and navigate fields.  * }
 function db_CheckRootField(const Name: U_String; var Field_: TField; var DB_: TObjectDataHandle): Boolean; { * Ensures a root field exists, creating it if necessary. * }
 function db_CreateRootHeader(const Name: U_String; const ID: Byte; var DB_: TObjectDataHandle; var Header_: THeader): Boolean; { * Creates a root-level header (Field or Item). * }
 function db_CreateRootField(const Name, Description: U_String; var DB_: TObjectDataHandle): Boolean; { * Creates a root-level Field. * }
@@ -613,7 +597,7 @@ function db_DeleteItem(const pathName, FilterName: U_String; const ItemExtID: By
 function db_DeleteItem2(const FieldPos: Int64; const Item_Name: U_String; const ItemExtID: Byte; var DB_: TObjectDataHandle): Boolean; { * Deletes an Item by field position and name. * }
 function db_GetItem(const pathName, ItemName: U_String; const ItemExtID: Byte; var Item_: TItem; var DB_: TObjectDataHandle): Boolean; { * Retrieves an Item by path and name. * }
 
-{ * Advanced Item operations ¨C create/open/close/read/write with handles. * }
+{ * Advanced Item operations - create/open/close/read/write with handles. * }
 function db_ItemCreate(const pathName, ItemName, ItemDescription: U_String; const ItemExtID: Byte; var ItemHnd_: TItemHandle_; var DB_: TObjectDataHandle): Boolean; { * Creates an Item and returns a handle for I/O operations. * }
 function db_ItemFastCreate(const ItemName, ItemDescription: U_String; const fPos: Int64; const ItemExtID: Byte; var ItemHnd_: TItemHandle_; var DB_: TObjectDataHandle): Boolean; { * Fast creates an Item directly in a field position (no path traversal). * }
 function db_ItemFastInsertNew(const ItemName, ItemDescription: U_String; const FieldPos, InsertHeaderPos: Int64; const ItemExtID: Byte; var ItemHnd_: TItemHandle_; var DB_: TObjectDataHandle): Boolean; { * Inserts a new Item at a specific position in a field. * }
@@ -624,11 +608,11 @@ function db_ItemUpdate(var ItemHnd_: TItemHandle_; var DB_: TObjectDataHandle): 
 function db_ItemBodyReset(var ItemHnd_: TItemHandle_; var DB_: TObjectDataHandle): Boolean; { * Resets an Item's body data (clears all blocks). * }
 function db_ItemReName(const FieldPos: Int64; const NewItemName, NewItemDescription: U_String; var ItemHnd_: TItemHandle_; var DB_: TObjectDataHandle): Boolean; { * Renames an Item and updates its description. * }
 
-{ * Item I/O operations ¨C read/write data from/to an open Item. * }
+{ * Item I/O operations - read/write data from/to an open Item. * }
 function db_ItemRead(const Size: Int64; var Buff_; var ItemHnd_: TItemHandle_; var DB_: TObjectDataHandle): Boolean; { * Reads data from the current position in the Item. * }
 function db_ItemWrite(const Size: Int64; const Buff_; var ItemHnd_: TItemHandle_; var DB_: TObjectDataHandle): Boolean; { * Writes data to the current position in the Item. * }
 
-{ * Item position management ¨C seek and size operations. * }
+{ * Item position management - seek and size operations. * }
 function db_ItemSeekPos(const fPos: Int64; var ItemHnd_: TItemHandle_; var DB_: TObjectDataHandle): Boolean; { * Seeks to a specific position within the Item. * }
 function db_ItemSeekStartPos(var ItemHnd_: TItemHandle_; var DB_: TObjectDataHandle): Boolean; { * Seeks to the beginning of the Item. * }
 function db_ItemSeekLastPos(var ItemHnd_: TItemHandle_; var DB_: TObjectDataHandle): Boolean; { * Seeks to the end of the Item. * }
@@ -636,7 +620,7 @@ function db_ItemGetPos(var ItemHnd_: TItemHandle_; var DB_: TObjectDataHandle): 
 function db_ItemGetSize(var ItemHnd_: TItemHandle_; var DB_: TObjectDataHandle): Int64; { * Returns the total size of the Item's data. * }
 function db_AppendItemSize(var ItemHnd_: TItemHandle_; const Size: Int64; var DB_: TObjectDataHandle): Boolean; { * Appends a zero-filled block of the specified size to the Item. * }
 
-{ * Search API ¨C find headers, items, and fields with wildcard support. * }
+{ * Search API - find headers, items, and fields with wildcard support. * }
 function db_ExistsRootField(const Name: U_String; var DB_: TObjectDataHandle): Boolean; { * Checks if a root field exists. * }
 function db_FindFirstHeader(const pathName, FilterName: U_String; const ID: Byte; var SenderSearch: TSearchHeader_; var DB_: TObjectDataHandle): Boolean; { * Finds the first header (Field or Item) matching a filter in a path. * }
 function db_FindNextHeader(var SenderSearch: TSearchHeader_; var DB_: TObjectDataHandle): Boolean; { * Finds the next header in a search. * }
@@ -646,7 +630,7 @@ function db_FindFirstItem(const pathName, FilterName: U_String; const ItemExtID:
 function db_FindNextItem(var SenderSearch: TSearchItem_; const ItemExtID: Byte; var DB_: TObjectDataHandle): Boolean; { * Finds the next Item in a search. * }
 function db_FindLastItem(const pathName, FilterName: U_String; const ItemExtID: Byte; var SenderSearch: TSearchItem_; var DB_: TObjectDataHandle): Boolean; { * Finds the last Item matching a filter in a path. * }
 function db_FindPrevItem(var SenderSearch: TSearchItem_; const ItemExtID: Byte; var DB_: TObjectDataHandle): Boolean; { * Finds the previous Item in a search. * }
-function db_FastFindFirstItem(const FieldPos: Int64; const FilterName: U_String; const ItemExtID: Byte; var SenderSearch: TSearchItem_; var DB_: TObjectDataHandle): Boolean; { * Fast find first Item ¨C searches directly in a field position. * }
+function db_FastFindFirstItem(const FieldPos: Int64; const FilterName: U_String; const ItemExtID: Byte; var SenderSearch: TSearchItem_; var DB_: TObjectDataHandle): Boolean; { * Fast find first Item - searches directly in a field position. * }
 function db_FastFindNextItem(var SenderSearch: TSearchItem_; const ItemExtID: Byte; var DB_: TObjectDataHandle): Boolean; { * Fast find next Item. * }
 function db_FastFindLastItem(const FieldPos: Int64; const FilterName: U_String; const ItemExtID: Byte; var SenderSearch: TSearchItem_; var DB_: TObjectDataHandle): Boolean; { * Fast find last Item. * }
 function db_FastFindPrevItem(var SenderSearch: TSearchItem_; const ItemExtID: Byte; var DB_: TObjectDataHandle): Boolean; { * Fast find previous Item. * }
@@ -654,12 +638,12 @@ function db_FindFirstField(const pathName, FilterName: U_String; var SenderSearc
 function db_FindNextField(var SenderSearch: TSearchField_; var DB_: TObjectDataHandle): Boolean; { * Finds the next Field in a search. * }
 function db_FindLastField(const pathName, FilterName: U_String; var SenderSearch: TSearchField_; var DB_: TObjectDataHandle): Boolean; { * Finds the last Field matching a filter in a path. * }
 function db_FindPrevField(var SenderSearch: TSearchField_; var DB_: TObjectDataHandle): Boolean; { * Finds the previous Field in a search. * }
-function db_FastFindFirstField(const FieldPos: Int64; const FilterName: U_String; var SenderSearch: TSearchField_; var DB_: TObjectDataHandle): Boolean; { * Fast find first Field ¨C searches directly in a field position. * }
+function db_FastFindFirstField(const FieldPos: Int64; const FilterName: U_String; var SenderSearch: TSearchField_; var DB_: TObjectDataHandle): Boolean; { * Fast find first Field - searches directly in a field position. * }
 function db_FastFindNextField(var SenderSearch: TSearchField_; var DB_: TObjectDataHandle): Boolean; { * Fast find next Field. * }
 function db_FastFindLastField(const FieldPos: Int64; const FilterName: U_String; var SenderSearch: TSearchField_; var DB_: TObjectDataHandle): Boolean; { * Fast find last Field. * }
 function db_FastFindPrevField(var SenderSearch: TSearchField_; var DB_: TObjectDataHandle): Boolean; { * Fast find previous Field. * }
 
-{ * Recursive search ¨C traverse the entire database tree. * }
+{ * Recursive search - traverse the entire database tree. * }
 function db_RecursionSearchFirst(const InitPath, FilterName: U_String; var SenderRecursionSearch: TRecursionSearch_; var DB_: TObjectDataHandle): Boolean; { * Starts a recursive search from a given path, returning the first match. * }
 function db_RecursionSearchNext(var SenderRecursionSearch: TRecursionSearch_; var DB_: TObjectDataHandle): Boolean; { * Continues a recursive search, returning the next match. * }
 
