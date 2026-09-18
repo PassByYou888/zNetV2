@@ -1,8 +1,58 @@
-# Z.Json 知识库（最终传承版）
+# Z.Json 知识库修正版（v2）
 
+> **修正说明**：本次修正补入了 **P10-1 / P10-2 / P10-3** 三个来自 `LingoFuse_LLM_Pitfalls_For_AI.md` 的致命坑点，并对若干原有描述做了**精确化**。所有新增内容均标注来源；原文档正确的部分全部保留。
+>
 > **定位**：面向 AI 与人类工程师的权威参考。目标是让读者**无需翻阅源码**即可安全、准确地使用 `Z.Json`。
 > **承诺**：所有描述均来自 `Z.Json.pas` 与两个 `.inc` 文件的逐行核对。凡我无法从源码确定的，在文末「诚实的不确定清单」中明示。
 > **制图约定**：全文流程图/架构图/决策树一律使用 Mermaid，不使用字符制图。
+> **优先级标识**：
+> - 🔴 **致命**：不修必崩
+> - 🟠 **严重**：逻辑错误 / 静默失败
+> - 🟡 **一般**：体验 / 可维护性
+
+---
+
+## 本版修正摘要
+
+| 编号 | 修正内容 | 来源 |
+|:----:|---------|------|
+| P10-1 | 补入「子对象调 parse 类方法会破坏父树」的核心坑点 | `LingoFuse_LLM_Pitfalls_For_AI.md` §12 |
+| P10-2 | 补入「JSON 经 AnsiString 中转会丢非 ASCII 字符」的坑点 | 同上 |
+| P10-3 | 补入「GBK 回退必须用 `USystemString`」的坑点 | 同上 |
+| — | 新增「🔴 P10 系列致命坑速查」 | 第 0 章 |
+| — | 新增「根对象原则」专章 | §4.0 |
+| — | 新增「Parse 类方法只能在 root 上调用」专章 | §4.9 |
+| — | 新增 6.11 / 6.12 正确范式 | 第 6 章 |
+| — | 新增 7.16 / 7.17 / 7.18 / 7.19 反例 | 第 7 章 |
+| — | 新增「🔴 审计清单」章节 | 第 10 章 |
+| — | 更新不确定清单（删除已确定的项） | 第 11 章 |
+
+---
+
+## 目录
+
+- [1. 类型系统](#1-类型系统)
+- [2. `TZ_JsonBase` —— 生命周期基础](#2-tz_jsonbase--生命周期基础)
+- [3. `TZ_JsonArray` —— 数组](#3-tz_jsonarray--数组)
+- [4. `TZ_JsonObject` —— 对象](#4-tz_jsonobject--对象)
+  - [4.0 🔴 根对象原则（核心）](#40--根对象原则核心)
+  - [4.1 字段与构造](#41-字段与构造)
+  - [4.2 交换与复制](#42-交换与复制)
+  - [4.3 清空与查询](#43-清空与查询)
+  - [4.4 读写（按名称）](#44-读写按名称)
+  - [4.5 默认值辅助](#45-默认值辅助)
+  - [4.6 序列化](#46-序列化)
+  - [4.7 MD5](#47-md5)
+  - [4.8 测试与调试](#48-测试与调试)
+  - [4.9 🔴 Parse 类方法只能在 root 上调用](#49--parse-类方法只能在-root-上调用)
+- [5. `TZ_JsonObject_List` —— 对象列表](#5-tz_jsonobject_list--对象列表)
+- [6. 完整使用范式](#6-完整使用范式)
+- [7. 反例集](#7-反例集)
+- [8. 常见错误对照表](#8-常见错误对照表)
+- [9. 与 Z.Core / Z.PascalStrings / Z.MemoryStream 的衔接](#9-与-zcore--zpascalstrings--zmemorystream-的衔接)
+- [10. 🔴 审计清单](#10--审计清单)
+- [11. 诚实的不确定清单](#11-诚实的不确定清单)
+- [12. 结语](#12-结语)
 
 ---
 
@@ -51,12 +101,48 @@ flowchart TD
 | MD5 | 直接计算整个 JSON 的 MD5 |
 | 别名 | `TZJ` = `TZ_JsonObject`，`TZJArry` = `TZ_JsonArray`，`TZJList` = `TZ_JsonObject_List` |
 
-**关键事实**：
+### 0.1 关键事实
+
 - **`TZ_JsonString` 在两个编译器下类型不同**：
   - FPC：`TUPascalString`（UTF-16）
   - Delphi：`TPascalString`（UnicodeString 或 UTF-16，取决于编译选项）
 - **根对象的 `FInstance` 由根对象持有**，子对象的 `FInstance` 由底层库持有，`TZ_JsonObject.Destroy` 中通过 `Parent = nil` 判断。
-- **`GetArray` / `GetObject` 会自动创建不存在的成员**——这是最重要的使用陷阱。
+- **`GetArray` / `GetObject` 会自动创建不存在的成员**——这是最重要的使用陷阱之一。
+
+### 0.2 🔴 P10 系列致命坑速查
+
+> **来源**：`LingoFuse_LLM_Pitfalls_For_AI.md` §12（v3.11 新增 · P10 系列）
+> **优先级**：🔴 致命
+> **不修必崩**
+
+```mermaid
+flowchart TD
+    Root["TZ_JsonObject"] --> Q1{"Parent = nil？"}
+
+    Q1 -- "是（root）" --> OK["✅ 所有方法可用<br/>Parae / Assign / LoadFromStream / ParseText"]
+
+    Q1 -- "否（child）" --> Forbidden["❌ 以下方法 FORBIDDEN：<br/>• Parae<br/>• Assign<br/>• LoadFromStream<br/>• ParseText"]
+
+    Forbidden --> Consequence["后果：<br/>• 父树悬空指针<br/>• 随机崩溃 / 访问冲突<br/>• 字段静默丢失<br/>• ToBytes 崩<br/>• schema = null"]
+
+    style OK fill:#1E8449,stroke:#0E4D2A,stroke-width:3px,color:#FFFFFF
+    style Forbidden fill:#922B21,stroke:#5A1A14,stroke-width:3px,color:#FFFFFF
+    style Consequence fill:#B7791F,stroke:#7E5109,stroke-width:3px,color:#FFFFFF
+```
+
+| 编号 | 一句话说明 | 正确做法 |
+|:----:|-----------|---------|
+| **P10-1** | **`TZ_JsonObject` 是树。子对象调 `Parae` / `Assign` / `LoadFromStream` / `ParseText` 会破坏父树** | 只在 **root** 上 parse；要注入子对象时，用「独立 root 解析 → 取紧凑 JSON 字符串 → `TZ_JsonString` 拼接 → 最后 `.Bytes`」 |
+| **P10-2** | **JSON 组装经 `string`（AnsiString）中转会丢非 ASCII 字符**（emoji / 韩文 / 生僻字变 `?`） | 中间容器一律用 `TZ_JsonString`；`.Bytes` 只在最后一步调 |
+| **P10-3** | **GBK / Latin-1 回退必须用 `USystemString`**，不能混用 `AnsiString` + `SetLength` + `Move` | 目标变量声明为 `USystemString`，逐字节 `WideChar(...)` 映射 |
+
+**🔴 遇到以上三个坑之一，先停下来。** 详见：
+- 第 0 章（本节）
+- §4.0「根对象原则」
+- §4.9「Parse 类方法只能在 root 上调用」
+- 第 6.11 / 6.12 节「正确范式」
+- 第 7.16–7.19 节「反例」
+- 第 10 章「审计清单」
 
 ---
 
@@ -87,6 +173,15 @@ type
 | `TZ_JsonString` | `TUPascalString` | `TPascalString` |
 | 数组/对象类型 | `fpjson.TJsonArray` / `TJsonObject` | `JsonDataObjects.TJsonArray` / `TJsonObject` |
 | 元素访问 | `Integers[]` / `Int64s[]` / `QWords[]` / `Floats[]` / `Strings[]` / `Booleans[]` / `Arrays[]` / `Objects[]` | `I[]` / `I64[]` / `U64[]` / `F[]` / `S[]` / `B[]` / `A[]` / `O[]` |
+
+**🟠 `TZ_JsonString` 的 `.Text` 与 `.Bytes`（P10-2 相关）**：
+
+| 属性 | 语义 | 用途 |
+|------|------|------|
+| `.Text` | `SystemString` / `USystemString` —— 受**系统代码页**影响 | 面向 UI 显示 |
+| `.Bytes` | `TBytes` —— **直接是 UTF-8 字节** | 面向网络传输、文件、MD5 |
+
+**⚠️ 规则**：JSON 组装时**中间容器用 `TZ_JsonString`**，最终转字节时用 `.Bytes`（不是 `.Text`）。
 
 ### 1.2 类层次
 
@@ -164,6 +259,7 @@ flowchart TD
 **⚠️ 循环引用陷阱**：
 - **不要**把根对象赋给子对象的父对象。
 - **不要**让子对象持有父对象的强引用（除了 `FParent`）。
+- **不要**手动 Free 一个已有 parent 的子对象——父对象会 Free，双 Free。
 
 ---
 
@@ -298,6 +394,75 @@ flowchart TD
 
 ## 第 4 章 `TZ_JsonObject` —— 对象
 
+### 4.0 🔴 根对象原则（核心）
+
+> **这一节是理解 `Z.Json` 所有陷阱的总钥匙。请务必先读。**
+
+`TZ_JsonObject` **不是一个扁平的键值容器，而是一棵树**。每个 `TZ_JsonObject` 实例在树中的位置由 `FParent` 决定：
+
+```mermaid
+flowchart TD
+    Root["TZ_JsonObject (Parent = nil)<br/>ROOT · 拥有 FInstance"]
+    Child1["TZ_JsonObject (Parent = Root)<br/>CHILD · FInstance 指向父树"]
+    Child2["TZ_JsonObject (Parent = Root)<br/>CHILD · FInstance 指向父树"]
+    Grand["TZ_JsonObject (Parent = Child1)<br/>GRANDCHILD · FInstance 指向父树"]
+
+    Root -->|"O['a']"| Child1
+    Root -->|"O['b']"| Child2
+    Child1 -->|"O['c']"| Grand
+
+    style Root fill:#1E8449,stroke:#0E4D2A,stroke-width:3px,color:#FFFFFF
+    style Child1 fill:#B7791F,stroke:#7E5109,stroke-width:3px,color:#FFFFFF
+    style Child2 fill:#B7791F,stroke:#7E5109,stroke-width:3px,color:#FFFFFF
+    style Grand fill:#922B21,stroke:#5A1A14,stroke-width:3px,color:#FFFFFF
+```
+
+**核心规则**：
+
+| 方法 | ROOT (`Parent = nil`) | CHILD (`Parent <> nil`) |
+|------|:---------------------:|:-----------------------:|
+| `Parae(TBytes)` | ✅ 允许 | ❌ **禁止**（P10-1） |
+| `Assign(source)` | ✅ 允许 | ❌ **禁止**（P10-1） |
+| `LoadFromStream(stream)` | ✅ 允许 | ❌ **禁止**（P10-1） |
+| `ParseText(text)` | ✅ 允许 | ❌ **禁止**（P10-1） |
+| `S[...]` / `I[...]` / `B[...]` 读写 | ✅ | ✅ |
+| `O[...]` / `A[...]` 写字段 | ✅ | ✅ |
+| `GetArray` / `GetObject` | ✅ | ✅ |
+| `SwapInstance` | ✅ | ❌ 抛 `'error.'` |
+| `Clone` | ✅ | ✅（返回新的 root） |
+
+**为什么**：`Parae` / `Assign` / `LoadFromStream` / `ParseText` 内部都会 `DisposeObjectAndNil(FInstance)` 后创建**新实例**，但**新实例不会挂回父树**。于是：
+
+- 父树的对应节点变成**悬空指针**
+- 后续 `ToBytes` / `SaveToStream` 访问到**已释放内存** → **随机崩溃 / 访问冲突**
+- 或者字段**静默丢失**（例如 `options.response_format` 直接消失）
+- 或者 `schema` 字段变成 `null`
+
+**正确做法**（P10-1 的标准配方）：
+
+```mermaid
+flowchart LR
+    A["1. 独立 root 对象<br/>解析 JSON"] --> B["2. 取紧凑字符串<br/>ToJSONString(False)"]
+    B --> C["3. TZ_JsonString<br/>Unicode 空间拼接"]
+    C --> D["4. 最后 .Bytes<br/>转 UTF-8"]
+
+    style A fill:#1E8449,stroke:#0E4D2A,stroke-width:3px,color:#FFFFFF
+    style D fill:#1A5490,stroke:#0D2F52,stroke-width:3px,color:#FFFFFF
+```
+
+**审计方法**（grep 检查）：
+
+```
+搜索 "<obj>.Parae("           → 左侧必须是 ROOT
+搜索 "<obj>.Assign("          → 左侧必须是 ROOT
+搜索 "<obj>.LoadFromStream("  → 左侧必须是 ROOT
+搜索 "<obj>.ParseText("       → 左侧必须是 ROOT
+```
+
+详见 §4.9、§6.11、§7.16–7.19、第 10 章。
+
+---
+
 ### 4.1 字段与构造
 
 ```pascal
@@ -364,11 +529,18 @@ flowchart TD
 **⚠️ 仅根对象可调用**。子对象调用会**抛异常**。
 
 **`Assign` 契约**：
+
 - 用 `TMS64` 中转：`source_.SaveToStream(m64)` → `LoadFromStream(m64)`。
 - **会覆盖当前对象的内容**。
-- **`Assign` 保留当前对象的 `Parent` 和 `FTag`**（因为 LoadFromStream 只更新 `FInstance`）。
+- **`Assign` 保留当前对象的 `Parent` 和 `FTag`**（因为 `LoadFromStream` 只更新 `FInstance`）。
 
-**`Clone` 契约**：创建新的根对象并 `Assign`。
+**🔴 P10-1 警告**：
+
+> `Assign` 内部调用 `LoadFromStream`，而 `LoadFromStream` 会 `DisposeObjectAndNil(FInstance)` 后重建。**当目标对象是 child 时，这会破坏父树的对应节点**。
+>
+> **只能在 ROOT 上调用 `Assign`**。
+
+**`Clone` 契约**：创建新的**根对象**并 `Assign`。因为结果是 root，所以 `Clone` 可以安全地在任何对象上调用。
 
 ### 4.3 清空与查询
 
@@ -494,6 +666,8 @@ procedure LoadFromFile(FileName: SystemString);
 
 function ToBytes: TBytes;
 function Parae(buff: TBytes): boolean;    // ⚠️ 拼写错误，应为 Parse
+function ParseText(Text_: TZ_JsonString; UseUTF8: boolean): boolean; overload;
+function ParseText(Text_: TZ_JsonString): boolean; overload;
 ```
 
 **`ToJSONString(Formated_)` 契约**：
@@ -507,6 +681,28 @@ function Parae(buff: TBytes): boolean;    // ⚠️ 拼写错误，应为 Parse
 
 **`ToJSONString`（无参）返回格式化 JSON**（`Formated_=True`）。
 
+**🔴 P10-2 警告（编码）**：
+
+> `ToJSONString` 返回 `TZ_JsonString`（FPC 下是 `TUPascalString`，Delphi 下是 `TPascalString`）。
+>
+> **绝不能**把返回值赋给一个 `string` 变量再转换：
+>
+> ```pascal
+> (* ❌ 错误：经 AnsiString 中转 *)
+> var s: string;
+> s := js.ToJSONString(False).Text;         (* CP936 下非 ASCII 丢失 *)
+> reqBytes := TEncoding.UTF8.GetBytes(s);   (* 再转一次，双重损失 *)
+> ```
+>
+> **正确**：
+>
+> ```pascal
+> (* ✅ 正确：全程 TZ_JsonString，最后 .Bytes *)
+> var s: TZ_JsonString;
+> s := js.ToJSONString(False);
+> reqBytes := s.Bytes;                       (* 直接 UTF-8 *)
+> ```
+
 **`SaveToStream` 契约**：
 
 | 编译器 | 行为 |
@@ -514,16 +710,15 @@ function Parae(buff: TBytes): boolean;    // ⚠️ 拼写错误，应为 Parse
 | FPC | 手动将 `TZ_JsonString` 的 UTF-8 字节写入流 |
 | Delphi | `FInstance.SaveToStream(stream, not Formated_, TEncoding.UTF8, True)` |
 
-**`LoadFromStream` 契约**：
+**🔴 `LoadFromStream` 的 P10-1 警告**：
 
-| 编译器 | 行为 |
-|--------|------|
-| FPC | `DisposeObjectAndNil(FInstance)` → `GetJSON(stream)` → 类型检查 |
-| Delphi | `FInstance.LoadFromStream(stream, TEncoding.UTF8, True)` |
-
-**⚠️ FPC 下 `LoadFromStream` 会丢弃旧的 `FInstance`**：
-- 空流时创建新的空对象。
-- 非空流时 `GetJSON` 解析。
+> `LoadFromStream` **会替换 `FInstance`**（FPC 下明确 `DisposeObjectAndNil(FInstance)` 后重建）。
+>
+> **只能在 ROOT 上调用。** 在 child 上调用会破坏父树。
+>
+> **FPC 与 Delphi 的差异**：
+> - FPC：`DisposeObjectAndNil(FInstance)` → `GetJSON(stream)` → 类型检查
+> - Delphi：`FInstance.LoadFromStream(stream, TEncoding.UTF8, True)`
 
 **`LoadFromFile` 契约**：
 - 用 `TMS64` 加载文件。
@@ -532,9 +727,30 @@ function Parae(buff: TBytes): boolean;    // ⚠️ 拼写错误，应为 Parse
 **`ToBytes` 契约**：`SaveToStream` 到 `TMS64`，再 `ToBytes`。
 
 **`Parae(buff)` 契约**：
+
 - **拼写错误**（应为 Parse）。
-- 用 `TMS64.Mapping(@buff[0], length(buff))` 映射字节，再 `LoadFromStream`。
-- **`buff` 为空时 `@buff[0]` 越界**（详见反例）。
+- 内部用 `TMS64.Mapping(@buff[0], length(buff))` 映射字节，再调用 **`LoadFromStream`**。
+- **`buff` 为空时 `@buff[0]` 越界**（详见反例 7.1）。
+
+**🔴 `Parae` 的 P10-1 警告**：
+
+> `Parae` 是 `LoadFromStream` 的薄包装，因此**继承了 P10-1 的所有问题**。
+>
+> **只能在 ROOT 上调用。** 在 child / grandchild 上调用会破坏父树，导致随机崩溃、字段丢失、`ToBytes` 访问冲突。
+
+**`ParseText` 契约**：
+
+**🔴 `ParseText` 的 P10-1 警告**：
+
+> FPC 分支明确 `DisposeObjectAndNil(FInstance)` 后重建。**在 child 上调用会破坏父树**。
+>
+> **只能在 ROOT 上调用。** Delphi 分支委托 `FromJSON` / `FromUtf8JSON`，行为类似。
+>
+> **失败时状态未定义**：
+> - FPC：`FInstance` 被替换为空对象
+> - Delphi：`FInstance` 可能部分修改
+>
+> **建议**：`ParseText` 失败后重新创建对象。
 
 ### 4.7 MD5
 
@@ -549,6 +765,8 @@ property MD5: TMD5 read GetMD5;
 
 **⚠️ 同一对象两次 `GetMD5` 结果相同**——因为底层键序稳定。
 
+**⚠️ 跨编译器一致性**：FPC 与 Delphi 的 `SaveToStream(False)` 字节可能不同（键序、空白、编码），因此 `GetMD5` 跨编译器**可能不同**。
+
 ### 4.8 测试与调试
 
 ```pascal
@@ -557,9 +775,56 @@ class procedure Test;
 
 **契约**：内部用 `DoStatus` 输出测试信息，用于验证底层库正常工作。
 
-**`Test` 的副作用**：
-- 会创建临时对象并释放。
-- 仅用于调试。
+**⚠️ `Test` 内部含 P10-1 反面教材**：`js.O['obj'].LoadFromStream(m64)` 是**错误的写法**（对 child 调 `LoadFromStream`），仅作历史演示保留，**新代码不得复制**。
+
+**`Test` 的副作用**：会创建临时对象并释放。仅用于调试。
+
+---
+
+### 4.9 🔴 Parse 类方法只能在 root 上调用
+
+> **本节是 P10-1 的正面清单。** 请与 §4.0「根对象原则」对照阅读。
+
+**四个方法**：
+
+| 方法 | 内部动作 | 对 child 的危害 |
+|------|---------|----------------|
+| `Parae(TBytes)` | `LoadFromStream` 包装 | 破坏父树 |
+| `Assign(source)` | `SaveToStream` + `LoadFromStream` | 破坏父树 |
+| `LoadFromStream(stream)` | `DisposeObjectAndNil(FInstance)` 后重建 | 破坏父树 |
+| `ParseText(text)` | FPC 下 `DisposeObjectAndNil(FInstance)` 后重建 | 破坏父树 |
+
+**判定"当前对象是否是 root"**：
+
+```pascal
+if js.Parent = nil then
+  (* root，可以 parse *)
+else
+  (* child，禁止 parse *)
+```
+
+**正确注入 JSON 到 child 的标准配方**（P10-1 官方推荐）：
+
+```mermaid
+flowchart TD
+    A["场景：把一段 JSON<br/>注入到 child 的子节点"] --> B["Step 1: 独立 root 解析"]
+    B --> B1["joSchema := TZ_JsonObject.Create;<br/>joSchema.Parae(ASchemaJsonBytes);"]
+    B1 --> C["Step 2: 取紧凑 JSON 字符串"]
+    C --> C1["schemaJson := joSchema.ToJSONString(False);"]
+    C1 --> D["Step 3: Unicode 空间拼接"]
+    D --> D1["reqJson := reqJson.Text + '&quot;,' +<br/>'&quot;response_format&quot;:' + schemaJson.Text + '}'"]
+    D1 --> E["Step 4: 转 UTF-8 字节"]
+    E --> E1["reqBytes := reqJson.Bytes;"]
+
+    style B1 fill:#1E8449,stroke:#0E4D2A,stroke-width:3px,color:#FFFFFF
+    style E1 fill:#1A5490,stroke:#0D2F52,stroke-width:3px,color:#FFFFFF
+```
+
+**关键原则**：
+1. **独立 root 解析**——parse 只在新建 root 上做。
+2. **取紧凑 JSON 字符串**——用 `ToJSONString(False)` 得到单行字符串。
+3. **Unicode 空间拼接**——中间容器一律 `TZ_JsonString`。
+4. **最后 `.Bytes` 转字节**——不要用 `.Text` 中转。
 
 ---
 
@@ -596,7 +861,7 @@ end;
 - 用于强制清理。
 
 **`AddFromText` / `AddFromStream` / `AddFromFile`**：
-- 创建新 `TZ_JsonObject`（`Parent=nil`）。
+- 创建新 `TZ_JsonObject`（**`Parent=nil`，即新的 root**）——符合 §4.0 的 root 原则。
 - 用 `ParseText` / `LoadFromStream` / `LoadFromFile` 加载。
 - 添加到列表。
 - **失败时仍添加**（对象为空）。
@@ -704,10 +969,10 @@ begin
     js.S['k'] := 'v';
     text := js.ToJSONString(True);
 
-    js2 := TZ_JsonObject.Create;
+    js2 := TZ_JsonObject.Create;   (* root *)
     try
-      js2.ParseText(text);
-      WriteLn(js2.S['k']);   // 'v'
+      js2.ParseText(text);          (* OK: js2 是 root *)
+      WriteLn(js2.S['k']);          // 'v'
     finally
       js2.Free;
     end;
@@ -780,7 +1045,7 @@ begin
   original := TZ_JsonObject.Create;
   try
     original.S['k'] := 'v';
-    copy := original.Clone;
+    copy := original.Clone;      (* 返回新的 root *)
     try
       copy.S['k'] := 'modified';
       WriteLn(original.S['k']);   // 'v'（原对象不变）
@@ -804,6 +1069,110 @@ begin
   WriteLn(umlMD5ToStr(js.MD5).Text);
 end;
 ```
+
+### 6.11 🔴 正确注入 JSON 到子对象（P10-1 标准范式）
+
+**场景**：你有一段 JSON 字符串（例如从外部传入的 schema），需要把它作为一个字段注入到 `joReq` 的 `options.response_format`。
+
+**❌ 错误做法**（P10-1 违规）：
+
+```pascal
+(* ❌ 错误：对孙对象调 ParseText / Parae *)
+joJsonSchema := joReq.O['options'].O['response_format'];
+joJsonSchema.O['schema'].ParseText(ASchemaJson);  (* 破坏 joReq 的底层树 *)
+reqBytes := joReq.ToBytes;                        (* 崩 / 丢字段 *)
+```
+
+**✅ 正确做法**（三步走）：
+
+```pascal
+(* Step 1: 在独立 root 对象上解析 *)
+joSchema := TZ_JsonObject.Create;
+try
+  if not joSchema.ParseText(ASchemaJson) then
+  begin
+    AError := 'Schema JSON is not valid';
+    Exit;
+  end;
+  schemaJson := joSchema.ToJSONString(False);   (* 紧凑 JSON *)
+finally
+  DisposeObject(joSchema);
+end;
+
+(* Step 2: 用 TZ_JsonObject 生成 name/strict 片段 *)
+joNameStrict := TZ_JsonObject.Create;
+try
+  joNameStrict.S['name'] := ASchemaName;
+  joNameStrict.B['strict'] := AStrict;
+  nameStrictJson := joNameStrict.ToJSONString(False);
+finally
+  DisposeObject(joNameStrict);
+end;
+
+(* Step 3: 在 Unicode 空间拼接 *)
+reqJson := joReq.ToJSONString(False);            (* TZ_JsonString *)
+tmpReq := reqJson.Text;
+SetLength(tmpReq, Length(tmpReq) - 1);           (* 去掉尾 '}' *)
+reqJson.Text := tmpReq +
+  ',"options":{"response_format":{' +
+  '"type":"json_schema","json_schema":{' +
+  nameStrictJson.Text + ',' +
+  '"schema":' + schemaJson.Text +
+  '}}}';
+
+(* Step 4: 最后一步 .Bytes 转 UTF-8 *)
+reqBytes := reqJson.Bytes;
+```
+
+**关键点**：
+1. **只对独立 root 调 `ParseText` / `Parae`**。
+2. **`ToJSONString(False)` 得到紧凑字符串**。
+3. **中间容器用 `TZ_JsonString`，不用 `string`**（P10-2）。
+4. **最后才 `.Bytes`**。
+
+### 6.12 🔴 Unicode 空间拼接（P10-2 标准范式）
+
+**错误写法**：
+
+```pascal
+(* ❌ 错误：中间变量用 string（AnsiString） *)
+var
+  schemaJson, reqJsonStr: string;
+begin
+  schemaJson := joSchema.ToJSONString(False).Text;  (* CP936 下非 ASCII 丢失 *)
+  reqJsonStr := reqJsonStr + '...' + schemaJson + '...';
+  reqBytes := TEncoding.UTF8.GetBytes(reqJsonStr);  (* 再转一次 *)
+end;
+```
+
+**正确写法**：
+
+```pascal
+(* ✅ 正确：全程 TZ_JsonString *)
+var
+  schemaJson, reqJson: TZ_JsonString;
+  tmpReq: USystemString;
+begin
+  schemaJson := joSchema.ToJSONString(False);
+  reqJson    := joReq.ToJSONString(False);
+
+  tmpReq := reqJson.Text;                          (* 在 Unicode 空间 *)
+  SetLength(tmpReq, Length(tmpReq) - 1);
+  reqJson.Text := tmpReq +
+    ',"options":{"response_format":' + schemaJson.Text + '}}';
+
+  reqBytes := reqJson.Bytes;                       (* 最后一步转 UTF-8 *)
+end;
+```
+
+**命名约定**：
+
+| 用途 | 推荐类型 | 避免类型 |
+|------|---------|---------|
+| JSON 中间容器 | `TZ_JsonString` | `string` |
+| 短 ASCII 字段 | `string` 可接受 | — |
+| 面向 UI 的显示字符串 | `string` 可接受 | — |
+| 字节流 | `TBytes` | — |
 
 ---
 
@@ -863,29 +1232,17 @@ js.S['k'] := 'string';
 js.A['k'].Add(1);   // 行为依赖底层库（FPC/Delphi 不同）
 ```
 
-**✅ 正确**：用 `Exists` + 手动类型检查，或直接覆盖：
-
-```pascal
-if js.Exists('k') then
-  // 检查类型
-  ...
-```
+**✅ 正确**：用 `Exists` + 手动类型检查，或直接覆盖。
 
 ### 7.6 `A['x']` 的隐式创建
 
 ```pascal
 // ⚠️ 读操作会创建键
 if js.A['maybe_exists'].Count > 0 then   // ⚠️ 创建了 'maybe_exists' 空数组！
-  ...
+  ...;
 ```
 
-**✅ 正确**：先 `Exists` 检查：
-
-```pascal
-if js.Exists('maybe_exists') then
-  if js.A['maybe_exists'].Count > 0 then
-    ...
-```
+**✅ 正确**：先 `Exists` 检查。
 
 ### 7.7 `Set_Default_S` 的命名误导
 
@@ -938,7 +1295,7 @@ js.LoadFromFile('/no/such/file.json');
 // ⚠️ ParseText 返回 False 时 js 状态未定义
 if not js.ParseText('invalid json') then
   // js 可能保留旧内容或部分内容
-  ...
+  ...;
 ```
 
 **✅ 正确**：`ParseText` 失败后重新创建对象。
@@ -970,7 +1327,7 @@ js.SaveToStream(stream);
 
 **建议**：需要紧凑格式时显式传 `False`。
 
-### 7.15 `Delphi` 下 `Add(Int128)` 未在 .inc 中定义
+### 7.15 Delphi 下 `Add(Int128)` 走 .pas 实现
 
 ```pascal
 // Delphi 下 Add(Int128) 由 .pas 实现（通过 string 转换）
@@ -979,6 +1336,153 @@ js.A['arr'].Add(Int128('123'));
 ```
 
 **结论**：两个编译器下 `Add(Int128)` 行为一致（走字符串）。
+
+---
+
+### 7.16 🔴 子对象调 `Parae` 导致父树悬空（P10-1）
+
+```pascal
+(* ❌ 错误：对孙对象调用 Parae *)
+var
+  joRoot: TZ_JsonObject;
+  joJsonSchema: TZ_JsonObject;
+begin
+  joRoot := TZ_JsonObject.Create;
+  try
+    joRoot.S['k'] := 'v';
+
+    (* 下面这行是致命的 *)
+    joJsonSchema := joRoot.O['json_schema'];
+    joJsonSchema.O['schema'].Parae(ASchemaJsonBytes);   (* ❌ 破坏 joRoot 的底层树 *)
+
+    (* 到这里可能已经崩了，或者下面这句崩 *)
+    reqBytes := joRoot.ToBytes;                          (* ❌ 访问冲突 / 字段丢失 *)
+  finally
+    joRoot.Free;
+  end;
+end;
+```
+
+**症状**：
+
+- 调用 `BuildSchemaResponseFormatJson` / `GenerateStructured` / `SendGenerateCombined` 时**随机崩溃**（访问冲突）
+- 或返回的 JSON 里 `options.response_format` **字段丢失**，服务端收到 `{}`
+- 或不崩溃但 `schema` 字段内容是 `null`
+- 错误可能延迟出现——在 `ToBytes` 序列化时才崩
+
+**根因**：
+
+- `TZ_JsonObject` 是**树形容器**
+- 子对象的 `FInstance` 指向父对象底层 `TJSONObject` 树中某个节点
+- `Parae` 内部执行 `DisposeObjectAndNil(FInstance)` 后创建全新对象
+- 父对象底层树中留下**悬空指针**
+- 新 `FInstance` **没有挂接回父树**
+
+**✅ 正确**：见 §6.11 的标准范式。
+
+**审计**：grep `<obj>.Parae(`，确认 `.` 左侧对象是 root。
+
+---
+
+### 7.17 🔴 子对象调 `Assign` / `LoadFromStream` / `ParseText`（P10-1）
+
+```pascal
+(* ❌ 错误：对子对象调用 Assign *)
+parent.O['child'].Assign(other);              (* 破坏 parent 的底层树 *)
+
+(* ❌ 错误：对子对象调用 LoadFromStream *)
+parent.O['child'].LoadFromStream(stream);     (* 破坏 parent 的底层树 *)
+
+(* ❌ 错误：对子对象调用 ParseText *)
+parent.O['child'].ParseText('{"k": "v"}');    (* 破坏 parent 的底层树 *)
+```
+
+**根因**：三者内部都会 `DisposeObjectAndNil(FInstance)` 后重建，导致父树悬空。
+
+**✅ 正确**：只在 root 上调用；要注入内容到 child，用 §6.11 的拼接范式。
+
+**审计**：
+
+```
+grep "<obj>.Assign("          → 左侧必须是 ROOT
+grep "<obj>.LoadFromStream("  → 左侧必须是 ROOT
+grep "<obj>.ParseText("       → 左侧必须是 ROOT
+```
+
+---
+
+### 7.18 🔴 JSON 经 AnsiString 中转丢字符（P10-2）
+
+```pascal
+(* ❌ 错误：中间变量用 string（AnsiString） *)
+var
+  schemaJson, reqJsonStr: string;
+begin
+  schemaJson  := joSchema.ToJSONString(False).Text;   (* CP936 下 emoji/韩文/生僻字变 '?' *)
+  reqJsonStr  := '...' + schemaJson + '...';
+  reqBytes    := TEncoding.UTF8.GetBytes(reqJsonStr); (* 再走一遍系统代码页 *)
+end;
+```
+
+**症状**：
+
+- Schema 里含 emoji / 韩文 / 生僻字 → 到达服务端时变成 `?` 或乱码
+- **只在 Windows + FPC** 下出错，Linux / macOS 下正常
+- 只在 `DefaultSystemCodePage ≠ CP_UTF8` 时出错
+
+**✅ 正确**：见 §6.12 的标准范式。
+
+**审计**：grep `:= ...ToJSONString(...).Text;` 后赋给 `string` 的位置，改为 `TZ_JsonString`。
+
+---
+
+### 7.19 🔴 GBK / Latin-1 回退用错单位（P10-3）
+
+> **关联坑点**：本坑点在 `Z.Json` 的直接源码中不出现，但它揭示了 `TZ_JsonString` / `USystemString` 与 `AnsiString` 的字节单位差异——**处理 JSON 附带的文本文件**时会踩到。
+
+```pascal
+(* ❌ 错误：GBK / Latin-1 回退时用 AnsiString 加 SetLength *)
+var
+  Decoded: AnsiString;
+  i: integer;
+begin
+  try
+    Decoded := TEncoding.UTF8.GetString(rawBytes);
+  except
+    try
+      Decoded := TEncoding.GetEncoding(936).GetString(rawBytes);
+    except
+      SetLength(Decoded, Length(rawBytes));      (* ❌ 单位混乱 *)
+      for i := 0 to Length(rawBytes) - 1 do
+        Decoded[i + 1] := AnsiChar(rawBytes[i]); (* ❌ 高位丢失 *)
+    end;
+  end;
+end;
+```
+
+**✅ 正确**：
+
+```pascal
+(* ✅ 正确：目标用 USystemString，逐字节映射为 WideChar *)
+var
+  Decoded: USystemString;
+  i: integer;
+begin
+  try
+    Decoded := TEncoding.UTF8.GetString(rawBytes);
+  except
+    try
+      Decoded := TEncoding.GetEncoding(936).GetString(rawBytes);
+    except
+      SetLength(Decoded, Length(rawBytes));
+      for i := 0 to Length(rawBytes) - 1 do
+        Decoded[i + 1] := WideChar(rawBytes[i]);   (* ✅ Unicode 空间 *)
+    end;
+  end;
+end;
+```
+
+**审计**：搜索 GBK / Latin-1 回退分支，确认 `SetLength` 单位与索引语义一致。
 
 ---
 
@@ -997,6 +1501,14 @@ js.A['arr'].Add(Int128('123'));
 | `LoadFromFile` 静默失败 | `except` 吞掉异常 | 手动检查或先 `Exists` |
 | `Set_Default_S` 覆盖已有值 | 名字误导，实际是写 | 用 `Get_Default_S` 才是读或默认 |
 | `MD5` 与 `ToJSONString(False)` 不一致 | `GetMD5` 用未格式化版本 | 用 `SaveToStream(False)` 自行计算 |
+| **🔴 使用 Schema 时随机崩溃 / 丢字段** | **P10-1：子对象调 `Parae`** | **用 §6.11 的独立 root 范式** |
+| **🔴 `options.response_format` 字段丢失** | **P10-1：子对象调 `Parae` / `ParseText`** | **同上** |
+| **🔴 `ToBytes` 访问冲突** | **P10-1：子对象调 `Parae`** | **同上** |
+| **🔴 `FInstance` 悬空指针** | **P10-1：子对象调 `Assign` / `LoadFromStream`** | **同上** |
+| **🟠 JSON 里 emoji / 韩文变 `?`** | **P10-2：经 `string` 中转** | **用 `TZ_JsonString` + `.Bytes`** |
+| **🟠 Windows 下 JSON 非 ASCII 丢失** | **P10-2：CP936 环境** | **同上** |
+| **🟠 CP936 环境下 schema 损坏** | **P10-2：AnsiString 中转** | **同上** |
+| **🟡 GBK 回退输出乱码 / 截断** | **P10-3：`SetLength` 单位错** | **用 `USystemString` + `WideChar`** |
 
 ---
 
@@ -1038,12 +1550,77 @@ flowchart TD
 - `TZ_JsonString` 在 FPC 下是 `TUPascalString`（UTF-16），在 Delphi 下是 `TPascalString`。
 - **`S[Name]` 返回 `string`**（系统字符串），不是 `TZ_JsonString`。
 - 需要 `TPascalString` 时手动构造。
+- **🟠 面向 JSON 组装时用 `TZ_JsonString`，不要用 `string`**（P10-2）。
+
+### 9.4 与 `Z.MemoryStream` 的衔接
+
+- `LoadFromStream` / `SaveToStream` 接受 `TCore_Stream`（`TMS64` 是子类）。
+- `Parae` 内部用 `TMS64.Mapping(@buff[0], length(buff))` 映射字节。
+- **`TMS64.Mapping` 是零拷贝**，所以 `buff` 的生命周期必须覆盖整个 `Parae` 调用。
+
+### 9.5 与 `Z.Int128` 的衔接
+
+- `Int128` / `UInt128` 在 JSON 中以**字符串**形式存储。
+- 序列化用 `Value.ToLString.Text`。
+- 反序列化用 `Int128(TZ_JsonString(GetString(Name)).Text)`。
+- **跨系统互操作时注意**：外部系统可能不识别这种带引号的"数字"。
 
 ---
 
-## 第 10 章 诚实的不确定清单
+## 第 10 章 🔴 审计清单
+
+> **用途**：每次代码提交前按此清单 grep 检查，防止 P10 系列坑点混入。
+> **来源**：`LingoFuse_LLM_Pitfalls_For_AI.md` §18.6。
+
+### 10.1 P10-1 审计（根对象原则）
+
+- [ ] 搜索 `<对象>.Parae(`，确认 `.` 左侧对象是 **root**（`Parent = nil`）
+- [ ] 搜索 `<对象>.Assign(`，确认 `.` 左侧对象是 **root**
+- [ ] 搜索 `<对象>.LoadFromStream(`，确认 `.` 左侧对象是 **root**
+- [ ] 搜索 `<对象>.ParseText(`，确认 `.` 左侧对象是 **root**
+
+**推荐检查方式**：
+
+```pascal
+(* 通过封装函数的参数名提示 root 约束 *)
+procedure Safe_Parse_Into_Root(var ARoot: TZ_JsonObject;
+                               const ABytes: TBytes);
+begin
+  if ARoot.Parent <> nil then
+    raiseInfo('P10-1 violation: Parse target must be a root object');
+  if Length(ABytes) = 0 then
+    raiseInfo('P10-1: empty byte buffer');
+  ARoot.Parae(ABytes);
+end;
+```
+
+### 10.2 P10-2 审计（Unicode 空间）
+
+- [ ] 搜索 `:= ...ToJSONString(...).Text;` 后赋给 `string` 的位置，改为 `TZ_JsonString`
+- [ ] 搜索 `TEncoding.UTF8.GetBytes(<非字面量 string>)`，确认其来源不受代码页影响
+- [ ] 所有 JSON 组装的中间变量声明为 `TZ_JsonString`
+- [ ] `.Bytes` 只在最后一步调用
+
+### 10.3 P10-3 审计（编码回退）
+
+- [ ] 搜索 GBK / Latin-1 回退分支，确认 `SetLength` 单位与索引语义一致
+- [ ] 目标变量声明为 `USystemString`，不是 `AnsiString`
+
+### 10.4 通用 JSON 审计
+
+- [ ] `Exists` 检查先于 `A['x']` / `O['x']` 读操作（避免隐式创建）
+- [ ] `AutoFreeObj` 为 `True`，或显式 `Clean`
+- [ ] `SaveToStream` 需要紧凑格式时显式传 `False`
+- [ ] `Parae` 前检查 `Length(buff) > 0`
+- [ ] 跨编译器一致性要求高的场景避免依赖 `GetMD5`
+
+---
+
+## 第 11 章 诚实的不确定清单
 
 > 以下是我从源码**无法完全确定**的点。若 AI 需要在这些场景下工作，**必须回查源码或询问人类**。
+>
+> **本版更新**：删除已经确定的项（例如 `Parae` 空 buffer 越界——已确定会崩）；保留真正不确定的项。
 
 1. **`TZ_JsonObject.GetArray(Name)` 当键已存在但类型不是数组时的行为**
    - FPC：源码检查 `JSONType = jtArray`，若否则创建新数组（覆盖旧值？还是 `FInstance.Add` 追加？）。
@@ -1080,127 +1657,136 @@ flowchart TD
    - **不确定**：同一 JSON 在 FPC 和 Delphi 下 `GetMD5` 是否相同。
    - **推测**：**不同**（因为键序、空白、编码可能不同）。
 
-8. **`TZ_JsonObject.Parae(buff)` 的行为**
-   - 用 `TMS64.Mapping(@buff[0], length(buff))` 映射。
-   - **不确定**：`buff` 为空时 `@buff[0]` 是否真的越界（取决于编译器）。
-   - **推测**：FPC 下 `@buff[0]` 对空数组返回合法地址，但后续 `length=0` 的映射可能导致 `LoadFromStream` 读空流。
-
-9. **`TZ_JsonObject.Create(Parent_)` 中子对象 `FInstance` 的赋值时机**
+8. **`TZ_JsonObject.Create(Parent_)` 中子对象 `FInstance` 的赋值时机**
    - 源码：仅根对象创建 `FInstance`。
    - 子对象的 `FInstance` 由 `GetArray` / `GetObject` / `AddArray` / `AddObject` 赋值。
    - **不确定**：是否有其他路径（如直接 `TZ_JsonObject.Create(parent)` 后用户手动赋 `FInstance`）。
 
-10. **`TZ_JsonObject.SwapInstance` 的 `FList` 交换**
-    - 源码交换 `FParent` / `FList` / `FInstance` / `FTag`。
-    - **不确定**：子对象的 `FParent.FList` 中记录的指针是否仍指向正确的对象。
-    - **推测**：交换后，`FList` 指向的列表包含对方的子对象——这可能是设计意图。
+9. **`TZ_JsonObject.SwapInstance` 的 `FList` 交换**
+   - 源码交换 `FParent` / `FList` / `FInstance` / `FTag`。
+   - **不确定**：子对象的 `FParent.FList` 中记录的指针是否仍指向正确的对象。
+   - **推测**：交换后，`FList` 指向的列表包含对方的子对象——这可能是设计意图。
 
-11. **`TZ_JsonObject.Assign` 的 Self 赋值**
+10. **`TZ_JsonObject.Assign` 的 Self 赋值**
     - `js.Assign(js)` 会怎样？
     - **不确定**：`SaveToStream(m64)` + `LoadFromStream(m64)` 是否安全。
     - **推测**：安全（序列化 + 反序列化），但会覆盖自身内容。
 
-12. **`TZ_JsonObject.Clear` 后 `FTag` 是否重置**
+11. **`TZ_JsonObject.Clear` 后 `FTag` 是否重置**
     - 源码：`FInstance.Clear`。
     - **不确定**：`FTag` 保持不变（应该）。
     - **推测**：不变。
 
-13. **`TZ_JsonObject.GetName(Index)` 的键序**
+12. **`TZ_JsonObject.GetName(Index)` 的键序**
     - FPC：`FInstance.Names[Index]`（插入序）。
     - Delphi：`FInstance.Names[Index]`（JsonDataObjects 的插入序）。
     - **不确定**：两者是否一致。
 
-14. **`TZ_JsonObject.Count` 的语义**
+13. **`TZ_JsonObject.Count` 的语义**
     - 是键值对数量。
     - **不确定**：嵌套对象是否计算在内（应该不计算）。
 
-15. **`TZ_JsonArray.GetString(Index)` 的类型转换**
+14. **`TZ_JsonArray.GetString(Index)` 的类型转换**
     - FPC：`FInstance.Strings[Index]`。
     - Delphi：`FInstance.S[Index]`。
     - **不确定**：数字元素通过 `S[]` 读取时的行为（是否转字符串）。
 
-16. **`TZ_JsonArray.GetInt(Index)` 对非整数元素的行为**
+15. **`TZ_JsonArray.GetInt(Index)` 对非整数元素的行为**
     - FPC：`FInstance.Integers[Index]`。
     - Delphi：`FInstance.I[Index]`。
     - **不确定**：字符串元素通过 `I[]` 读取时的行为。
     - **建议**：显式 `Exists` + 类型检查。
 
-17. **`TZ_JsonArray.GetDateTime(Index)` 的解析**
+16. **`TZ_JsonArray.GetDateTime(Index)` 的解析**
     - FPC：`umlStrToDateTime(FInstance.Strings[Index])`。
     - Delphi：`umlStrToDateTime(FInstance.S[Index])`。
     - **不确定**：无效字符串（如 `'abc'`）的行为。
     - **推测**：`umlStrToDateTime` 可能抛异常或返回默认值。
 
-18. **`TZ_JsonObject.GetInt128(Name)` 的空字符串行为**
+17. **`TZ_JsonObject.GetInt128(Name)` 的空字符串行为**
     - 源码：`Int128(TZ_JsonString(GetString(Name)).Text)`。
     - **不确定**：`GetString` 返回空字符串时 `Int128('')` 的行为。
     - **推测**：可能抛异常或返回 0。
 
-19. **`TZ_JsonObject.SetInt128(Name, Value)` 的序列化**
+18. **`TZ_JsonObject.SetInt128(Name, Value)` 的序列化**
     - 源码：`SetString(Name, Value.ToLString)`。
     - **不确定**：`Value.ToLString` 是 `TPascalString` 还是 `SystemString`。
     - **推测**：是 `TPascalString`（隐式转换）。
 
-20. **`TZ_JsonObject_List.AddFromText` 的失败处理**
+19. **`TZ_JsonObject_List.AddFromText` 的失败处理**
     - 源码：`Result.ParseText(Text_)`（未检查返回值），然后 `Add(Result)`。
     - **不确定**：`ParseText` 失败时是否仍添加空对象。
     - **推测**：是（添加空对象）。
 
-21. **`TZ_JsonObject_List.Destroy` 调用 `Clear` 的时机**
+20. **`TZ_JsonObject_List.Destroy` 调用 `Clear` 的时机**
     - 源码：`Clear` 然后 `inherited Destroy`。
     - **不确定**：`Clear` 时 `AutoFreeObj=True` 释放对象；若 `AutoFreeObj=False`，元素引用被移除但不释放。
     - **建议**：始终用 `AutoFreeObj=True` 或显式 `Clean`。
 
-22. **`TZ_JsonObject.Test` 的 `DoStatus` 输出**
-    - 用于调试。
-    - **不确定**：`DoStatus` 需要 `Z.Status` 初始化。
-    - **建议**：仅在调试时用。
-
-23. **`TZ_JsonBase.FList` 的 `AutoFreeObj=True` 与子对象双重释放**
+21. **`TZ_JsonBase.FList` 的 `AutoFreeObj=True` 与子对象双重释放**
     - 父对象析构时 `FList.Free` 释放所有子对象。
     - 子对象析构时 `FList.Free`（自己的子对象）。
     - **不确定**：子对象被父对象释放时，子对象的 `FParent` 指针是否被清空。
     - **推测**：不清理（因为不需要）。
 
-24. **`TZ_JsonObject.S` 属性读写不存在的键的详细行为**
+22. **`TZ_JsonObject.S` 属性读写不存在的键的详细行为**
     - 读：返回 `''`。
     - 写：创建键。
     - **不确定**：FPC 与 Delphi 是否完全一致。
 
+23. **`TZ_JsonObject.ParseText` 在 Delphi 下是否也有 P10-1 语义**
+    - 源码：Delphi 分支委托 `FromUtf8JSON` / `FromJSON`。
+    - **不确定**：这两个方法是否也会替换 `FInstance` 内部的树。
+    - **推测**：**是**（否则 P10-1 不会同时列 `ParseText`）。
+    - **建议**：保守起见，把 `ParseText` 也当作 root-only。
+
+24. **P10-2 在不同 FPC 版本下的具体表现**
+    - 文档说"只在 Windows + FPC 下出错"。
+    - **不确定**：具体从哪个 FPC 版本开始引入代码页问题。
+    - **建议**：无论如何都用 `TZ_JsonString` + `.Bytes`。
+
 ---
 
-## 第 11 章 结语
+## 第 12 章 结语
 
-### 11.1 本知识库覆盖范围
+### 12.1 本知识库覆盖范围
 
-- **已精确描述**：
-  - `TZ_JsonBase` / `TZ_JsonArray` / `TZ_JsonObject` / `TZ_JsonObject_List` 的所有公开 API。
-  - 父子生命周期、`FInstance` 所有权。
-  - 跨编译器（FPC / Delphi）差异。
-  - 序列化 / 反序列化 / 文件 I/O / MD5。
-  - 类型化访问器与索引器。
+**已精确描述**：
+- `TZ_JsonBase` / `TZ_JsonArray` / `TZ_JsonObject` / `TZ_JsonObject_List` 的所有公开 API。
+- 父子生命周期、`FInstance` 所有权。
+- 跨编译器（FPC / Delphi）差异。
+- 序列化 / 反序列化 / 文件 I/O / MD5。
+- 类型化访问器与索引器。
+- **🔴 P10-1：子对象调 parse 类方法会破坏父树**。
+- **🔴 P10-2：JSON 组装必须停在 Unicode 空间**。
+- **🟠 P10-3：GBK / Latin-1 回退必须用 `USystemString`**。
 
-- **已纠正的常见幻觉**：
-  - **`TZ_JsonArray.Create(nil)` 后 `FInstance` 为 nil**（不能直接用）。
-  - **`TZ_JsonObject.Create(Parent)` 后 `FInstance` 为 nil**（子对象由父对象管理）。
-  - **`SwapInstance` 仅对根对象有效**。
-  - **`A['x']` / `O['x']` 读操作会隐式创建**。
-  - **`Add(Int128)` / `Add(UInt128)` / `Add(TDateTime)` 存字符串**。
-  - **`Set_Default_S` 是"写"不是"设默认"**。
-  - **`SaveToStream(stream)` 默认是格式化版本**。
-  - **`Parae` 是 `Parse` 的拼写错误**。
-  - **`LoadFromFile` 静默失败**。
-  - **`ParseText` 失败后状态未定义**。
-  - **FPC 与 Delphi 的 `SaveToStream` / `LoadFromStream` 实现不同**。
-  - **`GetMD5` 的跨编译器一致性无保证**。
+**已纠正的常见幻觉**：
+- **`TZ_JsonArray.Create(nil)` 后 `FInstance` 为 nil**（不能直接用）。
+- **`TZ_JsonObject.Create(Parent)` 后 `FInstance` 为 nil**（子对象由父对象管理）。
+- **`SwapInstance` 仅对根对象有效**。
+- **`A['x']` / `O['x']` 读操作会隐式创建**。
+- **`Add(Int128)` / `Add(UInt128)` / `Add(TDateTime)` 存字符串**。
+- **`Set_Default_S` 是"写"不是"设默认"**。
+- **`SaveToStream(stream)` 默认是格式化版本**。
+- **`Parae` 是 `Parse` 的拼写错误**。
+- **`LoadFromFile` 静默失败**。
+- **`ParseText` 失败后状态未定义**。
+- **FPC 与 Delphi 的 `SaveToStream` / `LoadFromStream` 实现不同**。
+- **`GetMD5` 的跨编译器一致性无保证**。
+- **🔴 `Parae` / `Assign` / `LoadFromStream` / `ParseText` 只能在 root 上调用**（P10-1）。
+- **🔴 `ToJSONString().Text` 赋给 `string` 会丢非 ASCII 字符**（P10-2）。
+- **🟠 编码回退用 `AnsiString` + `SetLength` 单位错**（P10-3）。
 
-- **未覆盖**：
-  - 源码中的 24 个不确定点。
-  - `fpjson` / `Z.Delphi.JsonDataObjects` 的内部实现。
-  - `Z.Core` / `Z.PascalStrings` / `Z.MemoryStream` / `Z.UnicodeMixedLib` 的内部实现。
-  - 除 `Z.Json` 之外的单元。
+**未覆盖**：
+- 源码中的 24 个不确定点。
+- `fpjson` / `Z.Delphi.JsonDataObjects` 的内部实现。
+- `Z.Core` / `Z.PascalStrings` / `Z.MemoryStream` / `Z.UnicodeMixedLib` 的内部实现。
+- 除 `Z.Json` 之外的单元。
 
-### 11.2 给 AI 的使用规则
+### 12.2 给 AI 的使用规则
+
+**基础规则**：
 
 1. **根对象用 `TZ_JsonObject.Create`**，不要手动传 `Parent`。
 2. **访问子数组/子对象用 `js.A['x']` / `js.O['x']`**，它们会自动创建。
@@ -1214,16 +1800,42 @@ flowchart TD
 10. **`ParseText` 失败后对象状态未定义**——重新创建。
 11. **`AutoFreeObj=False` 时对象列表会泄漏**——用 `True` 或 `Clean`。
 12. **多线程访问同一 `TZ_JsonObject` 必须加锁**。
-13. **遇到不确定清单里的场景，请查源码或问人**。
 
-### 11.3 与 Z.Core / Z.PascalStrings 的衔接
+**🔴 P10 系列规则**：
+
+13. **🔴 P10-1**：**`Parae` / `Assign` / `LoadFromStream` / `ParseText` 只在 root 上调用**。对 child 调用会破坏父树。
+14. **🔴 P10-1 正确配方**：要在 child 上注入 JSON 时，用「独立 root 解析 → 取紧凑 JSON 字符串 → `TZ_JsonString` 拼接 → 最后 `.Bytes`」。
+15. **🔴 P10-2**：**JSON 组装中间容器必须是 `TZ_JsonString`**，不能是 `string`。`.Bytes` 只在最后一步。
+16. **🟠 P10-3**：**GBK / Latin-1 回退目标变量必须是 `USystemString`**。
+
+17. **遇到不确定清单里的场景，请查源码或问人**。
+
+### 12.3 与 Z.Core / Z.PascalStrings 的衔接
 
 - 使用本单元前，请先读 Z.Core 知识库第 1、2、5 章。
 - `TZ_JsonObject` 继承自 `TCore_Object_Intermediate`（支持实例跟踪）。
 - `TZ_JsonString` 在 FPC 下是 `TUPascalString`（UTF-16），在 Delphi 下是 `TPascalString`。
 - `umlDateTimeToStr` / `umlStrToDateTime` / `umlStreamMD5` 来自 `Z.UnicodeMixedLib`。
 - `TMS64` 来自 `Z.MemoryStream`。
+- **🟠 跨库 JSON 组装时**，请对照 `LingoFuse_LLM_Pitfalls_For_AI.md` 第 12 章的 P10 系列完整说明。
+
+### 12.4 与 `LingoFuse_LLM_Pitfalls_For_AI.md` 的对应关系
+
+| 本文档章节 | 对应 Pitfalls 文档章节 |
+|-----------|---------------------|
+| §0.2 P10 系列速查 | §12 P10-1 / P10-2 / P10-3 |
+| §4.0 根对象原则 | §12 P10-1 |
+| §4.9 Parse 类方法只能在 root 上调用 | §12 P10-1 |
+| §6.11 正确注入 JSON 到子对象 | §12 P10-1 正确做法 |
+| §6.12 Unicode 空间拼接 | §12 P10-2 正确做法 |
+| §7.16 子对象调 Parae 反例 | §12 P10-1 反面示例 |
+| §7.17 子对象调 Assign / LoadFromStream / ParseText | §12 P10-1 |
+| §7.18 JSON 经 AnsiString 中转丢字符 | §12 P10-2 反面示例 |
+| §7.19 GBK / Latin-1 回退 | §12 P10-3 |
+| §10 审计清单 | §18.6 审计清单 |
 
 ---
 
 **本知识库的定位**：一份**准确的、有边界的、可操作的** `Z.Json` 参考。它不假装能替代源码，但能让你在 90% 的场景下正确使用，并在剩下 10% 的场景下知道该停下来问人。
+
+**v2 修正摘要**：本版补入了 P10-1 / P10-2 / P10-3 三个致命坑点，新增「根对象原则」专章、「Parse 类方法只能在 root 上调用」专章、「审计清单」章节、「P10 正确范式」两节、「P10 反例」四节。原文档正确的部分全部保留。

@@ -387,10 +387,14 @@ var
   s_: TZ_JsonString;
   buff: TBytes;
 begin
-  if Formated_ then
-    s_.Text := FInstance.FormatJSON()
-  else
-    s_.Text := FInstance.AsJSON;
+  try
+    if Formated_ then
+      s_.Text := FInstance.FormatJSON()
+    else
+      s_.Text := FInstance.AsJSON;
+  except
+    s_.Text := '{}';
+  end;
   buff := s_.Bytes;
   s_ := '';
   stream.Write(buff[0], length(buff));
