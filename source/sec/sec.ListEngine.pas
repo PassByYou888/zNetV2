@@ -9093,8 +9093,10 @@ var
   i: Integer;
 begin
   dest.Clear;
+  dest.BeginUpdate;
   for i := 0 to Count - 1 do
       dest.AddObject(Items[i], Objects[i]);
+  dest.EndUpdate;
 end;
 
 procedure TListPascalString.AssignTo(dest: TListPascalString);
