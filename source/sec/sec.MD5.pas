@@ -25,10 +25,10 @@ SOFTWARE.
   * Z.MD5 – Fast MD5 Message‑Digest Implementation
   *
   * This unit provides a high‑performance MD5 hash function, optimized for
-  * Windows/Delphi using hand‑written assembly (32‑bit and 64‑bit). On other
-  * platforms, it falls back to a pure Pascal implementation from the
-  * Z.UnicodeMixedLib unit. The API is simple: compute the MD5 digest of a
-  * memory buffer or a stream (or a sub‑range of a stream).
+  * Windows on both Delphi and Free Pascal using hand‑written assembly
+  * (32‑bit and 64‑bit). On other platforms (Linux, macOS, FreeBSD, ARM,
+  * AArch64, LoongArch, etc.) and non‑Windows builds, it falls back to a
+  * pure Pascal implementation from the Z.UnicodeMixedLib unit.
   *
   * The MD5 algorithm produces a 128‑bit (16‑byte) hash, commonly represented
   * as a 32‑character hexadecimal string. This unit returns the digest as a
@@ -38,14 +38,39 @@ SOFTWARE.
   * Maxim Masiutin (64‑bit), and provide a significant speed boost over pure
   * Pascal on supported platforms.
   *
+  * ===========================================================================
+  * Platform support matrix (v2)
+  * ===========================================================================
+  *   Windows  x86  | Delphi ✓  FPC ✓  | Assembly (register convention)
+  *   Windows  x64  | Delphi ✓  FPC ✓  | Assembly (Win64 convention)
+  *   Linux    x86  | Delphi N/A FPC ✓ | Pure Pascal (umlMD5)
+  *   Linux    x64  | Delphi N/A FPC ✓ | Pure Pascal (umlMD5)
+  *   macOS    x64  | Delphi N/A FPC ✓ | Pure Pascal (umlMD5)
+  *   macOS    arm64| Delphi N/A FPC ✓ | Pure Pascal (umlMD5)
+  *   FreeBSD  x86/x64              FPC ✓ | Pure Pascal (umlMD5)
+  *   Android  arm/arm64/x86/x64    FPC ✓ | Pure Pascal (umlMD5)
+  *   LoongArch                     FPC ✓ | Pure Pascal (umlMD5)
+  *
+  * ===========================================================================
+  * Symbol naming notes (Windows x86)
+  * ===========================================================================
+  *   The bundled Z.MD5_32.obj exports the symbol "MD5_Transform" WITHOUT
+  *   a leading underscore. Delphi's `external` declaration accepts this
+  *   directly. FPC, however, decorates external symbols with a leading
+  *   underscore on Windows x86 by default, so we must use
+  *   `external name 'MD5_Transform'` to bypass the decoration.
+  *
+  *   On Windows x64, neither Delphi nor FPC decorate symbols, so the
+  *   plain `external` declaration works for both compilers.
+  * ===========================================================================
+  *
   * @Example (computing MD5 of a string):
   *   var
   *     s: RawByteString;
   *     digest: TMD5;
   *   begin
   *     s := 'Hello, world!';
-  *     digest := FastMD5(@s[1], Length(s));   // Compute hash of the bytes
-  *     // 'digest' now contains the 16‑byte MD5 checksum
+  *     digest := FastMD5(@s[1], Length(s));
   *   end;
   *
   * @Example (computing MD5 of a file stream):
@@ -55,7 +80,7 @@ SOFTWARE.
   *   begin
   *     fs := TFileStream.Create('myfile.dat', fmOpenRead);
   *     try
-  *       digest := FastMD5(fs, 0, fs.Size);  // Hash the entire file
+  *       digest := FastMD5(fs, 0, fs.Size);
   *     finally
   *       fs.Free;
   *     end;
@@ -63,6 +88,7 @@ SOFTWARE.
   ****************************************************************************** }
 unit sec.MD5;
 
+{$DEFINE FPC_DELPHI_MODE}
 {$I ..\Z.Define.inc}
 
 interface
@@ -71,46 +97,44 @@ uses sec.Core, sec.UnicodeMixedLib;
 
 {
   * MD5_Transform – internal low‑level function that processes a single 64‑byte
-  * chunk of data. It is implemented in assembly (on Windows/Delphi) or may be
-  * unused elsewhere. You normally do not call this directly; use FastMD5 instead.
+  * chunk of data. Implemented in assembly (Windows / Delphi / FPC).
+  * Do not call directly; use FastMD5 instead.
 }
-{$IF Defined(MSWINDOWS) and Defined(Delphi)}
-procedure MD5_Transform(var Accu; const Buf);
-{$ENDIF Defined(MSWINDOWS) and Defined(Delphi)}
+{$IF Defined(MSWINDOWS) and (Defined(Delphi) or Defined(FPC))}
+  {$IF Defined(WIN32)}
+  procedure MD5_Transform(var Accu; const Buf); register;
+  {$ELSEIF Defined(WIN64)}
+  procedure MD5_Transform(var Accu; const Buf);
+  {$ENDIF}
+{$ENDIF Defined(MSWINDOWS) and (Defined(Delphi) or Defined(FPC))}
 
 {
   * FastMD5 – computes the MD5 digest of a memory buffer.
   * @Param buffPtr: pointer to the first byte of the buffer (PByte).
-  * @Param bufSiz: size of the buffer in bytes (nativeUInt, typically 32‑bit or 64‑bit).
+  * @Param bufSiz: size of the buffer in bytes.
   * @Returns: a TMD5 record containing the 16‑byte digest.
-  * @Example: see unit header.
 }
 function FastMD5(const buffPtr: PByte; bufSiz: nativeUInt): TMD5; overload;
 
 {
   * FastMD5 – computes the MD5 digest of a portion of a stream.
-  * @Param stream: a TCore_Stream (or descendant) to read from.
-  * @Param StartPos: starting position (byte offset) in the stream; if greater than
-  *        EndPos, the two values are swapped automatically.
-  * @Param EndPos: ending position (exclusive) in the stream; the hash is computed
-  *        over the range [StartPos, EndPos). Clamped to the stream size.
+  * @Param stream:   a TCore_Stream (or descendant) to read from.
+  * @Param StartPos: starting position (byte offset) in the stream; if greater
+  *                  than EndPos, the two values are swapped automatically.
+  * @Param EndPos:   ending position (exclusive) in the stream; the hash is
+  *                  computed over the range [StartPos, EndPos). Clamped to
+  *                  the stream size.
   * @Returns: a TMD5 record containing the 16‑byte digest for the specified range.
-  * @Example: see unit header.
-  *
-  * If the stream is a TCore_MemoryStream or TMS64, and the conditional define
-  * 'OptimizationMemoryStreamMD5' is set, the function reads the data directly
-  * from memory without intermediate buffering, for extra speed.
 }
 function FastMD5(stream: TCore_Stream; StartPos, EndPos: Int64): TMD5; overload;
 
 implementation
 
-{$IF Defined(MSWINDOWS) and Defined(Delphi)}
-
+{$IF Defined(MSWINDOWS) and (Defined(Delphi) or Defined(FPC))}
 
 uses sec.MemoryStream;
 
-{ *************** Assembly‑linked MD5 core (Windows/Delphi only) *************** }
+{ *************** Assembly‑linked MD5 core (Windows only) *************** }
 (*
   fastMD5 algorithm by Maxim Masiutin
   https://github.com/maximmasiutin/MD5_Transform-x64
@@ -121,23 +145,45 @@ uses sec.MemoryStream;
   For 32‑bit Windows, the external object file Z.MD5_32.obj contains the
   386‑optimized MD5_Transform routine by Peter Sawatzki.
   For 64‑bit Windows, Z.MD5_64.obj contains the x64 version by Maxim Masiutin.
+
+  Both object files are MS COFF format (produced by ml.exe / ml64.exe) and
+  export the symbol "MD5_Transform" without any decoration.
 *)
 
 {$IF Defined(WIN32)}
-{$L Z.MD5_32.obj} // Link 32‑bit assembly object
+
+  {$L Z.MD5_32.obj}
+
+  {$IF Defined(FPC)}
+    {
+      FPC on Windows x86 automatically decorates external symbols with a
+      leading underscore. Since the COFF object exports "MD5_Transform"
+      (no underscore), we must use `external name` to bypass decoration.
+    }
+    procedure MD5_Transform(var Accu; const Buf); register;
+      external name 'MD5_Transform';
+  {$ELSE}
+    {
+      Delphi on Windows x86 uses the register calling convention without
+      decorating the symbol name, so the plain `external` declaration works.
+    }
+    procedure MD5_Transform(var Accu; const Buf); register; external;
+  {$ENDIF}
+
 {$ELSEIF Defined(WIN64)}
-{$L Z.MD5_64.obj} // Link 64‑bit assembly object
+
+  {$L Z.MD5_64.obj}
+
+  {
+    On Windows x64, neither Delphi nor FPC decorate external symbols,
+    so the plain `external` declaration works for both compilers.
+  }
+  procedure MD5_Transform(var Accu; const Buf); external;
+
 {$ENDIF}
 
 {
-  * MD5_Transform – externally implemented in assembly.
-  * This procedure updates the MD5 accumulator (Accu) by hashing one 64‑byte block
-  * (Buf). It is called repeatedly by FastMD5 for each full block of the input.
-}
-procedure MD5_Transform(var Accu; const Buf); register; external;
-
-{
-  * FastMD5 – buffer version (Windows/Delphi assembly accelerated).
+  * FastMD5 – buffer version (Windows, assembly accelerated).
   *
   * The algorithm follows the standard MD5 padding and processing:
   *   - Initialize the four 32‑bit state variables with the MD5 constants.
@@ -161,8 +207,8 @@ begin
   PCardinal(@Digest[12])^ := $10325476;
 
   // Compute length in bits: low 32 bits, high 32 bits (bits shifted by 29)
-  Lo := bufSiz shl 3; // lower 32 bits of bit length
-  Hi := bufSiz shr 29; // upper 32 bits (since 2^29 = 512 MB)
+  Lo := bufSiz shl 3;
+  Hi := bufSiz shr 29;
 
   p := buffPtr;
 
@@ -190,8 +236,8 @@ begin
   if ChunkIndex > $38 then
     begin
       if ChunkIndex < $40 then
-          FillPtrByte(@ChunkBuff[ChunkIndex], $40 - ChunkIndex, 0); // zero fill the rest
-      MD5_Transform(Result, ChunkBuff); // process this chunk
+          FillPtrByte(@ChunkBuff[ChunkIndex], $40 - ChunkIndex, 0);
+      MD5_Transform(Result, ChunkBuff);
       ChunkIndex := 0;
     end;
 
@@ -207,12 +253,13 @@ begin
 end;
 
 {
-  * FastMD5 – stream version (Windows/Delphi assembly accelerated).
+  * FastMD5 – stream version (Windows, assembly accelerated).
   *
-  * This version reads the stream in chunks (default chunk size = 64 * 0xFFFF bytes)
-  * to avoid allocating a huge buffer. It uses a temporary block buffer (DeltaBuf)
-  * for reading. If the stream is a memory‑based stream, and the define
-  * OptimizationMemoryStreamMD5 is active, it reads directly from memory.
+  * This version reads the stream in chunks (default chunk size = 64 * 0xFFFF
+  * bytes) to avoid allocating a huge buffer. It uses a temporary block buffer
+  * (DeltaBuf) for reading. If the stream is a memory‑based stream, and the
+  * define OptimizationMemoryStreamMD5 is active, it reads directly from
+  * memory.
   *
   * The hash computation is otherwise identical to the buffer version.
 }
@@ -258,6 +305,7 @@ begin
       exit;
     end;
 {$ENDIF}
+
   // Initialize MD5 state
   PCardinal(@Digest[0])^ := $67452301;
   PCardinal(@Digest[4])^ := $EFCDAB89;
@@ -266,8 +314,8 @@ begin
 
   bufSiz := EndPos - StartPos;
   Rest := 0;
-  Lo := bufSiz shl 3; // lower 32 bits of bit length
-  Hi := bufSiz shr 29; // upper 32 bits
+  Lo := bufSiz shl 3;
+  Hi := bufSiz shr 29;
 
   // Allocate a buffer for reading chunks from the stream
   DeltaBuf := GetMemory(deltaSize);
@@ -305,7 +353,7 @@ begin
   if bufSiz > 0 then
       CopyPtr(p, @ChunkBuff[0], bufSiz);
 
-  FreeMemory(DeltaBuf); // release temporary read buffer
+  FreeMemory(DeltaBuf);
 
   // Finalize hash (same as buffer version)
   Result := PMD5(@Digest[0])^;
@@ -324,10 +372,11 @@ begin
   MD5_Transform(Result, ChunkBuff);
 end;
 
-{$ELSE} // Not (Windows and Delphi): fallback to pure Pascal implementation
+{$ELSE} // Not Windows, or not (Delphi or FPC): pure Pascal fallback
 
 {
-  * FastMD5 – buffer version (non‑Windows or non‑Delphi).
+  * FastMD5 – buffer version (non‑Windows platforms: Linux, macOS, BSD,
+  * Android, and non‑x86/x64 architectures: ARM, AArch64, LoongArch, …).
   * Uses the pure Pascal MD5 implementation from Z.UnicodeMixedLib.umlMD5.
 }
 function FastMD5(const buffPtr: PByte; bufSiz: nativeUInt): TMD5;
@@ -336,7 +385,7 @@ begin
 end;
 
 {
-  * FastMD5 – stream version (non‑Windows or non‑Delphi).
+  * FastMD5 – stream version (non‑Windows platforms).
   * Uses the pure Pascal stream MD5 from Z.UnicodeMixedLib.umlStreamMD5.
 }
 function FastMD5(stream: TCore_Stream; StartPos, EndPos: Int64): TMD5;
@@ -344,6 +393,6 @@ begin
   Result := umlStreamMD5(stream, StartPos, EndPos);
 end;
 
-{$ENDIF Defined(MSWINDOWS) and Defined(Delphi)}
+{$ENDIF Defined(MSWINDOWS) and (Defined(Delphi) or Defined(FPC))}
 
 end.

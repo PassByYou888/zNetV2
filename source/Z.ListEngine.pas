@@ -1219,6 +1219,7 @@ type
     procedure SaveToFile(fn: SystemString);
 
     property AsText: SystemString read GetText write SetText;
+    property Text: SystemString read GetText write SetText;
 
     property Items[idx: Integer]: TPascalString read GetItems write SetItems; default;
     property Items_PPascalString[idx: Integer]: PPascalString read GetItems_PPascalString;

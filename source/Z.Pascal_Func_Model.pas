@@ -145,10 +145,10 @@ unit Z.Pascal_Func_Model;
 interface
 
 uses
-{$IFDEF FPC}
+  {$IFDEF FPC}
   (*FPC-specific generic list support (backported from fgl).*)
   Z.FPC.GenericList,
-{$ENDIF FPC}
+  {$ENDIF FPC}
   Z.Core,
   Z.PascalStrings, Z.UPascalStrings,
   Z.Pascal_Func_Tool,
@@ -246,8 +246,7 @@ type
     destructor Destroy; override;
     procedure Clear;
 
-    property Typ_Normalize_Func: TTyp_Normalize_Func
-      read FTyp_Normalize_Func write FTyp_Normalize_Func;
+    property Typ_Normalize_Func: TTyp_Normalize_Func read FTyp_Normalize_Func write FTyp_Normalize_Func;
     property UnitName: TP_String read FUnitName write FUnitName;
     property Funcs: TFunctionList read FFuncs;
     property FuncCount: integer read GetFuncCount;
@@ -261,8 +260,7 @@ type
       *             messages about declarations that were not loaded (e.g.
       *             unsupported types, var/out parameters).
     *)
-    procedure LoadFromParser(Parser: tpascal_func_decl_tool;
-      Report: TPascalStringList);
+    procedure LoadFromParser(Parser: tpascal_func_decl_tool; Report: TPascalStringList);
 
     (*
       * SaveToParser - Writes the model data back into a parser object,
@@ -320,14 +318,14 @@ implementation
 procedure Log(const Msg: TP_String); overload;
 begin
   if PascalFuncModel_LogEnabled then
-      DoStatus('[PascalFuncModel] ' + Msg);
+    DoStatus('[PascalFuncModel] ' + Msg);
 end;
 
 (* Internal logging procedure with formatting. *)
 procedure Log(const Fmt: TP_String; const Args: array of const); overload;
 begin
   if PascalFuncModel_LogEnabled then
-      DoStatus('[PascalFuncModel] ' + PFormat(Fmt, Args));
+    DoStatus('[PascalFuncModel] ' + PFormat(Fmt, Args));
 end;
 
 (* ---------------------------------------------------------------------------
@@ -358,7 +356,7 @@ begin
   Name := '';
   IsFunction := False;
   for i := 0 to Length(Params) - 1 do
-      Params[i].Clear;
+    Params[i].Clear;
   SetLength(Params, 0);
   ReturnType := '';
   Comment := '';
@@ -378,7 +376,7 @@ begin
   Result.Comment := Self.Comment;
   SetLength(Result.Params, Length(Self.Params));
   for i := 0 to High(Self.Params) do
-      Result.Params[i] := Self.Params[i];
+    Result.Params[i] := Self.Params[i];
 end;
 
 (* ---------------------------------------------------------------------------
@@ -391,7 +389,7 @@ begin
     tnf_Json: Result := Normalize_Json_Type(Typ);
     tnf_ABI: Result := Normalize_ABI_Type(Typ);
     else
-        RaiseInfo('error');
+      RaiseInfo('error');
   end;
 end;
 
@@ -420,7 +418,7 @@ var
   i: integer;
 begin
   for i := 0 to FFuncs.Count - 1 do
-      FFuncs[i].Clear;
+    FFuncs[i].Clear;
   FFuncs.Clear;
   FUnitName := '';
   Log('Structure cleared.');
@@ -441,17 +439,14 @@ var
   lowTyp: TP_String;
 begin
   lowTyp := Typ.TrimChar(#32#9).LowerText;
-  if lowTyp.Same('integer', 'int64', 'cardinal', 'longint', 'dword') or
-    lowTyp.Same('word', 'smallint', 'byte', 'uint64', 'longword') then
-      Result := 'int64'
+  if lowTyp.Same('integer', 'int64', 'cardinal', 'longint', 'dword') or lowTyp.Same('word', 'smallint', 'byte', 'uint64', 'longword') then
+    Result := 'int64'
   else if lowTyp.Same('double', 'single', 'extended', 'real') then
-      Result := 'double'
-  else if lowTyp.Same('tpascalstring', 'tupascalstring', 'tp_string',
-    'string', 'ansistring', 'unicodestring') or
-    lowTyp.Same('pchar', 'pansichar', 'pwidechar') then
-      Result := 'string'
+    Result := 'double'
+  else if lowTyp.Same('tpascalstring', 'tupascalstring', 'tp_string', 'string', 'ansistring', 'unicodestring') or lowTyp.Same('pchar', 'pansichar', 'pwidechar') then
+    Result := 'string'
   else
-      Result := '';
+    Result := '';
 end;
 
 function Normalize_ABI_Type(const Typ: TP_String): TP_String;
@@ -459,17 +454,14 @@ var
   lowTyp: TP_String;
 begin
   lowTyp := Typ.TrimChar(#32#9).LowerText;
-  if lowTyp.Same('integer', 'int64', 'cardinal', 'longint', 'dword') or
-    lowTyp.Same('word', 'smallint', 'byte', 'uint64', 'longword') then
-      Result := lowTyp
+  if lowTyp.Same('integer', 'int64', 'cardinal', 'longint', 'dword') or lowTyp.Same('word', 'smallint', 'byte', 'uint64', 'longword') then
+    Result := lowTyp
   else if lowTyp.Same('double', 'single', 'extended', 'real') then
-      Result := lowTyp
-  else if lowTyp.Same('tpascalstring', 'tupascalstring', 'tp_string',
-    'string', 'ansistring', 'unicodestring') or
-    lowTyp.Same('pchar', 'pansichar', 'pwidechar') then
-      Result := lowTyp
+    Result := lowTyp
+  else if lowTyp.Same('tpascalstring', 'tupascalstring', 'tp_string', 'string', 'ansistring', 'unicodestring') or lowTyp.Same('pchar', 'pansichar', 'pwidechar') then
+    Result := lowTyp
   else
-      Result := '';
+    Result := '';
 end;
 
 (* ---------------------------------------------------------------------------
@@ -502,37 +494,36 @@ var
 begin
   Result := '';
   if Cmt = '' then
-      Exit;
+    Exit;
 
   Parser := TTextParsing.Create(Cmt, tsPascal);
   try
     SetLength(Parts, 0);
     for i := 0 to Parser.TokenCount - 1 do
+    begin
+      Token := Parser.Tokens[i];
+      if Token^.tokenType = ttComment then
       begin
-        Token := Parser.Tokens[i];
-        if Token^.tokenType = ttComment then
-          begin
-            Part := TTextParsing.Translate_Pascal_Decl_Comment_To_Text(
-              Token^.Text);
-            Part := Part.TrimChar(#32#9#13#10);
-            if Part <> '' then
-              begin
-                SetLength(Parts, Length(Parts) + 1);
-                Parts[High(Parts)] := Part;
-              end;
-          end;
+        Part := TTextParsing.Translate_Pascal_Decl_Comment_To_Text(Token^.Text);
+        Part := Part.TrimChar(#32#9#13#10);
+        if Part <> '' then
+        begin
+          SetLength(Parts, Length(Parts) + 1);
+          Parts[High(Parts)] := Part;
+        end;
       end;
+    end;
 
     (* Join parts with LF only; keeps line splitting trivial downstream. *)
     Result := '';
     for i := 0 to High(Parts) do
-      begin
-        if i > 0 then
-            Result := Result + #10;
-        Result := Result + Parts[i];
-      end;
+    begin
+      if i > 0 then
+        Result := Result + #10;
+      Result := Result + Parts[i];
+    end;
   finally
-      Parser.Free;
+    Parser.Free;
   end;
 end;
 
@@ -603,23 +594,21 @@ end;
   * appended verbatim (including its original leading whitespace). Lines are
   * joined with LF (#10).
 *)
-function ExtractParamDescriptions(const CommentText___: TP_String;
-  const ParamNames: TP_ArrayString): TParamDescPool;
+function ExtractParamDescriptions(const CommentText___: TP_String; const ParamNames: TP_ArrayString): TParamDescPool;
 
-(* True if c may start a Pascal identifier. *)
+  (* True if c may start a Pascal identifier. *)
   function IsIdentStart(c: TP_Char): boolean;
   begin
-    Result := ((c >= 'a') and (c <= 'z')) or
-      ((c >= 'A') and (c <= 'Z')) or (c = '_');
+    Result := ((c >= 'a') and (c <= 'z')) or ((c >= 'A') and (c <= 'Z')) or (c = '_');
   end;
 
-(* True if c may continue a Pascal identifier. *)
+  (* True if c may continue a Pascal identifier. *)
   function IsIdentChar(c: TP_Char): boolean;
   begin
     Result := IsIdentStart(c) or ((c >= '0') and (c <= '9'));
   end;
 
-(* True if c is a horizontal whitespace character. *)
+  (* True if c is a horizontal whitespace character. *)
   function IsHSpace(c: TP_Char): boolean;
   begin
     Result := (c = ' ') or (c = #9);
@@ -642,25 +631,25 @@ var
   Found: boolean;
   Pool: TParamDescPool;
 
-  (* Advance past horizontal whitespace. *)
+(* Advance past horizontal whitespace. *)
   procedure SkipWS(const S: TP_String; var pos: integer);
   begin
     while (pos <= S.Len) and IsHSpace(S[pos]) do
-        Inc(pos);
+      Inc(pos);
   end;
 
-(* Read an identifier starting at pos; advances pos past it. *)
+  (* Read an identifier starting at pos; advances pos past it. *)
   function ReadIdent(const S: TP_String; var pos: integer): TP_String;
   begin
     Result := '';
     while (pos <= S.Len) and IsIdentChar(S[pos]) do
-      begin
-        Result := Result + S[pos];
-        Inc(pos);
-      end;
+    begin
+      Result := Result + S[pos];
+      Inc(pos);
+    end;
   end;
 
-(* Return the canonical parameter name if Name_ matches one, else ''. *)
+  (* Return the canonical parameter name if Name_ matches one, else ''. *)
   function MatchParam(const Name_: TP_String): TP_String;
   var
     jj: integer;
@@ -668,10 +657,10 @@ var
     Result := '';
     for jj := 0 to High(ParamNames) do
       if ParamNames[jj].Same(True, Name_) then
-          Exit(ParamNames[jj]);
+        Exit(ParamNames[jj]);
   end;
 
-(* Compute the number of leading horizontal whitespace characters. *)
+  (* Compute the number of leading horizontal whitespace characters. *)
   function ComputeIndent(const S: TP_String): integer;
   var
     k: integer;
@@ -679,9 +668,9 @@ var
     Result := 0;
     for k := 1 to S.Len do
       if IsHSpace(S[k]) then
-          Inc(Result)
+        Inc(Result)
       else
-          Break;
+        Break;
   end;
 
 (*
@@ -713,11 +702,11 @@ var
   begin
     k := 1;
     while (k <= S.Len) and IsHSpace(S[k]) do
-        Inc(k);
+      Inc(k);
     if (k <= S.Len) and (S[k] = '*') then
-        Result := S.GetString(k + 1, S.Len + 1)
+      Result := S.GetString(k + 1, S.Len + 1)
     else
-        Result := S;
+      Result := S;
   end;
 
 (*
@@ -728,9 +717,7 @@ var
   * the name (so the description text is
   * TrimmedLine_[DescStartPos_ .. Len]).
 *)
-  function TryMatchParamLine(const TrimmedLine_: TP_String;
-    out MatchedName_: TP_String;
-    out DescStartPos_: integer): boolean;
+  function TryMatchParamLine(const TrimmedLine_: TP_String; out MatchedName_: TP_String; out DescStartPos_: integer): boolean;
   var
     pos: integer;
     ident: TP_String;
@@ -740,55 +727,54 @@ var
     MatchedName_ := '';
     DescStartPos_ := 1;
     if TrimmedLine_.Len = 0 then
-        Exit;
+      Exit;
 
     pos := 1;
     SkipWS(TrimmedLine_, pos);
     if pos > TrimmedLine_.Len then
-        Exit;
+      Exit;
 
     (* Form B / C: Doxygen marker. *)
     if (TrimmedLine_[pos] = '@') or (TrimmedLine_[pos] = '\') then
+    begin
+      Inc(pos);
+      SkipWS(TrimmedLine_, pos);
+      if pos > TrimmedLine_.Len then
+        Exit;
+
+      ident := ReadIdent(TrimmedLine_, pos);
+      if ident = '' then
+        Exit;
+
+      (* Keyword form: '@param name', '@arg name', '@parameter name'. *)
+      if ident.Same('param') or ident.Same('arg') or ident.Same('parameter') then
       begin
-        Inc(pos);
         SkipWS(TrimmedLine_, pos);
         if pos > TrimmedLine_.Len then
-            Exit;
-
+          Exit;
         ident := ReadIdent(TrimmedLine_, pos);
         if ident = '' then
-            Exit;
-
-        (* Keyword form: '@param name', '@arg name', '@parameter name'. *)
-        if ident.Same('param') or ident.Same('arg') or
-          ident.Same('parameter') then
-          begin
-            SkipWS(TrimmedLine_, pos);
-            if pos > TrimmedLine_.Len then
-                Exit;
-            ident := ReadIdent(TrimmedLine_, pos);
-            if ident = '' then
-                Exit;
-          end;
-
-        canonical := MatchParam(ident);
-        if canonical = '' then
-            Exit;
-
-        MatchedName_ := canonical;
-        DescStartPos_ := pos;
-        Result := True;
-        Exit;
+          Exit;
       end;
+
+      canonical := MatchParam(ident);
+      if canonical = '' then
+        Exit;
+
+      MatchedName_ := canonical;
+      DescStartPos_ := pos;
+      Result := True;
+      Exit;
+    end;
 
     (* Form A: line-leading name. *)
     ident := ReadIdent(TrimmedLine_, pos);
     if ident = '' then
-        Exit;
+      Exit;
 
     canonical := MatchParam(ident);
     if canonical = '' then
-        Exit;
+      Exit;
 
     MatchedName_ := canonical;
     DescStartPos_ := pos;
@@ -799,37 +785,34 @@ var
   * Extract the description text after the parameter name and strip any
   * leading separator characters (ASCII or fullwidth colon / equal).
 *)
-  function ExtractDescAfterName(const TrimmedLine_: TP_String;
-    DescStartPos_: integer): TP_String;
+  function ExtractDescAfterName(const TrimmedLine_: TP_String; DescStartPos_: integer): TP_String;
   var
     desc: TP_String;
   begin
     Result := '';
     if DescStartPos_ > TrimmedLine_.Len then
-        Exit;
+      Exit;
 
     desc := TrimmedLine_.GetString(DescStartPos_, TrimmedLine_.Len + 1);
     desc := desc.TrimChar(#32#9);
 
-    while (desc.Len > 0) and
-      ((desc[1] = ':') or (desc[1] = '=') or
-        (desc[1] = #$FF1A) or (desc[1] = #$FF1D)) do
-        desc := desc.GetString(2, desc.Len + 1).TrimChar(#32#9);
+    while (desc.Len > 0) and ((desc[1] = ':') or (desc[1] = '=') or (desc[1] = #$FF1A) or (desc[1] = #$FF1D)) do
+      desc := desc.GetString(2, desc.Len + 1).TrimChar(#32#9);
 
     Result := desc;
   end;
 
-(* Write the accumulated parameter description into the pool. *)
+  (* Write the accumulated parameter description into the pool. *)
   procedure FlushCurrent;
   begin
     if (CurrentParam <> '') and (CurrentDesc <> '') then
-      begin
-        if Pool.Exists(CurrentParam) then
-            Pool.Key_Value[CurrentParam] :=
-            Pool.Key_Value[CurrentParam] + #10 + CurrentDesc
-        else
-            Pool.Add(CurrentParam, CurrentDesc, False);
-      end;
+    begin
+      if Pool.Exists(CurrentParam) then
+        Pool.Key_Value[CurrentParam] :=
+          Pool.Key_Value[CurrentParam] + #10 + CurrentDesc
+      else
+        Pool.Add(CurrentParam, CurrentDesc, False);
+    end;
     CurrentParam := '';
     CurrentDesc := '';
     ParamIndent := -1;
@@ -840,7 +823,7 @@ begin
   Pool := TParamDescPool.Create(256, '');
   Result := Pool;
   if (CommentText = '') or (Length(ParamNames) = 0) then
-      Exit;
+    Exit;
 
   CurrentParam := '';
   CurrentDesc := '';
@@ -851,63 +834,61 @@ begin
     umlSeparatorText(CommentText, Lines, #10);
 
     for i := 0 to Lines.Count - 1 do
-      begin
-        (* Start from the raw line so that indentation is preserved. *)
-        RawLine := TP_String(Lines[i]);
+    begin
+      (* Start from the raw line so that indentation is preserved. *)
+      RawLine := TP_String(Lines[i]);
 
-        (* Strip trailing CR / LF and horizontal whitespace. *)
-        while (RawLine.Len > 0) and
-          ((RawLine.Last = #13) or (RawLine.Last = #10)) do
-            RawLine.DeleteLast;
-        while (RawLine.Len > 0) and IsHSpace(RawLine.Last) do
-            RawLine.DeleteLast;
+      (* Strip trailing CR / LF and horizontal whitespace. *)
+      while (RawLine.Len > 0) and ((RawLine.Last = #13) or (RawLine.Last = #10)) do
+        RawLine.DeleteLast;
+      while (RawLine.Len > 0) and IsHSpace(RawLine.Last) do
+        RawLine.DeleteLast;
 
         (*
           * Normalise block-comment markers: this is the step that makes the
           * C-to-Pascal path work. After this call, ContentLine carries only
           * the content and its own leading whitespace.
         *)
-        ContentLine := GetContentLine(RawLine);
-        TrimmedLine := ContentLine.TrimChar(#32#9);
+      ContentLine := GetContentLine(RawLine);
+      TrimmedLine := ContentLine.TrimChar(#32#9);
 
-        (* ---- Blank line: flush and continue. ---- *)
-        if TrimmedLine.Len = 0 then
-          begin
-            FlushCurrent;
-            Continue;
-          end;
-
-        (* ---- Parameter declaration? ---- *)
-        Found := TryMatchParamLine(TrimmedLine, MatchedParam,
-          DescStartPos);
-        if Found then
-          begin
-            FlushCurrent;
-            CurrentParam := MatchedParam;
-            ParamIndent := ComputeIndent(ContentLine);
-            CurrentDesc := ExtractDescAfterName(TrimmedLine, DescStartPos);
-            Continue;
-          end;
-
-        (* ---- Continuation of the current parameter block? ---- *)
-        RawIndent := ComputeIndent(ContentLine);
-        if (CurrentParam <> '') and (RawIndent > ParamIndent) then
-          begin
-            if CurrentDesc <> '' then
-                CurrentDesc := CurrentDesc + #10 + ContentLine
-            else
-                CurrentDesc := ContentLine;
-            Continue;
-          end;
-
-        (* ---- Anything else terminates the current block. ---- *)
+      (* ---- Blank line: flush and continue. ---- *)
+      if TrimmedLine.Len = 0 then
+      begin
         FlushCurrent;
+        Continue;
       end;
+
+      (* ---- Parameter declaration? ---- *)
+      Found := TryMatchParamLine(TrimmedLine, MatchedParam, DescStartPos);
+      if Found then
+      begin
+        FlushCurrent;
+        CurrentParam := MatchedParam;
+        ParamIndent := ComputeIndent(ContentLine);
+        CurrentDesc := ExtractDescAfterName(TrimmedLine, DescStartPos);
+        Continue;
+      end;
+
+      (* ---- Continuation of the current parameter block? ---- *)
+      RawIndent := ComputeIndent(ContentLine);
+      if (CurrentParam <> '') and (RawIndent > ParamIndent) then
+      begin
+        if CurrentDesc <> '' then
+          CurrentDesc := CurrentDesc + #10 + ContentLine
+        else
+          CurrentDesc := ContentLine;
+        Continue;
+      end;
+
+      (* ---- Anything else terminates the current block. ---- *)
+      FlushCurrent;
+    end;
 
     (* Flush whatever block is still open. *)
     FlushCurrent;
   finally
-      Lines.Free;
+    Lines.Free;
   end;
 
   Log('ExtractParamDescriptions: extracted %d entries', [Pool.Count]);
@@ -942,160 +923,144 @@ begin
   Log('LoadFromParser: starting');
   Clear;
   if Report <> nil then
-    begin
-      Report.Clear;
-      Report.Add('=== LoadFromParser skip report ===');
-      Report.Add(PFormat('Total declarations in FuncList: %d',
-          [Parser.FuncList.Count]));
-    end;
+  begin
+    Report.Clear;
+    Report.Add('=== LoadFromParser skip report ===');
+    Report.Add(PFormat('Total declarations in FuncList: %d', [Parser.FuncList.Count]));
+  end;
 
   if not Parser.ParseSuccess then
-    begin
-      Log('LoadFromParser: Parser.ParseSuccess = False, cannot load.');
-      if Report <> nil then
-          Report.Add('ERROR: Parser.ParseSuccess is False, nothing loaded.');
-      Exit;
-    end;
+  begin
+    Log('LoadFromParser: Parser.ParseSuccess = False, cannot load.');
+    if Report <> nil then
+      Report.Add('ERROR: Parser.ParseSuccess is False, nothing loaded.');
+    Exit;
+  end;
 
   FUnitName := Parser.UnitName;
   Log('LoadFromParser: UnitName = "%s"', [FUnitName.Text]);
   Log('LoadFromParser: Parser.FuncList.Count = %d', [Parser.FuncList.Count]);
 
   for i := 0 to Parser.FuncList.Count - 1 do
+  begin
+    decl := Parser.FuncList[i];
+
+    if not decl^.IsProc then
     begin
-      decl := Parser.FuncList[i];
-
-      if not decl^.IsProc then
-        begin
-          SkipReason := 'Not a procedure/function (IsProc=False)';
-          if Report <> nil then
-              Report.Add(PFormat('Skipped: "%s" (index %d) - Reason: %s',
-                [decl^.Name.Text, i, SkipReason]));
-          Continue;
-        end;
-
-      if decl^.NestLevel <> 0 then
-        begin
-          SkipReason := 'Nested declaration (NestLevel=' +
-            umlIntToStr(decl^.NestLevel) + ')';
-          if Report <> nil then
-              Report.Add(PFormat('Skipped: "%s" (index %d) - Reason: %s',
-                [decl^.Name.Text, i, SkipReason]));
-          Continue;
-        end;
-
-      (* Reset all fields of f explicitly. *)
-      f.Name := '';
-      f.IsFunction := False;
-      f.Comment := '';
-      f.ReturnType := '';
-      SetLength(f.Params, 0);
-
-      f.Name := decl^.Name;
-      f.IsFunction := decl^.IsFunction;
-      f.Comment := decl^.Comment;
-      Log('  Processing routine: %s (IsFunction=%s, Comment length=%d)',
-        [f.Name.Text, umlBoolToStr(f.IsFunction).Text, f.Comment.Len]);
-
-      (* Build the parameter name array for description extraction. *)
-      SetLength(ParamNames, Length(decl^.param_arry));
-      for j := 0 to High(decl^.param_arry) do
-          ParamNames[j] := decl^.param_arry[j].param_name;
-
-      descPool := ExtractParamDescriptions(f.Comment, ParamNames);
-      try
-        SetLength(paramList, Length(decl^.param_arry));
-        ok := True;
-        for j := 0 to High(decl^.param_arry) do
-          begin
-            paramDecl := decl^.param_arry[j];
-
-            if paramDecl.param_name = '' then
-              begin
-                SkipReason := 'Parameter name is empty';
-                if Report <> nil then
-                    Report.Add(PFormat(
-                      'Skipped: "%s" (index %d) - Reason: %s',
-                      [f.Name.Text, i, SkipReason]));
-                ok := False;
-                Break;
-              end;
-
-            if paramDecl.param_mod.Same('var', 'out') then
-              begin
-                SkipReason := 'var/out parameter "' + paramDecl.param_name +
-                  '" not supported';
-                if Report <> nil then
-                    Report.Add(PFormat(
-                      'Skipped: "%s" (index %d) - Reason: %s',
-                      [f.Name.Text, i, SkipReason]));
-                ok := False;
-                Break;
-              end;
-
-            normTyp := Do_Normalize_Type(paramDecl.param_typ);
-            if normTyp = '' then
-              begin
-                SkipReason := 'Parameter "' + paramDecl.param_name +
-                  '" has unsupported type "' + paramDecl.param_typ + '"';
-                if Report <> nil then
-                    Report.Add(PFormat(
-                      'Skipped: "%s" (index %d) - Reason: %s',
-                      [f.Name.Text, i, SkipReason]));
-                ok := False;
-                Break;
-              end;
-
-            paramName := paramDecl.param_name;
-            paramList[j].Name := paramName;
-            paramList[j].Typ := paramDecl.param_typ;
-            paramList[j].PascalType := normTyp;
-            if descPool.Exists(paramName) then
-                paramList[j].Description := descPool.Key_Value[paramName]
-            else
-                paramList[j].Description := '';
-
-            Log('    Param[%d]: %s: %s -> %s (desc: %s)',
-              [j, paramName.Text, paramDecl.param_typ.Text,
-                normTyp.Text, paramList[j].Description.Text]);
-          end;
-      finally
-          descPool.Free;
-      end;
-      if not ok then
-          Continue;
-
-      f.Params := paramList;
-
-      if f.IsFunction then
-        begin
-          f.ReturnType := Do_Normalize_Type(decl^.ResultDecl);
-          if f.ReturnType = '' then
-            begin
-              SkipReason := 'Return type "' + decl^.ResultDecl +
-                '" is unsupported';
-              if Report <> nil then
-                  Report.Add(PFormat(
-                    'Skipped: "%s" (index %d) - Reason: %s',
-                    [f.Name.Text, i, SkipReason]));
-              Continue;
-            end;
-          Log('    Return type: %s', [f.ReturnType.Text]);
-        end
-      else
-          f.ReturnType := '';
-
-      FFuncs.Add(f.Clone);
-      Log('  Added routine "%s" with %d parameters',
-        [f.Name.Text, Length(f.Params)]);
+      SkipReason := 'Not a procedure/function (IsProc=False)';
+      if Report <> nil then
+        Report.Add(PFormat('Skipped: "%s" (index %d) - Reason: %s', [decl^.Name.Text, i, SkipReason]));
+      Continue;
     end;
+
+    if decl^.NestLevel <> 0 then
+    begin
+      SkipReason := 'Nested declaration (NestLevel=' + umlIntToStr(decl^.NestLevel) + ')';
+      if Report <> nil then
+        Report.Add(PFormat('Skipped: "%s" (index %d) - Reason: %s', [decl^.Name.Text, i, SkipReason]));
+      Continue;
+    end;
+
+    (* Reset all fields of f explicitly. *)
+    f.Name := '';
+    f.IsFunction := False;
+    f.Comment := '';
+    f.ReturnType := '';
+    SetLength(f.Params, 0);
+
+    f.Name := decl^.Name;
+    f.IsFunction := decl^.IsFunction;
+    f.Comment := decl^.Comment;
+    Log('  Processing routine: %s (IsFunction=%s, Comment length=%d)',
+      [f.Name.Text, umlBoolToStr(f.IsFunction).Text, f.Comment.Len]);
+
+    (* Build the parameter name array for description extraction. *)
+    SetLength(ParamNames, Length(decl^.param_arry));
+    for j := 0 to High(decl^.param_arry) do
+      ParamNames[j] := decl^.param_arry[j].param_name;
+
+    descPool := ExtractParamDescriptions(f.Comment, ParamNames);
+    try
+      SetLength(paramList, Length(decl^.param_arry));
+      ok := True;
+      for j := 0 to High(decl^.param_arry) do
+      begin
+        paramDecl := decl^.param_arry[j];
+
+        if paramDecl.param_name = '' then
+        begin
+          SkipReason := 'Parameter name is empty';
+          if Report <> nil then
+            Report.Add(PFormat('Skipped: "%s" (index %d) - Reason: %s', [f.Name.Text, i, SkipReason]));
+          ok := False;
+          Break;
+        end;
+
+        if paramDecl.param_mod.Same('var', 'out') then
+        begin
+          SkipReason := 'var/out parameter "' + paramDecl.param_name + '" not supported';
+          if Report <> nil then
+            Report.Add(PFormat('Skipped: "%s" (index %d) - Reason: %s', [f.Name.Text, i, SkipReason]));
+          ok := False;
+          Break;
+        end;
+
+        normTyp := Do_Normalize_Type(paramDecl.param_typ);
+        if normTyp = '' then
+        begin
+          SkipReason := 'Parameter "' + paramDecl.param_name + '" has unsupported type "' + paramDecl.param_typ + '"';
+          if Report <> nil then
+            Report.Add(PFormat('Skipped: "%s" (index %d) - Reason: %s', [f.Name.Text, i, SkipReason]));
+          ok := False;
+          Break;
+        end;
+
+        paramName := paramDecl.param_name;
+        paramList[j].Name := paramName;
+        paramList[j].Typ := paramDecl.param_typ;
+        paramList[j].PascalType := normTyp;
+        if descPool.Exists(paramName) then
+          paramList[j].Description := descPool.Key_Value[paramName]
+        else
+          paramList[j].Description := '';
+
+        Log('    Param[%d]: %s: %s -> %s (desc: %s)',
+          [j, paramName.Text, paramDecl.param_typ.Text, normTyp.Text, paramList[j].Description.Text]);
+      end;
+    finally
+      descPool.Free;
+    end;
+    if not ok then
+      Continue;
+
+    f.Params := paramList;
+
+    if f.IsFunction then
+    begin
+      f.ReturnType := Do_Normalize_Type(decl^.ResultDecl);
+      if f.ReturnType = '' then
+      begin
+        SkipReason := 'Return type "' + decl^.ResultDecl + '" is unsupported';
+        if Report <> nil then
+          Report.Add(PFormat('Skipped: "%s" (index %d) - Reason: %s', [f.Name.Text, i, SkipReason]));
+        Continue;
+      end;
+      Log('    Return type: %s', [f.ReturnType.Text]);
+    end
+    else
+      f.ReturnType := '';
+
+    FFuncs.Add(f.Clone);
+    Log('  Added routine "%s" with %d parameters',
+      [f.Name.Text, Length(f.Params)]);
+  end;
 
   Log('LoadFromParser: finished, %d routines loaded', [FFuncs.Count]);
   if Report <> nil then
-    begin
-      Report.Add(PFormat('Loaded %d routines.', [FFuncs.Count]));
-      Report.Add('=== End of report ===');
-    end;
+  begin
+    Report.Add(PFormat('Loaded %d routines.', [FFuncs.Count]));
+    Report.Add('=== End of report ===');
+  end;
 end;
 
 (* ---------------------------------------------------------------------------
@@ -1123,40 +1088,40 @@ begin
   Parser.UnitName := FUnitName;
 
   for i := 0 to FFuncs.Count - 1 do
+  begin
+    f := FFuncs[i];
+    New(decl);
+    decl^.Init;
+    decl^.IsProc := True;
+    decl^.Name := f.Name;
+    decl^.IsFunction := f.IsFunction;
+    decl^.ResultDecl := f.ReturnType;
+    decl^.Comment := f.Comment;
+    decl^.NestLevel := 0;
+    decl^.CallConv := '';
+    decl^.IsExternal := False;
+    decl^.ExternalLibrary := '';
+    decl^.HasExplicitName := False;
+    decl^.ExplicitName := '';
+    decl^.HasExplicitIndex := False;
+    decl^.ExplicitIndex := '';
+    decl^.Index := 0;
+
+    SetLength(decl^.param_arry, Length(f.Params));
+    for j := 0 to High(f.Params) do
     begin
-      f := FFuncs[i];
-      New(decl);
-      decl^.Init;
-      decl^.IsProc := True;
-      decl^.Name := f.Name;
-      decl^.IsFunction := f.IsFunction;
-      decl^.ResultDecl := f.ReturnType;
-      decl^.Comment := f.Comment;
-      decl^.NestLevel := 0;
-      decl^.CallConv := '';
-      decl^.IsExternal := False;
-      decl^.ExternalLibrary := '';
-      decl^.HasExplicitName := False;
-      decl^.ExplicitName := '';
-      decl^.HasExplicitIndex := False;
-      decl^.ExplicitIndex := '';
-      decl^.Index := 0;
-
-      SetLength(decl^.param_arry, Length(f.Params));
-      for j := 0 to High(f.Params) do
-        begin
-          paramDecl.param_mod := '';
-          paramDecl.param_name := f.Params[j].Name;
-          paramDecl.param_typ := f.Params[j].Typ;
-          paramDecl.param_value := '';
-          paramDecl.param_array := '';
-          decl^.param_arry[j] := paramDecl;
-        end;
-
-      Parser.FuncList.Add(decl);
-      Log('SaveToParser: added routine "%s" with %d parameters',
-        [f.Name.Text, Length(f.Params)]);
+      paramDecl.param_mod := '';
+      paramDecl.param_name := f.Params[j].Name;
+      paramDecl.param_typ := f.Params[j].Typ;
+      paramDecl.param_value := '';
+      paramDecl.param_array := '';
+      decl^.param_arry[j] := paramDecl;
     end;
+
+    Parser.FuncList.Add(decl);
+    Log('SaveToParser: added routine "%s" with %d parameters',
+      [f.Name.Text, Length(f.Params)]);
+  end;
 
   Parser.ParseSuccess := True;
   Log('SaveToParser: finished, %d routines saved', [FFuncs.Count]);
@@ -1201,7 +1166,7 @@ begin
   jo := TZ_JsonObject.Create;
   try
     try
-        jo.ParseText(JsonStr);
+      jo.ParseText(JsonStr);
     except
       Log('LoadFromJson: JSON parse error');
       Exit;
@@ -1212,69 +1177,69 @@ begin
 
     Arr := jo.A['Functions'];
     if Arr = nil then
-      begin
-        Log('LoadFromJson: "Functions" array is nil or missing');
-        Exit;
-      end;
+    begin
+      Log('LoadFromJson: "Functions" array is nil or missing');
+      Exit;
+    end;
 
     Log('LoadFromJson: Functions array count = %d', [Arr.Count]);
 
     for i := 0 to Arr.Count - 1 do
+    begin
+      f.Name := '';
+      f.IsFunction := False;
+      f.Comment := '';
+      f.ReturnType := '';
+      SetLength(f.Params, 0);
+
+      f.Name := Arr.O[i].S['Name'];
+      f.IsFunction := Arr.O[i].B['IsFunction'];
+      f.Comment := Arr.O[i].S['Comment'];
+      f.ReturnType := Arr.O[i].S['ReturnType'];
+
+      Log('LoadFromJson: Function[%d] "%s" (IsFunction=%s)',
+        [i, f.Name.Text, umlBoolToStr(f.IsFunction).Text]);
+
+      paramsArr := Arr.O[i].A['Params'];
+      if paramsArr = nil then
       begin
-        f.Name := '';
-        f.IsFunction := False;
-        f.Comment := '';
-        f.ReturnType := '';
+        Log('LoadFromJson:   Params array is nil, assuming empty');
         SetLength(f.Params, 0);
-
-        f.Name := Arr.O[i].S['Name'];
-        f.IsFunction := Arr.O[i].B['IsFunction'];
-        f.Comment := Arr.O[i].S['Comment'];
-        f.ReturnType := Arr.O[i].S['ReturnType'];
-
-        Log('LoadFromJson: Function[%d] "%s" (IsFunction=%s)',
-          [i, f.Name.Text, umlBoolToStr(f.IsFunction).Text]);
-
-        paramsArr := Arr.O[i].A['Params'];
-        if paramsArr = nil then
+      end
+      else
+      begin
+        Log('LoadFromJson:   Params count = %d', [paramsArr.Count]);
+        SetLength(f.Params, paramsArr.Count);
+        for j := 0 to paramsArr.Count - 1 do
+        begin
+          paramObj := paramsArr.O[j];
+          if paramObj = nil then
           begin
-            Log('LoadFromJson:   Params array is nil, assuming empty');
-            SetLength(f.Params, 0);
+            Log('LoadFromJson:   Param[%d] object is nil, skipping',
+              [j]);
+            p.Clear;
           end
-        else
+          else
           begin
-            Log('LoadFromJson:   Params count = %d', [paramsArr.Count]);
-            SetLength(f.Params, paramsArr.Count);
-            for j := 0 to paramsArr.Count - 1 do
-              begin
-                paramObj := paramsArr.O[j];
-                if paramObj = nil then
-                  begin
-                    Log('LoadFromJson:   Param[%d] object is nil, skipping',
-                      [j]);
-                    p.Clear;
-                  end
-                else
-                  begin
-                    p.Name := paramObj.S['Name'];
-                    p.Typ := paramObj.S['Typ'];
-                    p.PascalType := paramObj.S['PascalType'];
-                    p.Description := paramObj.S['Description'];
-                    Log('LoadFromJson:   Param[%d]: Name="%s", Typ="%s"',
-                      [j, p.Name.Text, p.Typ.Text]);
-                  end;
-                f.Params[j] := p;
-              end;
+            p.Name := paramObj.S['Name'];
+            p.Typ := paramObj.S['Typ'];
+            p.PascalType := paramObj.S['PascalType'];
+            p.Description := paramObj.S['Description'];
+            Log('LoadFromJson:   Param[%d]: Name="%s", Typ="%s"',
+              [j, p.Name.Text, p.Typ.Text]);
           end;
-
-        FFuncs.Add(f.Clone);
-        Log('LoadFromJson:   Added routine "%s" with %d parameters',
-          [f.Name.Text, Length(f.Params)]);
+          f.Params[j] := p;
+        end;
       end;
+
+      FFuncs.Add(f.Clone);
+      Log('LoadFromJson:   Added routine "%s" with %d parameters',
+        [f.Name.Text, Length(f.Params)]);
+    end;
 
     Log('LoadFromJson: finished, loaded %d routines', [FFuncs.Count]);
   finally
-      jo.Free;
+    jo.Free;
   end;
 end;
 
@@ -1305,34 +1270,34 @@ begin
     Arr := jo.A['Functions'];
 
     for i := 0 to FFuncs.Count - 1 do
+    begin
+      f := FFuncs[i];
+      funcObj := Arr.AddObject;
+      funcObj.S['Name'] := f.Name.Text;
+      funcObj.B['IsFunction'] := f.IsFunction;
+      funcObj.S['Comment'] := f.Comment.Text;
+      funcObj.S['ReturnType'] := f.ReturnType.Text;
+
+      fArr := funcObj.A['Params'];
+      for j := 0 to High(f.Params) do
       begin
-        f := FFuncs[i];
-        funcObj := Arr.AddObject;
-        funcObj.S['Name'] := f.Name.Text;
-        funcObj.B['IsFunction'] := f.IsFunction;
-        funcObj.S['Comment'] := f.Comment.Text;
-        funcObj.S['ReturnType'] := f.ReturnType.Text;
-
-        fArr := funcObj.A['Params'];
-        for j := 0 to High(f.Params) do
-          begin
-            fArr.AddObject;
-            fArr.O[fArr.Count - 1].S['Name'] := f.Params[j].Name.Text;
-            fArr.O[fArr.Count - 1].S['Typ'] := f.Params[j].Typ.Text;
-            fArr.O[fArr.Count - 1].S['PascalType'] :=
-              f.Params[j].PascalType.Text;
-            fArr.O[fArr.Count - 1].S['Description'] :=
-              f.Params[j].Description.Text;
-          end;
-
-        Log('SaveToJson:   Function[%d] "%s" has %d parameters',
-          [i, f.Name.Text, Length(f.Params)]);
+        fArr.AddObject;
+        fArr.O[fArr.Count - 1].S['Name'] := f.Params[j].Name.Text;
+        fArr.O[fArr.Count - 1].S['Typ'] := f.Params[j].Typ.Text;
+        fArr.O[fArr.Count - 1].S['PascalType'] :=
+          f.Params[j].PascalType.Text;
+        fArr.O[fArr.Count - 1].S['Description'] :=
+          f.Params[j].Description.Text;
       end;
+
+      Log('SaveToJson:   Function[%d] "%s" has %d parameters',
+        [i, f.Name.Text, Length(f.Params)]);
+    end;
 
     Result := jo.ToJSONString(True);
     Log('SaveToJson: finished, JSON length=%d', [Result.Len]);
   finally
-      jo.Free;
+    jo.Free;
   end;
 end;
 
