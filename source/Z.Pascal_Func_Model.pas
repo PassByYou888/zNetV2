@@ -130,6 +130,8 @@ SOFTWARE.
   * ------------------
   *   Original author: qq600585 (circa 2012)
   *   Modernised and documented for the Z-framework ecosystem.
+  *   Version: 3.1 (2026-09-25)
+  *     - Automatic duplicate-function-name correction added.
   *   Version: 3.0 (2026-09-20)
   *     - Robust block-comment marker handling (C-to-Pascal path).
   *     - Multi-line parameter description state machine.
@@ -259,6 +261,8 @@ type
       *             declarations. If provided, it is cleared and filled with
       *             messages about declarations that were not loaded (e.g.
       *             unsupported types, var/out parameters).
+      *
+      * Duplicate function names are automatically corrected after loading.
     *)
     procedure LoadFromParser(Parser: tpascal_func_decl_tool; Report: TPascalStringList);
 
@@ -274,6 +278,8 @@ type
       * LoadFromJson - Restores the model from a JSON string.
       *
       *   JsonStr : A valid JSON string containing unit name and function list.
+      *
+      * Duplicate function names are automatically corrected after loading.
     *)
     procedure LoadFromJson(const JsonStr: TP_String);
 
@@ -283,6 +289,20 @@ type
       * Returns a formatted JSON string.
     *)
     function SaveToJson: TP_String;
+
+    (*
+      * FixDuplicateFunctionNames - Scans all loaded functions and renames
+      * any duplicates by appending a numeric suffix (1, 2, 3, ...).
+      *
+      * The comparison is case-insensitive (Pascal identifier rules).
+      * For example, three functions named "Add" become
+      * "Add", "Add1", "Add2".
+      *
+      * This method is invoked automatically at the end of LoadFromParser
+      * and LoadFromJson to guarantee unique function names in the model.
+      * It can also be called manually if the caller mutates FFuncs.
+    *)
+    procedure FixDuplicateFunctionNames;
   end;
 
   (*
@@ -905,6 +925,10 @@ end;
   * CreateFrom_C_Code and must have ParseSuccess = True. Declarations that
   * cannot be represented (nested routines, var/out parameters, unsupported
   * types) are skipped and reported in the optional Report list.
+  *
+  * After all declarations have been loaded, FixDuplicateFunctionNames is
+  * invoked automatically so that the model always contains uniquely named
+  * routines.
 *)
 procedure TPascal_Func_Model.LoadFromParser(Parser: tpascal_func_decl_tool; Report: TPascalStringList);
 var
@@ -1061,6 +1085,9 @@ begin
     Report.Add(PFormat('Loaded %d routines.', [FFuncs.Count]));
     Report.Add('=== End of report ===');
   end;
+
+  (* Enforce unique function names across the entire model. *)
+  FixDuplicateFunctionNames;
 end;
 
 (* ---------------------------------------------------------------------------
@@ -1149,6 +1176,9 @@ end;
   *       }
   *     ]
   *   }
+  *
+  * After all functions have been read, FixDuplicateFunctionNames is invoked
+  * automatically so that the model always contains uniquely named routines.
 *)
 procedure TPascal_Func_Model.LoadFromJson(const JsonStr: TP_String);
 var
@@ -1238,6 +1268,9 @@ begin
     end;
 
     Log('LoadFromJson: finished, loaded %d routines', [FFuncs.Count]);
+
+    (* Enforce unique function names across the entire model. *)
+    FixDuplicateFunctionNames;
   finally
     jo.Free;
   end;
@@ -1299,6 +1332,84 @@ begin
   finally
     jo.Free;
   end;
+end;
+
+(* ---------------------------------------------------------------------------
+  * FixDuplicateFunctionNames
+  * --------------------------------------------------------------------------- *)
+
+(*
+  * Scans all loaded functions and renames any duplicates by appending a
+  * numeric suffix (1, 2, 3, ...). The comparison is case-insensitive
+  * because it uses TPascalString_Big_Hash_Pair_Pool, whose Compare_Key
+  * delegates to TPascalString.Same (ASCII case folding).
+  *
+  * Example:
+  *   Three routines named "Add" become "Add", "Add1", "Add2".
+  *   A routine named "Add1" that appears after these would become "Add11"
+  *   because "Add1" is already taken.
+  *
+  * This method is idempotent: running it twice produces the same result.
+  * It is called automatically at the end of LoadFromParser and LoadFromJson.
+*)
+procedure TPascal_Func_Model.FixDuplicateFunctionNames;
+var
+  i: integer;
+  UsedNames: TString_Big_Hash_Pair_Pool<Boolean>;
+  f: TFunctionStructure;   (* Mutable copy of the record being inspected. *)
+  BaseName: TP_String;
+  NewName: TP_String;
+  Counter: integer;
+begin
+  Log('FixDuplicateFunctionNames: scanning %d functions', [FFuncs.Count]);
+
+  UsedNames := TString_Big_Hash_Pair_Pool<Boolean>.Create(256, False);
+  try
+    for i := 0 to FFuncs.Count - 1 do
+    begin
+      (*
+        IMPORTANT: TFunctionStructure is a record (value type).
+        FFuncs[i] returns a COPY, so we must:
+          1. pull the copy out,
+          2. mutate the copy,
+          3. write the modified copy back into the list.
+        Writing directly to FFuncs[i].Name would only touch a temporary.
+      *)
+      f := FFuncs[i];
+      BaseName.Text := f.Name.Text;
+
+      (* Empty names are left untouched; they are not real identifiers. *)
+      if BaseName = '' then
+        Continue;
+
+      if UsedNames.Exists(BaseName.Text) then
+      begin
+        (* Duplicate detected: try BaseName + '1', BaseName + '2', ...
+          until an unused name is found. *)
+        Counter := 1;
+        repeat
+          NewName := BaseName.Text + umlIntToStr(Counter).Text;
+          Inc(Counter);
+        until not UsedNames.Exists(NewName);
+
+        f.Name.Text := NewName.Text;
+        FFuncs[i] := f;   (* Write the modified copy back into the list. *)
+
+        Log('  Renamed duplicate function "%s" -> "%s"',
+          [BaseName.Text, NewName.Text]);
+        UsedNames.Add(NewName, True, True);
+      end
+      else
+      begin
+        (* First occurrence: reserve the original name. *)
+        UsedNames.Add(BaseName, True, True);
+      end;
+    end;
+  finally
+    UsedNames.Free;
+  end;
+
+  Log('FixDuplicateFunctionNames: completed');
 end;
 
 end.
