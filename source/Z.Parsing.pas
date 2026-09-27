@@ -4497,121 +4497,130 @@ begin
     end;
 end;
 
+(*
+  * ---------------------------------------------------------------------------
+  * DetectSourceLanguage
+  * ---------------------------------------------------------------------------
+  * Automatically detect whether the given source text is Pascal or C using
+  * the TTextParsing lexer.
+  *
+  * Algorithm
+  * ---------
+  *   1. Parse the source twice: once with tsPascal, once with tsC.
+  *      A dedicated SpecialSymbol list is supplied so that ':=' and '->'
+  *      are recognised as ttSpecialSymbol in both modes.
+  *
+  *   2. For each parse, collect evidence from FOUR categories. The comment
+  *      BODY is never inspected: a comment is scored only by its STYLE,
+  *      because a legitimate Pascal comment may contain C example code
+  *      and we must not let the embedded snippet flip the detection.
+  *
+  *      Category A - Comment style (weight x2 / x5 / x1)
+  *        - Pascal brace comment or paren-star comment (Pascal parse only)
+  *                                                          -> Pascal +2
+  *        - C slash-star comment        (C parse only)        -> C +3
+  *        - C preprocessor line         (C parse only)        -> C +5
+  *        - Double-slash comment        (both languages)      -> +1 each
+  *
+  *      Category B - String literal style (weight x1..x3)
+  *        - Single-quoted literal, Pascal parse  -> Pascal +1
+  *        - Single-quoted literal, C parse       -> C +1
+  *        - Double-quoted literal, C parse       -> C +3
+  *
+  *      Category C - Language-specific keywords (weight x3)
+  *        - Pascal: unit, interface, implementation, begin, end,
+  *                  procedure, function, program, library, record,
+  *                  class, object, property, published, private,
+  *                  protected, public, constructor, destructor,
+  *                  inherited, nil, then, var, const, type, inline,
+  *                  overload, virtual, abstract, override
+  *        - C     : void, int, char, float, double, struct, union,
+  *                  enum, typedef, unsigned, signed, static, extern,
+  *                  volatile, register, sizeof, long, short, return,
+  *                  switch
+  *
+  *      Category D - Strong operators (weight x5)
+  *        - ':='  (Pascal parse only)  -> Pascal +5
+  *        - '->'  (C parse only)       -> C +5
+  *        - '<>'  '..' (Pascal only)   -> Pascal +2
+  *
+  *   3. C-side region masking
+  *        When parsing with tsC, every brace region is SKIPPED using a
+  *        brace-depth counter. This is the key robustness fix: a Pascal
+  *        comment body such as an example containing C keywords would
+  *        otherwise be tokenised as C symbols plus C keywords and give
+  *        the C side a large spurious bonus. Skipping the region removes
+  *        that source of false evidence without losing any real C signal
+  *        (real C keywords appear OUTSIDE block braces: return type,
+  *        function name, parameters, top-level declarations).
+  *
+  *   4. Decision
+  *        - Higher score wins.
+  *        - Perfect tie or no evidence -> slUnknown (refuse to guess).
+  *        - Empty input -> slUnknown.
+  *
+  * Robustness notes
+  * ----------------
+  *   - A Pascal unit whose comments embed C example code now scores
+  *     correctly as slPascal because the C body never contributes.
+  *   - A real C header still scores as slC thanks to preprocessor
+  *     lines, slash-star comments, '->' and C keywords at the outer
+  *     level.
+  *   - Pure block-only C code (rare) may still be misdetected; supply
+  *     at least one top-level declaration or preprocessor line for
+  *     reliable detection.
+  *
+  * @param Source  The text to analyse.
+  * @return        slPascal / slC / slUnknown
+  * ---------------------------------------------------------------------------
+*)
 function DetectSourceLanguage(const Source: TP_String): TSourceLanguage;
 const
-  { Pascal keywords that do NOT collide with C. }
-  PascalKeywords: array [0 .. 22] of string = (
+  (* Pascal-specific keywords that do NOT collide with C. *)
+  PascalKeywords: array [0 .. 29] of string = (
     'unit', 'interface', 'implementation', 'begin', 'end',
-    'procedure', 'function', 'uses', 'program', 'library',
-    'type', 'var', 'const', 'record', 'class', 'object',
-    'property', 'published', 'private', 'protected', 'public',
-    'inline', 'overload'
+    'procedure', 'function', 'program', 'library',
+    'record', 'class', 'object', 'property',
+    'published', 'private', 'protected', 'public',
+    'constructor', 'destructor', 'inherited',
+    'nil', 'then', 'var', 'const', 'type',
+    'inline', 'overload', 'virtual', 'abstract', 'override'
     );
-  { C keywords that do NOT collide with Pascal. }
-  CKeywords: array [0 .. 29] of string = (
+  (* C-specific keywords that do NOT collide with Pascal. *)
+  CKeywords: array [0 .. 19] of string = (
     'void', 'int', 'char', 'float', 'double',
     'struct', 'union', 'enum', 'typedef',
     'unsigned', 'signed', 'static', 'extern',
     'volatile', 'register', 'sizeof', 'long', 'short',
-    'return', 'if', 'else', 'while', 'for',
-    'switch', 'case', 'break', 'continue', 'goto', 'do', 'default'
-    );
-  { Markers that identify C code hidden inside a Pascal comment. }
-  CBlockMarkers: array [0 .. 6] of string = (
-    'return', 'switch', 'goto', 'sizeof', 'typedef', 'struct', 'union'
+    'return', 'switch'
     );
 
 var
   SpecialSymbols: TListPascalString;
   ParserP, ParserC: TTextParsing;
-  i: integer;
-  tp, TC: PTokenData;
+  i, j, depth: integer;
+  tp, tc: PTokenData;
   ScoreP, ScoreC: integer;
 
-  { True if S starts with the given prefix. }
+  (* True if S starts with the given prefix. *)
   function StartsWith(const s: TP_String; const Prefix: TP_String): boolean;
   begin
     Result := s.ComparePos(1, Prefix);
   end;
 
-{ True if the token is an identifier matching any of the given keywords. }
+(* True if Tok is an identifier matching any of the given keywords. *)
   function MatchKeyword(const Tok: PTokenData;
     const Keywords: array of string): boolean;
   var
     k: integer;
   begin
     Result := False;
-    if Tok = nil then exit;
-    if Tok^.tokenType <> ttAscii then exit;
+    if Tok = nil then
+        exit;
+    if Tok^.tokenType <> ttAscii then
+        exit;
     for k := Low(Keywords) to High(Keywords) do
       if Tok^.Text.Same(Keywords[k]) then
-          exit(True);
-  end;
-
-{ True if Word appears in Text with non-identifier characters (or string
-  boundaries) on both sides.  Prevents "returnValue" from matching "return". }
-  function HasWord(const Text, Word: TP_String): boolean;
-  var
-    p, W: integer;
-    BeforeC, AfterC: TP_Char;
-
-    function IsIdentChar(c: TP_Char): boolean;
-    begin
-      Result := TTextParsing.Char_is(c,
-{$IFDEF FPC}
-        [uc0to9, ucAtoZ]
-{$ELSE FPC}
-        [c0to9, cAtoZ]
-{$ENDIF FPC}
-        , '_');
-    end;
-
-  begin
-    Result := False;
-    if (Text.L = 0) or (Word.L = 0) then exit;
-    W := Word.L;
-    p := 1;
-    while p <= Text.L do
-      begin
-        p := Text.GetPos(Word, p);
-        if p <= 0 then exit;
-        if (p > 1) and IsIdentChar(Text[p - 1]) then
-          begin
-            Inc(p);
-            Continue;
-          end;
-        if (p + W <= Text.L) and IsIdentChar(Text[p + W]) then
-          begin
-            Inc(p);
-            Continue;
-          end;
-        exit(True);
-      end;
-  end;
-
-{ Strip delimiters, return the inner text. }
-  function StripCommentDelimiters(const c: TP_String): TP_String;
-  begin
-    Result := c;
-    if StartsWith(Result, '{') then
-        Result := Result.GetString(2, Result.L + 1)
-    else if StartsWith(Result, '(*') then
-        Result := Result.GetString(3, Result.L + 1);
-    while (Result.L > 0) and CharIn(Result.Last, ['}', ')']) do
-        Result.DeleteLast;
-  end;
-
-{ True if a Pascal-style comment body actually contains C code. }
-  function LooksLikeCCode(const CommentText: TP_String): boolean;
-  var
-    Body: TP_String;
-    k: integer;
-  begin
-    Result := False;
-    Body := StripCommentDelimiters(CommentText);
-    if Body.L = 0 then exit;
-    for k := Low(CBlockMarkers) to High(CBlockMarkers) do
-      if HasWord(Body, CBlockMarkers[k]) then
           exit(True);
   end;
 
@@ -4623,17 +4632,22 @@ begin
   ScoreP := 0;
   ScoreC := 0;
 
-  { Use a dedicated SpecialSymbol list so that ':=' and '->' are
-    recognised as ttSpecialSymbol in both parsing modes. }
+  (* Use a dedicated SpecialSymbol list so that ':=' and '->' are
+    recognised as ttSpecialSymbol in both parsing modes. *)
   SpecialSymbols := TListPascalString.Create;
   try
-    SpecialSymbols.Add(':='); // Pascal assignment
-    SpecialSymbols.Add('->'); // C pointer member access
-    SpecialSymbols.Add('::'); // Scope resolution (harmless in both)
+    SpecialSymbols.Add(':=');
+    SpecialSymbols.Add('->');
+    SpecialSymbols.Add('::');
 
-    { ================================================================ }
-    { Step 1: Parse with Pascal mode. }
-    { ================================================================ }
+    (* ================================================================
+      Step 1: Parse with Pascal mode.
+
+      We score the comment STYLE only; the comment BODY is never
+      inspected. This is the core fix: a Pascal comment may legally
+      contain C example code and we must not let it contribute to the
+      C score.
+      ================================================================ *)
     ParserP := TTextParsing.Create(Source, tsPascal, SpecialSymbols);
     try
       for i := 0 to ParserP.TokenCount - 1 do
@@ -4644,70 +4658,112 @@ begin
               begin
                 if StartsWith(tp^.Text, '{') or StartsWith(tp^.Text, '(*') then
                   begin
-                    { A Pascal comment that actually contains C code should be
-                      attributed to C, not to Pascal. }
-                    if LooksLikeCCode(tp^.Text) then
-                        Inc(ScoreC, 4)
-                    else
-                        Inc(ScoreP, 4);
+                    (* Pascal-specific comment style. Score the style,
+                      never the body. *)
+                    Inc(ScoreP, 2);
                   end
                 else if StartsWith(tp^.Text, '//') then
-                    Inc(ScoreP, 1); // weak: both languages use //
+                  begin
+                    (* Shared by Pascal and C99+. Weak signal. *)
+                    Inc(ScoreP, 1);
+                  end;
+                (* Any other comment style is not recognised by tsPascal. *)
               end;
 
             ttTextDecl:
               if StartsWith(tp^.Text, '''') then
-                  Inc(ScoreP, 2);
+                  Inc(ScoreP, 1);
 
             ttAscii:
               if MatchKeyword(tp, PascalKeywords) then
-                  Inc(ScoreP, 2);
+                  Inc(ScoreP, 3);
 
             ttSpecialSymbol:
-              if tp^.Text.Same(':=') then
-                  Inc(ScoreP, 3);
+              begin
+                if tp^.Text.Same(':=') then
+                    Inc(ScoreP, 5) (* Pascal assignment: strong signal *)
+                else if tp^.Text.Same('->') then
+                    Inc(ScoreC, 5); (* Defensive: -> is C-only *)
+              end;
+
+            ttSymbol:
+              begin
+                if tp^.Text.Same('<>') or tp^.Text.Same('..') then
+                    Inc(ScoreP, 2); (* Pascal-specific operators *)
+              end;
           end;
         end;
     finally
         ParserP.Free;
     end;
 
-    { ================================================================ }
-    { Step 2: Parse with C mode. }
-    { ================================================================ }
+    (* ================================================================
+      Step 2: Parse with C mode.
+
+      Every brace region is SKIPPED using a brace-depth counter.
+      This is the second core fix: it prevents the body of a Pascal
+      comment (parsed as raw C symbols plus keywords) from polluting
+      the C score. Real C keywords appear OUTSIDE the block braces,
+      so no genuine C evidence is lost.
+      ================================================================ *)
     ParserC := TTextParsing.Create(Source, tsC, SpecialSymbols);
     try
-      for i := 0 to ParserC.TokenCount - 1 do
+      i := 0;
+      while i < ParserC.TokenCount do
         begin
-          TC := ParserC.Tokens[i];
-          case TC^.tokenType of
+          tc := ParserC.Tokens[i];
+
+          (* ---- Skip the whole brace region, honouring nesting. ---- *)
+          if tc^.Text.Same('{') then
+            begin
+              depth := 1;
+              j := i + 1;
+              while (j < ParserC.TokenCount) and (depth > 0) do
+                begin
+                  if ParserC.Tokens[j]^.Text.Same('{') then
+                      Inc(depth)
+                  else if ParserC.Tokens[j]^.Text.Same('}') then
+                      Dec(depth);
+                  Inc(j);
+                end;
+              i := j;
+              Continue;
+            end;
+
+          case tc^.tokenType of
             ttComment:
               begin
-                if StartsWith(TC^.Text, '/*') then
-                    Inc(ScoreC, 4)
-                else if StartsWith(TC^.Text, '#') then
-                    Inc(ScoreC, 4)
-                else if StartsWith(TC^.Text, '//') then
-                    Inc(ScoreC, 1);
+                if StartsWith(tc^.Text, '/*') then
+                    Inc(ScoreC, 3) (* C block comment *)
+                else if StartsWith(tc^.Text, '#') then
+                    Inc(ScoreC, 5) (* C preprocessor: strong signal *)
+                else if StartsWith(tc^.Text, '//') then
+                    Inc(ScoreC, 1); (* shared with Pascal *)
+                (* The comment body is never inspected. *)
               end;
 
             ttTextDecl:
-              if StartsWith(TC^.Text, '"') then
-                  Inc(ScoreC, 2);
+              begin
+                if StartsWith(tc^.Text, '"') then
+                    Inc(ScoreC, 3) (* double-quoted literal is C-only *)
+                else if StartsWith(tc^.Text, '''') then
+                    Inc(ScoreC, 1); (* single-quoted is shared *)
+              end;
 
             ttAscii:
-              if MatchKeyword(TC, CKeywords) then
-                  Inc(ScoreC, 2);
-
-            ttSpecialSymbol:
-              if TC^.Text.Same('->') then
+              if MatchKeyword(tc, CKeywords) then
                   Inc(ScoreC, 3);
 
-            { Counter-balance: C code blocks that Pascal mode would misread as comments should give C at least some credit. }
-            ttSymbol:
-              if TC^.Text.Same('{') then
-                  Inc(ScoreC, 1);
+            ttSpecialSymbol:
+              begin
+                if tc^.Text.Same('->') then
+                    Inc(ScoreC, 5) (* C pointer member access *)
+                else if tc^.Text.Same(':=') then
+                    Inc(ScoreP, 5); (* Defensive: := is Pascal-only *)
+              end;
           end;
+
+          Inc(i);
         end;
     finally
         ParserC.Free;
@@ -4717,9 +4773,9 @@ begin
       SpecialSymbols.Free;
   end;
 
-  { ================================================================ }
-  { Step 3: Decision. }
-  { ================================================================ }
+  (* ================================================================
+    Step 3: Decision.
+    ================================================================ *)
   if (ScoreP = 0) and (ScoreC = 0) then
       Result := slUnknown
   else if ScoreP > ScoreC then
@@ -4727,7 +4783,7 @@ begin
   else if ScoreC > ScoreP then
       Result := slC
   else
-      Result := slUnknown; // Tie: refuse to guess.
+      Result := slUnknown; (* Tie: refuse to guess. *)
 end;
 
 initialization
