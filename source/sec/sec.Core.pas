@@ -82,7 +82,7 @@ uses
   Math;
 
 const
-  C_Z_Core_Edition = '18.0';
+  C_Z_Core_Edition = '18.1';
 
 {$Region 'core defines + class'}
 

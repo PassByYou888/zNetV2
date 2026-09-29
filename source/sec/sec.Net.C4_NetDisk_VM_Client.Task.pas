@@ -726,7 +726,7 @@ end;
 
 procedure TC40_NetDisk_VM_Client_Task_Auto_Post_Encrypt_Stream.Th_Encrypt;
 var
-  enc_: TCipher_Base;
+  enc_: TCipher_Tool_Base;
 begin
   Encrypt_Stream.Size := Stream.Size;
   Stream.Position := 0;
@@ -786,7 +786,7 @@ procedure TC40_NetDisk_VM_Client_Task_Auto_Get_Decrypt_Stream.Do_Usr_Auto_Get_Fi
   Stream_: TCore_Stream; Stream_Final_MD5__: TMD5; Successed: Boolean; info: U_String);
 var
   Decrypt_Stream: TMS64;
-  enc_: TCipher_Base;
+  enc_: TCipher_Tool_Base;
 begin
   if Successed then
     begin

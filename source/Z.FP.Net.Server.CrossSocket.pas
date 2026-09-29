@@ -605,7 +605,7 @@ constructor TZNet_Server_FP_CrossSocket.Create;
   *   - 4 threads otherwise (good balance for typical servers)
 }
 begin
-  CreateTh({$IFDEF DEBUG}1{$ELSE DEBUG}4{$ENDIF DEBUG} ); // ZNet内部走的并发模型,不会阻塞线程,普通服务器并发线程2个就够了,如果高并发服务器,给8个线程
+  CreateTh({$IFDEF DEBUG}1{$ELSE DEBUG}8{$ENDIF DEBUG} ); // ZNet内部走的并发模型,不会阻塞线程,普通服务器并发线程2个就够了,如果高并发服务器,给8个线程
 end;
 
 constructor TZNet_Server_FP_CrossSocket.CreateTh(maxThPool: Word);

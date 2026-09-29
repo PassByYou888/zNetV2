@@ -239,6 +239,7 @@ begin
         TCompute.Sleep(1);
   until r;
 end;
+
 function AtomInc(var x: Int64): Int64;
 begin
 {$IFDEF FPC}

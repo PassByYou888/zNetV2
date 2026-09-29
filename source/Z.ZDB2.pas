@@ -278,7 +278,7 @@ type
   // Implementation of IZDB2_Cipher using TCipher_Base from Z.Cipher
   TZDB2_Cipher = class(TCore_InterfacedObject_Intermediate, IZDB2_Cipher)
   private
-    FCipher_: TCipher_Base; // Underlying cipher object - set by constructor
+    FCipher_: TCipher_Tool_Base; // Underlying cipher object - set by constructor
   public
     class function GetCipherSecurity(CipherSecurityString_: U_String): TCipherSecurity;
     constructor Create(CipherSecurity_: TCipherSecurity; password_: U_String; Level_: Integer; Tail_, CBC_: Boolean); overload;
@@ -4699,4 +4699,5 @@ FillPtr(@ZDB2_NULL_Data, $FFFF, 0);
 finalization
 
 end.
+
  

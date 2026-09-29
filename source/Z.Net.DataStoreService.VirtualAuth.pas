@@ -49,7 +49,7 @@ type
     { data security }
     FDataStoreCipherSecurity: TCipherSecurity;
     FDataStoreCipherKey: TCipherKeyBuffer;
-    FCipherInstance: TCipher_Base;
+    FCipherInstance: TCipher_Tool_Base;
   public
     constructor Create(Owner_: TPeerIO); override;
     destructor Destroy; override;
@@ -162,7 +162,7 @@ type
   private
     FDataStoreCipherSecurity: TCipherSecurity;
     FDataStoreCipherKey: TCipherKeyBuffer;
-    FCipherInstance: TCipher_Base;
+    FCipherInstance: TCipher_Tool_Base;
     procedure EncryptBuffer(sour: Pointer; Size: NativeInt; Encrypt: Boolean);
     procedure Command_DataStoreSecurity(Sender: TPeerIO; InData: TDFE);
   private
@@ -3230,4 +3230,5 @@ begin
 end;
 
 end.
+
  

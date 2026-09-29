@@ -1032,6 +1032,7 @@ end;
 constructor TDF_String.Create(ID: Byte);
 begin
   inherited Create(ID);
+  Buffer:=nil;
   SetLength(Buffer, 0);
 end;
 
