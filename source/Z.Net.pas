@@ -145,11 +145,10 @@ const
 
 {$REGION 'base Decl'}
 
-
-{
-  * Forward declarations of core classes and interfaces used throughout the unit.
-  * These allow circular references to be resolved at compile time.
-}
+  {
+    * Forward declarations of core classes and interfaces used throughout the unit.
+    * These allow circular references to be resolved at compile time.
+  }
 type
   TPeerIO = class; { Core per-connection state machine. }
   TZNet = class; { Base network framework class. }
@@ -1159,8 +1158,8 @@ type
 
   PQueueData = ^TQueueData;
 
-  TQueueData_Pool = class(TOrderStruct<PQueueData>); { FIFO queue for queue data items (non-thread-safe). }
-  TCritical_QueueData_Pool = class(TCritical_BigList<PQueueData>); { Thread-safe version of TQueueData_Pool. }
+  TQueueData_Order = class(TOrderStruct<PQueueData>); { FIFO queue for queue data items (non-thread-safe). }
+  TQueueData_Pool = class(TBigList<PQueueData>);
 {$ENDREGION 'Queue'}
 {$REGION 'Command_Instance'}
 
@@ -1943,7 +1942,7 @@ type
     FAllSendProcessing: Boolean; { Send processing flag. Set by Internal_Process_Send_Buffer. }
     FReceiveProcessing: Boolean; { Receive processing flag. Set by Internal_Process_Receive_Buffer. }
     FSend_Queue_Critical: TCritical; { Lock for send queue. Created by constructor. }
-    FSend_Queue_Pool: TQueueData_Pool; { Send queue. Created by constructor. }
+    FSend_Queue_Pool: TQueueData_Order; { Send queue. Created by constructor. }
     FLastCommunicationTick: TTimeTick; { Last communication timestamp. Updated by writes. }
     LastCommunicationTick_Received: TTimeTick; { Last receive timestamp. Updated on receive. }
     LastCommunicationTick_KeepAlive: TTimeTick; { Last keep-alive timestamp. Updated by keep-alive. }
@@ -2935,7 +2934,7 @@ type
     FIdleTimeOut: TTimeTick; { Idle timeout. Set by user. }
     FPhysicsFragmentSwapSpaceTechnology: Boolean; { Whether to use swap space for fragments. Set by user. }
     FPhysicsFragmentSwapSpaceTrigger: NativeInt; { Trigger size for fragment swap. Set by user. }
-    FSend_Queue_Swap_Pool: TCritical_QueueData_Pool; { Global send queue swap pool. Created by constructor. }
+    FSend_Queue_Swap_Pool: TQueueData_Pool; { Global send queue swap pool. Created by constructor. }
     FSendFlushSize: NativeInt; { default ZNet_Def_SendFlushSize }
     FSendDataCompressed: Boolean; { Whether to compress sent data. Set by user. }
     FCompleteBufferCompressed: Boolean; { Whether to compress complete buffers. Set by user. }
@@ -11177,7 +11176,7 @@ begin
   FCanPauseResultSend := False;
 
   FSend_Queue_Critical := TCritical.Create(ClassName + '.FSend_Queue_Critical');
-  FSend_Queue_Pool := TQueueData_Pool.Create;
+  FSend_Queue_Pool := TQueueData_Order.Create;
 
   UpdateLastCommunicationTime;
   LastCommunicationTick_Received := FLastCommunicationTick;
@@ -11365,7 +11364,11 @@ begin
 
     if not Result then
       if FOwnerFramework.InheritsFrom(TZNet_Client) then
+        begin
+          FOwnerFramework.FSend_Queue_Swap_Pool.Lock;
           Result := FOwnerFramework.FSend_Queue_Swap_Pool.Num > 0;
+          FOwnerFramework.FSend_Queue_Swap_Pool.UnLock;
+        end;
 
     { update io state }
     io_idle_ := not Result;
@@ -14106,54 +14109,59 @@ var
   tk: TTimeTick;
   P_IO: TPeerIO;
 begin
-  if FPeerIO_HashPool.Num <= 0 then
-    begin
-      while FSend_Queue_Swap_Pool.Num > 0 do
-        begin
-          PrintError('loss send queue dest ip %s cmd %s', [FSend_Queue_Swap_Pool.First^.data^.IP, FSend_Queue_Swap_Pool.First^.data^.Cmd]);
-          DisposeQueueData(FSend_Queue_Swap_Pool.First^.data);
-          FSend_Queue_Swap_Pool.Next;
-        end;
-      exit;
-    end;
+  FSend_Queue_Swap_Pool.Lock;
+  try
+    if FPeerIO_HashPool.Num <= 0 then
+      begin
+        while FSend_Queue_Swap_Pool.Num > 0 do
+          begin
+            PrintError('loss send queue dest ip %s cmd %s', [FSend_Queue_Swap_Pool.First^.data^.IP, FSend_Queue_Swap_Pool.First^.data^.Cmd]);
+            DisposeQueueData(FSend_Queue_Swap_Pool.First^.data);
+            FSend_Queue_Swap_Pool.Next;
+          end;
+        exit;
+      end;
 
-  tk := GetTimeTick();
-  if (FProgress_LargeScale_IO_Pool.Num <= 0) or (FProgressMaxDelay = 0) then
-    begin
-      { queue swap technology }
-      while (FSend_Queue_Swap_Pool.Num > 0) do
-        begin
-          if self is TZNet_Client then
-            begin
-              if TZNet_Client(self).ClientIO <> nil then
-                  TZNet_Client(self).ClientIO.PostQueueData(FSend_Queue_Swap_Pool.First^.data)
-              else
-                begin
-                  PrintError('loss send queue cmd %s', [FSend_Queue_Swap_Pool.First^.data^.Cmd]);
-                  DisposeQueueData(FSend_Queue_Swap_Pool.First^.data);
-                end;
-            end
-          else if self is TZNet_Server then
-            begin
-              P_IO := FPeerIO_HashPool[FSend_Queue_Swap_Pool.First^.data^.IO_ID];
-              if P_IO <> nil then
-                  P_IO.PostQueueData(FSend_Queue_Swap_Pool.First^.data)
-              else
-                begin
-                  PrintError('loss send queue dest ip %s cmd %s', [FSend_Queue_Swap_Pool.First^.data^.IP, FSend_Queue_Swap_Pool.First^.data^.Cmd]);
-                  DisposeQueueData(FSend_Queue_Swap_Pool.First^.data);
-                end;
-            end
-          else
-            begin
-              PrintError('illegal ZNet class: %s, loss send queue dest ip %s cmd %s', [ClassName, FSend_Queue_Swap_Pool.First^.data^.IP, FSend_Queue_Swap_Pool.First^.data^.Cmd]);
-              DisposeQueueData(FSend_Queue_Swap_Pool.First^.data);
-            end;
-          FSend_Queue_Swap_Pool.Next;
-        end;
+    tk := GetTimeTick();
+    if (FProgress_LargeScale_IO_Pool.Num <= 0) or (FProgressMaxDelay = 0) then
+      begin
+        { queue swap technology }
+        while (FSend_Queue_Swap_Pool.Num > 0) do
+          begin
+            if self is TZNet_Client then
+              begin
+                if TZNet_Client(self).ClientIO <> nil then
+                    TZNet_Client(self).ClientIO.PostQueueData(FSend_Queue_Swap_Pool.First^.data)
+                else
+                  begin
+                    PrintError('loss send queue cmd %s', [FSend_Queue_Swap_Pool.First^.data^.Cmd]);
+                    DisposeQueueData(FSend_Queue_Swap_Pool.First^.data);
+                  end;
+              end
+            else if self is TZNet_Server then
+              begin
+                P_IO := FPeerIO_HashPool[FSend_Queue_Swap_Pool.First^.data^.IO_ID];
+                if P_IO <> nil then
+                    P_IO.PostQueueData(FSend_Queue_Swap_Pool.First^.data)
+                else
+                  begin
+                    PrintError('loss send queue dest ip %s cmd %s', [FSend_Queue_Swap_Pool.First^.data^.IP, FSend_Queue_Swap_Pool.First^.data^.Cmd]);
+                    DisposeQueueData(FSend_Queue_Swap_Pool.First^.data);
+                  end;
+              end
+            else
+              begin
+                PrintError('illegal ZNet class: %s, loss send queue dest ip %s cmd %s', [ClassName, FSend_Queue_Swap_Pool.First^.data^.IP, FSend_Queue_Swap_Pool.First^.data^.Cmd]);
+                DisposeQueueData(FSend_Queue_Swap_Pool.First^.data);
+              end;
+            FSend_Queue_Swap_Pool.Next;
+          end;
 
-      GetIO_Order(FProgress_LargeScale_IO_Pool);
-    end;
+        GetIO_Order(FProgress_LargeScale_IO_Pool);
+      end;
+  finally
+      FSend_Queue_Swap_Pool.UnLock;
+  end;
 
   while FProgress_LargeScale_IO_Pool.Num > 0 do
     begin
@@ -14204,7 +14212,8 @@ begin
   FPhysicsFragmentSwapSpaceTechnology := ZNet_Def_Physics_Fragment_Cache_Activted;
   FPhysicsFragmentSwapSpaceTrigger := ZNet_Def_Physics_Fragment_Cache_Trigger;
 
-  FSend_Queue_Swap_Pool := TCritical_QueueData_Pool.Create;
+  FSend_Queue_Swap_Pool := TQueueData_Pool.Create;
+  FSend_Queue_Swap_Pool.Get_Critical__;
   FSendFlushSize := ZNet_Def_SendFlushSize;
   FSendDataCompressed := False;
   FCompleteBufferCompressed := False;
@@ -14290,11 +14299,18 @@ begin
   try
     if FZNet_Instance_Ptr__ <> nil then
         ZNet_Instance_Pool.Remove_P(FZNet_Instance_Ptr__);
-    while FSend_Queue_Swap_Pool.Num > 0 do
-      begin
-        DisposeQueueData(FSend_Queue_Swap_Pool.First^.data);
-        FSend_Queue_Swap_Pool.Next;
-      end;
+
+    FSend_Queue_Swap_Pool.Lock;
+    try
+      while FSend_Queue_Swap_Pool.Num > 0 do
+        begin
+          DisposeQueueData(FSend_Queue_Swap_Pool.First^.data);
+          FSend_Queue_Swap_Pool.Next;
+        end;
+    finally
+        FSend_Queue_Swap_Pool.UnLock;
+    end;
+
     DisposeObject(FSend_Queue_Swap_Pool);
     DisposeObject(FProgress_Pool);
     FreeAutomatedP2PVM();
@@ -14323,7 +14339,9 @@ end;
 
 procedure TZNet.Post_Queue_Data_To_Swap_Queue(p: PQueueData);
 begin
+  FSend_Queue_Swap_Pool.Lock;
   FSend_Queue_Swap_Pool.Add(p);
+  FSend_Queue_Swap_Pool.UnLock;
 end;
 
 function TZNet.AddProgresss(Progress_: TZNet_Progress_Class): TZNet_Progress;
@@ -14682,10 +14700,10 @@ end;
 
 procedure TZNet.Progress_IO_Now_Send(IO_: TPeerIO);
 begin
-  if FSend_Queue_Swap_Pool.Num > 0 then
-    begin
-      FSend_Queue_Swap_Pool.Lock;
-      try
+  FSend_Queue_Swap_Pool.Lock;
+  try
+    if FSend_Queue_Swap_Pool.Num > 0 then
+      begin
         with FSend_Queue_Swap_Pool.Repeat_ do
           repeat
             if Queue^.data^.IO_ID = IO_.ID then
@@ -14694,10 +14712,10 @@ begin
                 Discard();
               end;
           until not Next;
-      finally
-          FSend_Queue_Swap_Pool.UnLock;
       end;
-    end;
+  finally
+      FSend_Queue_Swap_Pool.UnLock;
+  end;
 end;
 
 procedure TZNet.ProgressPeerIOC(const OnBackcall: TPeerIOList_C);
@@ -21796,5 +21814,4 @@ Free_SwapSpace_Tech();
 Free_ZNet_Instance_Pool();
 
 end.
-
  

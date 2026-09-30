@@ -106,8 +106,7 @@
     {$UNDEF debug}
     {$DEFINE release}
     {$DEFINE INLINE_ASM}
-    {$OPTIMIZATION LEVEL3}
-    {$OPTIMIZATION REGVAR}
+    {$OPTIMIZATION LEVEL2}
     {$S-}   { No stack checks ¨C faster, but risk of silent stack overflow }
   {$ENDIF FPC_DEBUG}
 

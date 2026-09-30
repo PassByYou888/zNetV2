@@ -70,16 +70,25 @@ unit Z.Core;
 interface
 
 uses
-  { Standard RTL units used for basic functionality }
-  SysUtils, Classes, Types, Variants, SyncObjs,
+  SysUtils, Classes, Types, Variants,
   {$IFDEF FPC}
-    { FPC-specific generic list support (backported from fgl) }
     Z.FPC.GenericList, fgl,
+    {$IFDEF MSWINDOWS}
+    Windows,
+    {$ENDIF MSWINDOWS}
+    {$IFDEF POSIX}
+    BaseUnix,
+    {$ENDIF POSIX}
   {$ELSE FPC}
-    { Delphi generics collections }
     System.Generics.Collections,
+    {$IFDEF MSWINDOWS}
+    Winapi.Windows,
+    {$ENDIF MSWINDOWS}
+    {$IFDEF POSIX}
+    Posix.SysTime, Posix.Time,
+    {$ENDIF POSIX}
   {$ENDIF FPC}
-  Math;
+  SyncObjs, Math;
 
 const
   C_Z_Core_Edition = '18.1';
@@ -706,8 +715,8 @@ type
     FChanged: Boolean;                                             // Set to True whenever the list structure changes; invalidates index cache
     FList: Pointer;                                                // Cached index array (PQueueArrayStruct), rebuilt on demand
     procedure DoInternalFree(p: PQueueStruct);                     // Actually frees a node: calls DoFree and Dispose
-    function Get_Critical__: TCritical;                            // Returns the lock, creating it if it does not exist
   public
+    function Get_Critical__: TCritical;                            // Returns the lock, creating it if it does not exist
     property Critical__: TCritical read Get_Critical__;            // Provides external access to the internal lock
     constructor Create;                                            // Default constructor
     destructor Destroy; override;                                  // Destructor: clears all nodes and frees the lock
@@ -861,8 +870,8 @@ type
     FChanged: Boolean;                                             // Invalidation flag for index cache
     FList: Pointer;                                                // Cached index array
     procedure DoInternalFree(p: PQueueStruct);                     // Internal free of a node (calls DoFree and Dispose)
-    function Get_Critical__: TCritical;                            // Returns the lock (always non-nil)
   public
+    function Get_Critical__: TCritical;                            // Returns the lock (always non-nil)
     property Critical__: TCritical read Get_Critical__;            // Exposes the internal lock
     constructor Create;                                            // Creates the list and initializes the lock
     destructor Destroy; override;                                  // Cleans up all resources
@@ -2432,6 +2441,7 @@ function IsMobile: Boolean; // True if running on iOS or Android
 function GetTimeTick(): TTimeTick; // returns a monotonically increasing 64‑bit millisecond tick (never wraps)
 function GetTimeTickCount(): TTimeTick; // alias for GetTimeTick
 function GetCrashTimeTick(): TTimeTick; // returns MaxUInt64 - GetTimeTick (useful for crash dumps)
+function GetTimeTickDiff(t1, t2: TTimeTick): TTimeTick;
 
 // --- Floating‑point comparison with tolerance ---
 function SameF(const A, B: Double; Epsilon: Double = 0): Boolean; {$IFDEF INLINE_ASM} inline; {$ENDIF INLINE_ASM} overload; // compares two Doubles within Epsilon (auto if 0)
@@ -2546,6 +2556,16 @@ var
   On_Raise_Info: TOn_Raise_Info;
   Inc_Instance_Num: TOn_Instance_Info;
   Dec_Instance_Num: TOn_Instance_Info;
+  // Invoked by RaiseInfo just before the exception is raised.
+  // Arguments:
+  //   Msg            - the raw message passed to RaiseInfo
+  //   Caller_Address - return address of RaiseInfo, i.e. the address
+  //                    right after the call site in user code
+  //
+  // Assign this from a unit that wants to report every RaiseInfo
+  // invocation (including its source location) without interfering
+  // with the raise itself. Set to nil to disable.
+  On_Raise_Info_Detail: procedure(const Msg: string; Caller_Address: Pointer) = nil;
 
   // boot thread
   Boot_Thread: TCore_Thread; // boot-thread
@@ -2935,8 +2955,7 @@ initialization
   // MM hook
   GlobalMemoryHook := TAtomBool.Create(True);
   // timetick
-  Core_RunTime_Tick := C_Tick_Day * 3;
-  Core_Step_Tick := TCore_Thread.GetTickCount();
+  Init_Time_Tick();
   // global cirtical
   Init_Critical_System();
   // random

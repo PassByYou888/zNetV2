@@ -407,7 +407,7 @@ var
 
 implementation
 
-uses sec.Cipher;
+uses sec.Cipher, sec.Status.Exception_Helper;
 
 {
   * bufHashToString – Converts a binary buffer into a hexadecimal string.
@@ -1030,11 +1030,7 @@ end;
 procedure ConsoleWriteLn(const S: string);
 begin
   ConsoleWrite(S);
-{$IFDEF MSWINDOWS}
   ConsoleWrite(sLineBreak); // Write line break as UTF-8
-{$ELSE}
-  WriteLn(); // On Unix, WriteLn works fine
-{$ENDIF}
 end;
 
 procedure Post_To_DoStatus_Queue(Th: TCore_Thread; Text_: SystemString; const ID: Integer);
@@ -1223,9 +1219,9 @@ end;
   * RaiseInfo – Replacement for Z.Core's exception hook.
   * Logs the exception message via DoStatus.
 }
-procedure RaiseInfo(const n: string);
+procedure Do_RaiseInfo___(const n: string);
 begin
-  DoStatus('core exception ' + n);
+  DoStatus('%s exception ' + n, [umlDT(umlNow).Text]);
 end;
 
 { ******************************************************************************
@@ -1250,7 +1246,7 @@ begin
   sec.Core.OnCheckThreadSynchronize := DoCheckThreadSynchronize;
 
   Hooked_OnRaiseInfo := sec.Core.On_Raise_Info;
-  sec.Core.On_Raise_Info := RaiseInfo;
+  sec.Core.On_Raise_Info := Do_RaiseInfo___;
 end;
 
 { ******************************************************************************

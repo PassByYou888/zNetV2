@@ -2,23 +2,23 @@ function DisposeObject(const Obj: TObject): Boolean;
 begin
   Result := False;
   if Obj = nil then
-    exit;
+      exit;
   try
-    {$IFDEF AUTOREFCOUNT}Obj.DisposeOf;{$ELSE AUTOREFCOUNT}Obj.Free;{$ENDIF AUTOREFCOUNT}
+{$IFDEF AUTOREFCOUNT}Obj.DisposeOf; {$ELSE AUTOREFCOUNT}Obj.Free; {$ENDIF AUTOREFCOUNT}
     Result := True;
   except
-    {$IFDEF FPC} // fixed fpc 3.2.2 compiler internal error, by.qq600585
-      if Assigned(On_Raise_Info) then
+{$IFDEF FPC} // fixed fpc 3.2.2 compiler internal error, by.qq600585
+    if Assigned(On_Raise_Info) then
         On_Raise_Info('DisposeObject error');
-      Result := False;
-    {$ELSE FPC}
-      on E: Exception do
-        begin
-          if Assigned(On_Raise_Info) then
+    Result := False;
+{$ELSE FPC}
+    on E: Exception do
+      begin
+        if Assigned(On_Raise_Info) then
             On_Raise_Info('DisposeObject error ' + E.Message);
-          Result := False;
-        end;
-    {$ENDIF FPC}
+        Result := False;
+      end;
+{$ENDIF FPC}
   end;
 end;
 
@@ -65,27 +65,27 @@ end;
 
 procedure LockObject(Obj: TObject);
 {$IFNDEF CriticalSimulateAtomic}
-  {$IFDEF ANTI_DEAD_ATOMIC_LOCK}
-  var
-    d: TTimeTick;
-  {$ENDIF ANTI_DEAD_ATOMIC_LOCK}
+{$IFDEF ANTI_DEAD_ATOMIC_LOCK}
+var
+  d: TTimeTick;
+{$ENDIF ANTI_DEAD_ATOMIC_LOCK}
 {$ENDIF CriticalSimulateAtomic}
 begin
 {$IFDEF FPC}
   Lock_Critical_Obj__(Obj);
 {$ELSE FPC}
-  {$IFDEF CriticalSimulateAtomic}
-    Lock_Critical_Obj__(Obj);
-  {$ELSE CriticalSimulateAtomic}
-    {$IFDEF ANTI_DEAD_ATOMIC_LOCK}
-    d := GetTimeTick;
-    TMonitor.Enter(Obj, 5000);
-    if GetTimeTick - d >= 5000 then
-        RaiseInfo('dead');
-    {$ELSE ANTI_DEAD_ATOMIC_LOCK}
-    TMonitor.Enter(Obj);
-    {$ENDIF ANTI_DEAD_ATOMIC_LOCK}
-  {$ENDIF CriticalSimulateAtomic}
+{$IFDEF CriticalSimulateAtomic}
+  Lock_Critical_Obj__(Obj);
+{$ELSE CriticalSimulateAtomic}
+{$IFDEF ANTI_DEAD_ATOMIC_LOCK}
+  d := GetTimeTick;
+  TMonitor.Enter(Obj, 5000);
+  if GetTimeTick - d >= 5000 then
+      RaiseInfo('dead');
+{$ELSE ANTI_DEAD_ATOMIC_LOCK}
+  TMonitor.Enter(Obj);
+{$ENDIF ANTI_DEAD_ATOMIC_LOCK}
+{$ENDIF CriticalSimulateAtomic}
 {$ENDIF FPC}
 end;
 
@@ -94,11 +94,11 @@ begin
 {$IFDEF FPC}
   UnLock_Critical_Obj__(Obj);
 {$ELSE FPC}
-  {$IFDEF CriticalSimulateAtomic}
+{$IFDEF CriticalSimulateAtomic}
   UnLock_Critical_Obj__(Obj);
-  {$ELSE CriticalSimulateAtomic}
-  TMonitor.Exit(Obj);
-  {$ENDIF CriticalSimulateAtomic}
+{$ELSE CriticalSimulateAtomic}
+  TMonitor.exit(Obj);
+{$ENDIF CriticalSimulateAtomic}
 {$ENDIF FPC}
 end;
 
@@ -108,12 +108,14 @@ begin
   FillChar(dest^, Size, Value);
 end;
 {$ELSE FillPtr_Used_FillChar}
+
+
 var
   d: PByte;
   v: UInt64;
 begin
   if Size = 0 then
-      Exit;
+      exit;
   v := Value or (Value shl 8) or (Value shl 16) or (Value shl 24);
   v := v or (v shl 32);
   d := dest;
@@ -140,12 +142,13 @@ begin
 end;
 {$ENDIF FillPtr_Used_FillChar}
 
-procedure FillPtr(const dest:Pointer; Size: NativeUInt; const Value: Byte);
+
+procedure FillPtr(const dest: Pointer; Size: NativeUInt; const Value: Byte);
 begin
   FillPtrByte(dest, Size, Value);
 end;
 
-procedure FillByte(const dest:Pointer; Size: NativeUInt; const Value: Byte);
+procedure FillByte(const dest: Pointer; Size: NativeUInt; const Value: Byte);
 begin
   FillPtrByte(dest, Size, Value);
 end;
@@ -157,7 +160,7 @@ begin;
   if Size = 0 then
     begin
       Result := True;
-      Exit;
+      exit;
     end;
   Result := False;
   b1 := p1;
@@ -165,7 +168,7 @@ begin;
   while (Size >= 8) do
     begin
       if PUInt64(b2)^ <> PUInt64(b1)^ then
-          Exit;
+          exit;
       dec(Size, 8);
       inc(b2, 8);
       inc(b1, 8);
@@ -173,7 +176,7 @@ begin;
   if Size >= 4 then
     begin
       if PCardinal(b2)^ <> PCardinal(b1)^ then
-          Exit;
+          exit;
       dec(Size, 4);
       inc(b2, 4);
       inc(b1, 4);
@@ -181,14 +184,14 @@ begin;
   if Size >= 2 then
     begin
       if PWORD(b2)^ <> PWORD(b1)^ then
-          Exit;
+          exit;
       dec(Size, 2);
       inc(b2, 2);
       inc(b1, 2);
     end;
   if Size > 0 then
     if b2^ <> b1^ then
-        Exit;
+        exit;
   Result := True;
 end;
 
@@ -198,6 +201,8 @@ begin
   Move(sour^, dest^, Size);
 end;
 {$ELSE CopyPtr_Used_Move}
+
+
 var
   s, d: NativeUInt;
 begin
@@ -268,13 +273,115 @@ begin
 end;
 {$ENDIF CopyPtr_Used_Move}
 
-type EZCoreError = class(Exception);
+
+type
+  EZCoreError = class(Exception)
+  public
+    // Address of the caller that invoked RaiseInfo. Captured inside
+    // RaiseInfo so that the exception helper can resolve the user's
+    // call site instead of the internal 'raise' line in Z.Core.
+    Caller_Address: Pointer;
+  end;
+
+  (*
+    * Z_Get_Caller_Address
+    *
+    * Returns the return address of the caller of the function that
+    * calls this helper. When RaiseInfo invokes it, the result is the
+    * address in user code that invoked RaiseInfo.
+    *
+    * Why this works cross-platform, without assembly
+    * -----------------------------------------------
+    * FPC exposes three compiler intrinsics:
+    *
+    *   System.get_frame          - frame pointer of the current function
+    *   System.get_caller_frame   - frame pointer of the caller
+    *   System.get_caller_addr    - return address stored in a frame
+    *
+    * They are implemented by the compiler itself for every supported
+    * target (x86, x64, ARM32, AArch64, ...), so this helper contains
+    * no target-specific code.
+    *
+    * The only requirement is that a real stack frame exists for this
+    * function. FPC normally omits the frame for leaf functions (a
+    * function whose body calls nothing but intrinsics), in which case
+    * get_frame would return garbage.
+    *
+    * To prevent that, three measures are taken together:
+    *
+    *   {$INLINE OFF}                  - prevent inlining into RaiseInfo,
+    *                                    otherwise get_frame would
+    *                                    return the caller's frame
+    *   {$OPTIMIZATION NOOPTIMIZATION} - disable every optimization for
+    *                                    the body of this function,
+    *                                    including any frame-elision
+    *                                    pass the optimizer might run
+    *   local variables F0 / F1        - force real stack activity
+    *
+    * NOTE: the optimization name used here is NOOPTIMIZATION, not
+    * NOSTACKFRAME. NOFRAMEPOINTER is not a valid name at all and is
+    * rejected by FPC 3.2.x with "Illegal optimization specified".
+  *)
+{$IFDEF FPC}
+{$PUSH}
+{$INLINE OFF}
+{$O-}
+
+
+function Z_Get_Caller_Address: Pointer;
+var
+  F0, F1: Pointer;
+begin
+  F0 := System.get_frame; // frame of this function
+  F1 := System.get_caller_frame(F0); // frame of RaiseInfo
+  Result := System.get_caller_addr(F1); // return address into user code
+end;
+{$POP}
+{$ENDIF}
+
 
 procedure RaiseInfo(const n: string);
+var
+  E: EZCoreError;
+  Caller_Addr: Pointer;
 begin
   if Assigned(On_Raise_Info) then
-    On_Raise_Info(n);
-  raise EZCoreError.Create('[Z.Core] ' + n);
+      On_Raise_Info(n);
+
+  E := EZCoreError.Create('[Z.Core] ' + n);
+
+  { *
+    * Capture the caller's return address.
+    *
+    * Delphi: System.ReturnAddress returns the return address of the
+    * *containing* function, i.e. of the function whose body includes
+    * this call. When called directly inside RaiseInfo, the containing
+    * function is RaiseInfo itself, so the returned pointer is the
+    * user's call site. It MUST NOT be moved into a helper function -
+    * doing so would make the containing function the helper, and the
+    * reported address would point inside RaiseInfo.
+    *
+    * FPC: ReturnAddress does not exist. Use the frame-walking helper
+    * instead, which internally exploits get_frame to walk up exactly
+    * the required number of frames. The helper is written so that FPC
+    * emits a frame pointer for it, making the walk reliable.
+    * }
+{$IFDEF FPC}
+  Caller_Addr := Z_Get_Caller_Address;
+{$ELSE}
+  Caller_Addr := System.ReturnAddress;
+{$ENDIF}
+  E.Caller_Address := Caller_Addr;
+
+  if Assigned(On_Raise_Info_Detail) then
+    begin
+      try
+          On_Raise_Info_Detail(n, E.Caller_Address);
+      except
+      end;
+    end;
+
+  raise E;
 end;
 
 procedure RaiseInfo(const n: string; const Args: array of const);
@@ -292,9 +399,31 @@ end;
 
 var
   Core_RunTime_Tick: TTimeTick;
+{$IFDEF MSWINDOWS}
+  Core_Step_Tick: TTimeTick;
+{$ELSE MSWINDOWS}
   Core_Step_Tick: Cardinal;
+{$ENDIF MSWINDOWS}
+
+
+procedure Init_Time_Tick();
+begin
+  Core_RunTime_Tick := C_Tick_Day * 3;
+{$IFDEF MSWINDOWS}
+  Core_Step_Tick := TTimeTick(GetTickCount64);
+{$ELSE MSWINDOWS}
+  Core_Step_Tick := TCore_Thread.GetTickCount();
+{$ENDIF MSWINDOWS}
+end;
 
 function GetTimeTick(): TTimeTick;
+{$IFDEF MSWINDOWS}
+begin
+  Result := Core_RunTime_Tick + TTimeTick(GetTickCount64);
+end;
+{$ELSE MSWINDOWS}
+
+
 var
   Sys_Tick: Cardinal;
 begin
@@ -305,6 +434,8 @@ begin
   Result := Core_RunTime_Tick;
   TimeTick_Critical__.Release;
 end;
+{$ENDIF MSWINDOWS}
+
 
 function GetTimeTickCount(): TTimeTick;
 begin
@@ -314,6 +445,12 @@ end;
 function GetCrashTimeTick(): TTimeTick;
 begin
   Result := TTimeTick($FFFFFFFFFFFFFFFF) - GetTimeTick();
+end;
+
+function GetTimeTickDiff(t1, t2: TTimeTick): TTimeTick;
+begin
+  if t1 < t2 then TSwap<TTimeTick>.Do_(t1, t2);
+  Result := t1 - t2;
 end;
 
 function SameF(const A, B: Double; Epsilon: Double = 0): Boolean;
@@ -348,13 +485,13 @@ function IsDebuging: Boolean;
 begin
   Result := False;
 {$IFDEF DELPHI}
-  {$IFDEF MSWINDOWS}
-    Result := DebugHook > 0;
-  {$ELSE MSWINDOWS}
-    {$IFDEF DEBUG}
-      Result := True;
-    {$ENDIF DEBUG}
-  {$ENDIF MSWINDOWS}
+{$IFDEF MSWINDOWS}
+  Result := DebugHook > 0;
+{$ELSE MSWINDOWS}
+{$IFDEF DEBUG}
+  Result := True;
+{$ENDIF DEBUG}
+{$ENDIF MSWINDOWS}
 {$ENDIF DELPHI}
 end;
 
@@ -368,10 +505,10 @@ begin
   Result := Check_Soft_Thread_Synchronize(Timeout, True);
 end;
 
-function Check_Soft_Thread_Synchronize(Timeout: TTimeTick; Run_Hook_Event_:Boolean): Boolean;
+function Check_Soft_Thread_Synchronize(Timeout: TTimeTick; Run_Hook_Event_: Boolean): Boolean;
 begin
   if Assigned(On_Check_Soft_Thread_Synchronize) then
-    Result := On_Check_Soft_Thread_Synchronize(Timeout, Run_Hook_Event_)
+      Result := On_Check_Soft_Thread_Synchronize(Timeout, Run_Hook_Event_)
   else
     begin
       TCompute.Sleep(Timeout);
@@ -389,10 +526,10 @@ begin
   Check_System_Thread_Synchronize(Timeout, True);
 end;
 
-function Check_System_Thread_Synchronize(Timeout: TTimeTick; Run_Hook_Event_:Boolean): Boolean;
+function Check_System_Thread_Synchronize(Timeout: TTimeTick; Run_Hook_Event_: Boolean): Boolean;
 begin
   if Assigned(On_Check_System_Thread_Synchronize) then
-    Result := On_Check_System_Thread_Synchronize(Timeout, Run_Hook_Event_)
+      Result := On_Check_System_Thread_Synchronize(Timeout, Run_Hook_Event_)
   else
     begin
       TCompute.Sleep(Timeout);
@@ -403,51 +540,50 @@ end;
 procedure CheckThreadSynchronize;
 begin
   if Main_Thread_Soft_Synchronize then
-    Check_Soft_Thread_Synchronize(0)
+      Check_Soft_Thread_Synchronize(0)
   else
-    Check_System_Thread_Synchronize(0);
+      Check_System_Thread_Synchronize(0);
 end;
 
 function CheckThreadSynchronize(Timeout: TTimeTick): Boolean;
 begin
   if Main_Thread_Soft_Synchronize then
-    Result := Check_Soft_Thread_Synchronize(Timeout)
+      Result := Check_Soft_Thread_Synchronize(Timeout)
   else
-    Result := Check_System_Thread_Synchronize(Timeout);
+      Result := Check_System_Thread_Synchronize(Timeout);
 end;
 
 procedure CheckThreadSync;
 begin
   if Main_Thread_Soft_Synchronize then
-    Check_Soft_Thread_Synchronize(0)
+      Check_Soft_Thread_Synchronize(0)
   else
-    Check_System_Thread_Synchronize(0);
+      Check_System_Thread_Synchronize(0);
 end;
 
 function CheckThreadSync(Timeout: TTimeTick): Boolean;
 begin
   if Main_Thread_Soft_Synchronize then
-    Result := Check_Soft_Thread_Synchronize(Timeout)
+      Result := Check_Soft_Thread_Synchronize(Timeout)
   else
-    Result := Check_System_Thread_Synchronize(Timeout);
+      Result := Check_System_Thread_Synchronize(Timeout);
 end;
 
 procedure CheckThread;
 begin
   if Main_Thread_Soft_Synchronize then
-    Check_Soft_Thread_Synchronize(0)
+      Check_Soft_Thread_Synchronize(0)
   else
-    Check_System_Thread_Synchronize(0);
+      Check_System_Thread_Synchronize(0);
 end;
 
 function CheckThread(Timeout: TTimeTick): Boolean;
 begin
   if Main_Thread_Soft_Synchronize then
-    Result := Check_Soft_Thread_Synchronize(Timeout)
+      Result := Check_Soft_Thread_Synchronize(Timeout)
   else
-    Result := Check_System_Thread_Synchronize(Timeout);
+      Result := Check_System_Thread_Synchronize(Timeout);
 end;
-
 
 function if_(const bool_: Boolean; const True_, False_: Boolean): Boolean;
 begin
@@ -566,39 +702,38 @@ end;
 function IsValidUTF8Bytes(const Data: TBytes): Boolean;
 var
   i: Integer;
-  b: Byte;
+  B: Byte;
   bytes_needed: Integer;
 begin
   Result := False;
   bytes_needed := 0;
   for i := 0 to length(Data) - 1 do
     begin
-      b := Data[i];
+      B := Data[i];
       if bytes_needed = 0 then
         begin
-          if b <= $7F then
+          if B <= $7F then
             // µ¥×Ö½Ú
-          else if b >= $C2 then
+          else if B >= $C2 then
             begin
-              if b <= $DF then
+              if B <= $DF then
                   bytes_needed := 1
-              else if b <= $EF then
+              else if B <= $EF then
                   bytes_needed := 2
-              else if b <= $F4 then
+              else if B <= $F4 then
                   bytes_needed := 3
               else
-                  Exit(False);
+                  exit(False);
             end
           else
-              Exit(False);
+              exit(False);
         end
       else
         begin
-          if (b and $C0) <> $80 then
-              Exit(False);
-          Dec(bytes_needed);
+          if (B and $C0) <> $80 then
+              exit(False);
+          dec(bytes_needed);
         end;
     end;
   Result := (bytes_needed = 0);
 end;
-
