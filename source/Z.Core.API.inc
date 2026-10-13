@@ -195,6 +195,44 @@ begin;
   Result := True;
 end;
 
+function CompareMemoryIs0(const p: Pointer; Size: NativeUInt): Boolean;
+var
+  b: PByte;
+begin
+  if Size = 0 then
+    begin
+      Result := True;
+      exit;
+    end;
+  Result := False;
+  b := p;
+  while Size >= 8 do
+    begin
+      if PUInt64(b)^ <> 0 then
+          exit;
+      dec(Size, 8);
+      inc(b, 8);
+    end;
+  if Size >= 4 then
+    begin
+      if PCardinal(b)^ <> 0 then
+          exit;
+      dec(Size, 4);
+      inc(b, 4);
+    end;
+  if Size >= 2 then
+    begin
+      if PWORD(b)^ <> 0 then
+          exit;
+      dec(Size, 2);
+      inc(b, 2);
+    end;
+  if Size > 0 then
+    if b^ <> 0 then
+        exit;
+  Result := True;
+end;
+
 procedure CopyPtr(const sour, dest: Pointer; Size: NativeUInt);
 {$IFDEF CopyPtr_Used_Move}
 begin
@@ -453,28 +491,28 @@ begin
   Result := t1 - t2;
 end;
 
-function SameF(const A, B: Double; Epsilon: Double = 0): Boolean;
+function SameF(const A, b: Double; Epsilon: Double = 0): Boolean;
 const
   C_DoubleResolution = 1E-15 * 1000;
 begin
   if Epsilon = 0 then
-      Epsilon := Max(Min(Abs(A), Abs(B)) * C_DoubleResolution, C_DoubleResolution);
-  if A > B then
-      Result := (A - B) <= Epsilon
+      Epsilon := Max(Min(Abs(A), Abs(b)) * C_DoubleResolution, C_DoubleResolution);
+  if A > b then
+      Result := (A - b) <= Epsilon
   else
-      Result := (B - A) <= Epsilon;
+      Result := (b - A) <= Epsilon;
 end;
 
-function SameF(const A, B: Single; Epsilon: Single = 0): Boolean;
+function SameF(const A, b: Single; Epsilon: Single = 0): Boolean;
 const
   C_SingleResolution = 1E-7 * 1000;
 begin
   if Epsilon = 0 then
-      Epsilon := Max(Min(Abs(A), Abs(B)) * C_SingleResolution, C_SingleResolution);
-  if A > B then
-      Result := (A - B) <= Epsilon
+      Epsilon := Max(Min(Abs(A), Abs(b)) * C_SingleResolution, C_SingleResolution);
+  if A > b then
+      Result := (A - b) <= Epsilon
   else
-      Result := (B - A) <= Epsilon;
+      Result := (b - A) <= Epsilon;
 end;
 
 procedure Nop;
@@ -702,25 +740,25 @@ end;
 function IsValidUTF8Bytes(const Data: TBytes): Boolean;
 var
   i: Integer;
-  B: Byte;
+  b: Byte;
   bytes_needed: Integer;
 begin
   Result := False;
   bytes_needed := 0;
   for i := 0 to length(Data) - 1 do
     begin
-      B := Data[i];
+      b := Data[i];
       if bytes_needed = 0 then
         begin
-          if B <= $7F then
+          if b <= $7F then
             // µ¥×Ö½Ú
-          else if B >= $C2 then
+          else if b >= $C2 then
             begin
-              if B <= $DF then
+              if b <= $DF then
                   bytes_needed := 1
-              else if B <= $EF then
+              else if b <= $EF then
                   bytes_needed := 2
-              else if B <= $F4 then
+              else if b <= $F4 then
                   bytes_needed := 3
               else
                   exit(False);
@@ -730,7 +768,7 @@ begin
         end
       else
         begin
-          if (B and $C0) <> $80 then
+          if (b and $C0) <> $80 then
               exit(False);
           dec(bytes_needed);
         end;

@@ -248,7 +248,7 @@ var
 begin
   if Value_ = 0 then
       Exit;
-  p := Get_Value_Ptr(Key_);
+  p := Get_Or_Create_Value_Ptr(Key_);
   p^.Instance_Num := p^.Instance_Num + Value_;
   if p^.Instance_Num < 0 then
       p^.Instance_Num := 0;

@@ -411,12 +411,36 @@ type
 
   { *
     * Abstract implementation of ICrossConnection.
-    * Holds peer address, port, connection type, and status.
-    * Provides a default DirectSend that wraps the platform‑specific Send.
+    *
+    * Concurrency note (IMPORTANT):
+    *   Close() and Disconnect() may be invoked simultaneously from:
+    *     - the framework's main thread (through TPeerIO.Disconnect),
+    *     - the CrossSocket I/O thread (through _HandleRead / _HandleAccept /
+    *       _HandleConnect).
+    *
+    *   A naive "guard flag" stored as an instance field is NOT safe: the
+    *   guard field itself would have to be read/written, and if the object
+    *   has already been freed by the winning thread, that access becomes a
+    *   use-after-free (FastMM reports "block has been modified after being
+    *   freed").
+    *
+    *   The correct approach used here:
+    *     1. FLifeCycleLock is a CLASS-level lock, so it survives even when
+    *        the instance has been destroyed. Close() and Disconnect() are
+    *        serialized through it.
+    *     2. Both methods take an interface reference to Self (LSelf) at the
+    *        very beginning. That reference keeps the object alive for the
+    *        whole duration of the call, so no code inside may observe a
+    *        freed instance.
   }
   TAbstractCrossConnection = class(TCrossData, ICrossConnection)
   public const
     SND_BUF_SIZE = 16384; // default send chunk size (not used in all platforms)
+  public
+    // Class-level lifecycle lock. Serializes Close()/Disconnect() across
+    // all connection instances and all threads. Initialized in the unit's
+    // initialization section, freed in finalization.
+    class var FLifeCycleLock: TCritical;
   private
     FPeerAddr: SystemString;
     FPeerPort: Word;
@@ -1247,7 +1271,7 @@ begin
 end;
 
 { *
-  * TAbstractCrossConnection – constructor: set connect type and status.
+  * TAbstractCrossConnection – constructor.
 }
 constructor TAbstractCrossConnection.Create(AOwner: ICrossSocket;
   AClientSocket: THandle; AConnectType: TConnectType);
@@ -1255,7 +1279,7 @@ begin
   inherited Create(AOwner, AClientSocket);
 
   FConnectType := AConnectType;
-  ConnectStatus := csUnknown;
+  FConnectStatus := Integer(csUnknown);
 end;
 
 procedure TAbstractCrossConnection.SetConnectStatus(const Value: TConnectStatus);
@@ -1269,30 +1293,91 @@ begin
 end;
 
 { *
-  * Close – immediately close socket and trigger disconnect.
+  * Close - immediately close the socket and trigger the disconnect event.
+  *
+  * Concurrency-safe:
+  *   - LSelf keeps the object alive for the whole duration of this call.
+  *   - FLifeCycleLock serializes Close()/Disconnect() across all threads.
+  *   - Only the thread that observes a non-closed status inside the lock
+  *     performs the actual teardown.
+  *
+  * FSocket is invalidated inside the lock, before TriggerDisconnected, so
+  * no subsequent field access on Self is required after the object may
+  * have been released by the engine.
 }
 procedure TAbstractCrossConnection.Close;
+var
+  LSock: THandle;
+  LSelf: ICrossData;
+  LDoClose: Boolean;
 begin
-  if TConnectStatus(FConnectStatus) = csClosed then Exit;
-  _SetConnectStatus(csClosed);
+  // Interface reference keeps Self alive for the entire call.
+  LSelf := Self;
+  try
+    LDoClose := False;
+    LSock := THandle(INVALID_HANDLE_VALUE__);
 
-  if (FSocket <> INVALID_HANDLE_VALUE__) then
-    begin
-      TSocketAPI.CloseSocket(FSocket);
-      FOwner.TriggerDisconnected(Self);
-      FSocket := INVALID_HANDLE_VALUE__;
+    FLifeCycleLock.Lock;
+    try
+      // Only the first caller transitions to csClosed.
+      if TConnectStatus(FConnectStatus) <> csClosed then
+        begin
+          FConnectStatus := Integer(csClosed);
+          LSock := FSocket;
+          FSocket := THandle(INVALID_HANDLE_VALUE__);
+          LDoClose := True;
+        end;
+    finally
+      FLifeCycleLock.UnLock;
     end;
+
+    if LDoClose and (LSock <> INVALID_HANDLE_VALUE__) then
+      begin
+        TSocketAPI.CloseSocket(LSock);
+        // TriggerDisconnected may remove the last entry from FConnections.
+        // LSelf still holds an interface reference, so Self remains valid
+        // until this procedure exits.
+        if FOwner <> nil then
+          FOwner.TriggerDisconnected(Self);
+      end;
+  finally
+    LSelf := nil;
+  end;
 end;
 
 { *
-  * Disconnect – gracefully shutdown the socket (send FIN).
+  * Disconnect - gracefully shutdown the socket (send FIN).
+  * Uses the same lifecycle lock as Close(), so Close()/Disconnect() cannot
+  * race with each other.
 }
 procedure TAbstractCrossConnection.Disconnect;
+var
+  LSock: THandle;
+  LSelf: ICrossData;
+  LDoShutdown: Boolean;
 begin
-  if (ConnectStatus in [csDisconnected, csClosed]) then Exit;
-  _SetConnectStatus(csDisconnected);
+  LSelf := Self;
+  try
+    LDoShutdown := False;
+    LSock := THandle(INVALID_HANDLE_VALUE__);
 
-  TSocketAPI.Shutdown(FSocket, 2);
+    FLifeCycleLock.Lock;
+    try
+      if not(ConnectStatus in [csDisconnected, csClosed]) then
+        begin
+          FConnectStatus := Integer(csDisconnected);
+          LSock := FSocket;
+          LDoShutdown := True;
+        end;
+    finally
+      FLifeCycleLock.UnLock;
+    end;
+
+    if LDoShutdown and (LSock <> INVALID_HANDLE_VALUE__) then
+      TSocketAPI.Shutdown(LSock, 2);
+  finally
+    LSelf := nil;
+  end;
 end;
 
 function TAbstractCrossConnection.GetConnectStatus: TConnectStatus;
@@ -1307,7 +1392,7 @@ end;
 
 function TAbstractCrossConnection.GetIsClosed: Boolean;
 begin
-  Result := (GetConnectStatus = csClosed);
+  Result := (TConnectStatus(FConnectStatus) = csClosed);
 end;
 
 function TAbstractCrossConnection.GetPeerAddr: SystemString;
@@ -1325,9 +1410,6 @@ begin
   Result := UID_CONNECTION;
 end;
 
-{ *
-  * SendBuf – public entry point; calls DirectSend.
-}
 procedure TAbstractCrossConnection.SendBuf(ABuffer: Pointer; ACount: Integer;
   const ACallback: TProc_ICrossConnection_Boolean);
 begin
@@ -1335,7 +1417,7 @@ begin
 end;
 
 { *
-  * UpdateAddr – also fetch peer address/port via getpeername.
+  * UpdateAddr - also fetch peer address/port via getpeername.
 }
 procedure TAbstractCrossConnection.UpdateAddr;
 var
@@ -1357,7 +1439,7 @@ begin
 end;
 
 { *
-  * DirectSend – wraps the engine's Send method with a bridge callback.
+  * DirectSend - wraps the engine's Send method with a bridge callback.
   * The bridge releases itself after the callback fires.
 }
 procedure TAbstractCrossConnection.DirectSend(ABuffer: Pointer; ACount: Integer;
@@ -1398,5 +1480,13 @@ begin
     end;
   DisposeObject(Self);
 end;
+
+initialization
+  // Class-level lifecycle lock shared by every TAbstractCrossConnection.
+  // Must exist before any connection instance is created.
+  TAbstractCrossConnection.FLifeCycleLock := TCritical.Create('TAbstractCrossConnection.FLifeCycleLock');
+
+finalization
+  DisposeObjectAndNil(TAbstractCrossConnection.FLifeCycleLock);
 
 end.

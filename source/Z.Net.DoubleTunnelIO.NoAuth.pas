@@ -3953,7 +3953,7 @@ end;
 procedure TDT_P2PVM_NoAuth_Custom_Service.StopService;
 begin
   RecvTunnel.StopService;
-  RecvTunnel.StopService;
+  SendTunnel.StopService;
 end;
 
 procedure TDT_P2PVM_NoAuth_Custom_Client_Clone_Pool.DoFree(var Data: TDT_P2PVM_NoAuth_Custom_Client);
@@ -4104,16 +4104,17 @@ begin
     end;
   Clone_Pool.Clear;
 
+  Disconnect;
+
   if Bind_PhysicsTunnel <> nil then
     begin
       Bind_PhysicsTunnel.AutomatedP2PVMBindClient.RemoveClient(RecvTunnel);
       Bind_PhysicsTunnel.AutomatedP2PVMBindClient.RemoveClient(SendTunnel);
     end;
 
-  Disconnect;
+  DisposeObject(DTClient);
   DisposeObject(RecvTunnel);
   DisposeObject(SendTunnel);
-  DisposeObject(DTClient);
   DisposeObject(Clone_Pool);
   inherited Destroy;
 end;

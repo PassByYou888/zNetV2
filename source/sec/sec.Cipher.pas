@@ -105,6 +105,15 @@ const
   cKey256Size = 32;
 
 type
+{$IFDEF FPC}
+  TCipherString = TUPascalString; // Unicode string type (UTF‑16)
+  TCipherSystemString = USystemString; // Native system string (UnicodeString)
+  TCipherChar = USystemChar; // Unicode character (UTF‑16 code unit)
+{$ELSE FPC}
+  TCipherString = TPascalString; // Pascal string (UTF‑16 in Delphi)
+  TCipherSystemString = SystemString; // Native string
+  TCipherChar = SystemChar; // System character (WideChar)
+{$ENDIF FPC}
   {
     * Pointer to DWORD.
   }
@@ -314,10 +323,10 @@ type
   PSHA3_384_Digest = ^TSHA3_384_Digest;
   PSHA3_512_Digest = ^TSHA3_512_Digest;
 
-  TSHA3_224_Digest = array [0 .. 224 div 8 - 1] of Byte;
-  TSHA3_256_Digest = array [0 .. 256 div 8 - 1] of Byte;
-  TSHA3_384_Digest = array [0 .. 384 div 8 - 1] of Byte;
-  TSHA3_512_Digest = array [0 .. 512 div 8 - 1] of Byte;
+  TSHA3_224_Digest = array [0 .. (224 div 8) - 1] of Byte;
+  TSHA3_256_Digest = array [0 .. (256 div 8) - 1] of Byte;
+  TSHA3_384_Digest = array [0 .. (384 div 8) - 1] of Byte;
+  TSHA3_512_Digest = array [0 .. (512 div 8) - 1] of Byte;
 
   {
     * LMD custom hash context: 256-byte digest ring, key index, and the
@@ -469,7 +478,7 @@ type
     *   - Hash comparison helpers.
     *   - CBC and tail handling helpers.
   }
-  TCipher = class(TCore_Object_Intermediate)
+  TCipher = class sealed(TCore_Object)
   public const
     {
       * The full set of supported hash algorithms.
@@ -483,7 +492,7 @@ type
     {
       * Human-readable names for each hash algorithm.
     }
-    CHashName: array [THashSecurity] of SystemString = (
+    CHashName: array [THashSecurity] of TCipherSystemString = (
       'None',
       'FastMD5', 'MD5', 'SHA1', 'SHA256', 'SHA512',
       'SHA3_224', 'SHA3_256', 'SHA3_384', 'SHA3_512',
@@ -492,7 +501,7 @@ type
     {
       * Human-readable names for each cipher.
     }
-    CCipherSecurityName: array [TCipherSecurity] of SystemString =
+    CCipherSecurityName: array [TCipherSecurity] of TCipherSystemString =
       (
       'None',
       'DES64', 'DES128', 'DES192',
@@ -528,120 +537,130 @@ type
       ckyDynamicKey // csAES256
       );
   public
-    class function AllCipher: TCipherSecurityArray;
+    class function AllCipher: TCipherSecurityArray; static;
 
-    class function Random_Select_Cipher(const arry: TCipherSecurityArray): TCipherSecurity;
+    class function Random_Select_Cipher(const arry: TCipherSecurityArray): TCipherSecurity; static;
 
-    class function NameToHashSecurity(n: SystemString; var hash: THashSecurity): Boolean;
+    class function NameToHashSecurity(n: TCipherSystemString; var hash: THashSecurity): Boolean; static;
 
-    class function BuffToString(buff: Pointer; Size: NativeInt): TPascalString; overload;
-    class function StringToBuff(const Hex: TPascalString; var Buf; BufSize: Cardinal): Boolean; overload;
+    class function BuffToString(buff: Pointer; Size: NativeInt): TCipherString; overload; static;
+    class function StringToBuff(const Hex: TCipherString; var Buf; BufSize: Cardinal): Boolean; overload; static;
 
-    class procedure HashToString(hash: Pointer; Size: NativeInt; var output: TPascalString); overload;
+    class procedure HashToString(hash: Pointer; Size: NativeInt; var output: TCipherString); overload; static;
 
-    class procedure HashToString(hash: TSHA3_224_Digest; var output: TPascalString); overload;
-    class procedure HashToString(hash: TSHA3_256_Digest; var output: TPascalString); overload;
-    class procedure HashToString(hash: TSHA3_384_Digest; var output: TPascalString); overload;
-    class procedure HashToString(hash: TSHA3_512_Digest; var output: TPascalString); overload;
-    class procedure HashToString(hash: TSHA512Digest; var output: TPascalString); overload;
-    class procedure HashToString(hash: TSHA256Digest; var output: TPascalString); overload;
-    class procedure HashToString(hash: TSHA1Digest; var output: TPascalString); overload;
-    class procedure HashToString(hash: TMD5Digest; var output: TPascalString); overload;
-    class procedure HashToString(hash: TBytes; var output: TPascalString); overload;
-    class procedure HashToString(hash: TBytes; var output: SystemString); overload;
+    class procedure HashToString(hash: TSHA3_224_Digest; var output: TCipherString); overload; static;
+    class procedure HashToString(hash: TSHA3_256_Digest; var output: TCipherString); overload; static;
+    class procedure HashToString(hash: TSHA3_384_Digest; var output: TCipherString); overload; static;
+    class procedure HashToString(hash: TSHA3_512_Digest; var output: TCipherString); overload; static;
+    class procedure HashToString(hash: TSHA512Digest; var output: TCipherString); overload; static;
+    class procedure HashToString(hash: TSHA256Digest; var output: TCipherString); overload; static;
+    class procedure HashToString(hash: TSHA1Digest; var output: TCipherString); overload; static;
+    class procedure HashToString(hash: TMD5Digest; var output: TCipherString); overload; static;
+    class procedure HashToString(hash: TBytes; var output: TCipherString); overload; static;
+    class procedure HashToString(hash: TBytes; var output: TCipherSystemString); overload; static;
 
-    class function CompareHash(h1, h2: TSHA3_224_Digest): Boolean; overload;
-    class function CompareHash(h1, h2: TSHA3_256_Digest): Boolean; overload;
-    class function CompareHash(h1, h2: TSHA3_384_Digest): Boolean; overload;
-    class function CompareHash(h1, h2: TSHA3_512_Digest): Boolean; overload;
-    class function CompareHash(h1, h2: TSHA512Digest): Boolean; overload;
-    class function CompareHash(h1, h2: TSHA256Digest): Boolean; overload;
-    class function CompareHash(h1, h2: TSHA1Digest): Boolean; overload;
-    class function CompareHash(h1, h2: TMD5Digest): Boolean; overload;
-    class function CompareHash(h1, h2: Pointer; Size: NativeInt): Boolean; overload;
-    class function CompareHash(h1, h2: TBytes): Boolean; overload;
+    class function HashToString(hash: TSHA3_224_Digest): TCipherSystemString; overload; static;
+    class function HashToString(hash: TSHA3_256_Digest): TCipherSystemString; overload; static;
+    class function HashToString(hash: TSHA3_384_Digest): TCipherSystemString; overload; static;
+    class function HashToString(hash: TSHA3_512_Digest): TCipherSystemString; overload; static;
+    class function HashToString(hash: TSHA512Digest): TCipherSystemString; overload; static;
+    class function HashToString(hash: TSHA256Digest): TCipherSystemString; overload; static;
+    class function HashToString(hash: TSHA1Digest): TCipherSystemString; overload; static;
+    class function HashToString(hash: TMD5Digest): TCipherSystemString; overload; static;
+    class function HashToString(hash: TBytes): TCipherSystemString; overload; static;
 
-    class function CompareKey(k1, k2: TCipherKeyBuffer): Boolean; overload;
+    class function CompareHash(h1, h2: TSHA3_224_Digest): Boolean; overload; static;
+    class function CompareHash(h1, h2: TSHA3_256_Digest): Boolean; overload; static;
+    class function CompareHash(h1, h2: TSHA3_384_Digest): Boolean; overload; static;
+    class function CompareHash(h1, h2: TSHA3_512_Digest): Boolean; overload; static;
+    class function CompareHash(h1, h2: TSHA512Digest): Boolean; overload; static;
+    class function CompareHash(h1, h2: TSHA256Digest): Boolean; overload; static;
+    class function CompareHash(h1, h2: TSHA1Digest): Boolean; overload; static;
+    class function CompareHash(h1, h2: TMD5Digest): Boolean; overload; static;
+    class function CompareHash(h1, h2: Pointer; Size: NativeInt): Boolean; overload; static;
+    class function CompareHash(h1, h2: TBytes): Boolean; overload; static;
 
-    class function GenerateSHA3_224Hash(sour: Pointer; Size: NativeInt): TSHA3_224_Digest;
-    class function GenerateSHA3_256Hash(sour: Pointer; Size: NativeInt): TSHA3_256_Digest;
-    class function GenerateSHA3_384Hash(sour: Pointer; Size: NativeInt): TSHA3_384_Digest;
-    class function GenerateSHA3_512Hash(sour: Pointer; Size: NativeInt): TSHA3_512_Digest;
-    class function GenerateSHA512Hash(sour: Pointer; Size: NativeInt): TSHA512Digest;
-    class function GenerateSHA256Hash(sour: Pointer; Size: NativeInt): TSHA256Digest;
-    class function GenerateSHA1Hash(sour: Pointer; Size: NativeInt): TSHA1Digest;
-    class function GenerateMD5Hash(sour: Pointer; Size: NativeInt): TMD5Digest;
-    class procedure GenerateMDHash(sour: Pointer; Size: NativeInt; OutHash: Pointer; HashSize: NativeInt);
+    class function CompareKey(k1, k2: TCipherKeyBuffer): Boolean; overload; static;
 
-    class procedure GenerateHashByte(hs: THashSecurity; sour: Pointer; Size: NativeInt; var output: TBytes);
-    class function GenerateHashString(hs: THashSecurity; sour: Pointer; Size: NativeInt): TPascalString;
+    class function GenerateSHA3_224Hash(sour: Pointer; Size: NativeInt): TSHA3_224_Digest; static;
+    class function GenerateSHA3_256Hash(sour: Pointer; Size: NativeInt): TSHA3_256_Digest; static;
+    class function GenerateSHA3_384Hash(sour: Pointer; Size: NativeInt): TSHA3_384_Digest; static;
+    class function GenerateSHA3_512Hash(sour: Pointer; Size: NativeInt): TSHA3_512_Digest; static;
+    class function GenerateSHA512Hash(sour: Pointer; Size: NativeInt): TSHA512Digest; static;
+    class function GenerateSHA256Hash(sour: Pointer; Size: NativeInt): TSHA256Digest; static;
+    class function GenerateSHA1Hash(sour: Pointer; Size: NativeInt): TSHA1Digest; static;
+    class function GenerateMD5Hash(sour: Pointer; Size: NativeInt): TMD5Digest; static;
+    class procedure GenerateMDHash(sour: Pointer; Size: NativeInt; OutHash: Pointer; HashSize: NativeInt); static;
 
-    class function BufferToHex(const Buf; BufSize: Cardinal): TPascalString;
-    class function HexToBuffer(const Hex: TPascalString; var Buf; BufSize: Cardinal): Boolean;
+    class procedure GenerateHashByte(hs: THashSecurity; sour: Pointer; Size: NativeInt; var output: TBytes); static;
+    class function GenerateHashString(hs: THashSecurity; sour: Pointer; Size: NativeInt): TCipherString; static;
 
-    class function CopyKey(const k: TCipherKeyBuffer): TCipherKeyBuffer;
+    class function BufferToHex(const Buf; BufSize: Cardinal): TCipherString; static;
+    class function HexToBuffer(const Hex: TCipherString; var Buf; BufSize: Cardinal): Boolean; static;
 
-    class procedure GenerateNoneKey(var output: TCipherKeyBuffer);
-    class procedure GenerateKey64(const s: TPascalString; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateKey64(sour: Pointer; Size: NativeInt; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateKey128(const s: TPascalString; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateKey128(sour: Pointer; Size: NativeInt; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateKey256(const s: TPascalString; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateKey256(sour: Pointer; Size: NativeInt; var output: TCipherKeyBuffer); overload;
-    class procedure Generate3Key64(const s: TPascalString; var output: TCipherKeyBuffer); overload;
-    class procedure Generate3Key64(sour: Pointer; Size: NativeInt; var output: TCipherKeyBuffer); overload;
-    class procedure Generate2IntKey(const s: TPascalString; var output: TCipherKeyBuffer); overload;
-    class procedure Generate2IntKey(sour: Pointer; Size: NativeInt; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateIntKey(const s: TPascalString; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateIntKey(sour: Pointer; Size: NativeInt; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateBytesKey(const s: TPascalString; KeySize: DWORD; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateBytesKey(sour: Pointer; Size, KeySize: DWORD; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateKey64(const k: TKey64; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateKey128(const k1, k2: TKey64; var output: TCipherKeyBuffer); overload;
+    class function CopyKey(const k: TCipherKeyBuffer): TCipherKeyBuffer; static;
 
-    class procedure GenerateKey(const k: TKey64; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateKey(const k1, k2, k3: TKey64; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateKey(const k: TKey128; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateKey(const k: TKey256; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateKey(const k1, k2: DWORD; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateKey(const k: DWORD; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateKey(const key: PByte; Size: DWORD; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateKey(cs: TCipherSecurity; buffPtr: Pointer; Size: NativeInt; var output: TCipherKeyBuffer); overload;
-    class procedure GenerateKey(cs: TCipherSecurity; s: TPascalString; var output: TCipherKeyBuffer); overload;
+    class procedure GenerateNoneKey(var output: TCipherKeyBuffer); static;
+    class procedure GenerateKey64(const s: TCipherString; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateKey64(sour: Pointer; Size: NativeInt; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateKey128(const s: TCipherString; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateKey128(sour: Pointer; Size: NativeInt; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateKey256(const s: TCipherString; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateKey256(sour: Pointer; Size: NativeInt; var output: TCipherKeyBuffer); overload; static;
+    class procedure Generate3Key64(const s: TCipherString; var output: TCipherKeyBuffer); overload; static;
+    class procedure Generate3Key64(sour: Pointer; Size: NativeInt; var output: TCipherKeyBuffer); overload; static;
+    class procedure Generate2IntKey(const s: TCipherString; var output: TCipherKeyBuffer); overload; static;
+    class procedure Generate2IntKey(sour: Pointer; Size: NativeInt; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateIntKey(const s: TCipherString; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateIntKey(sour: Pointer; Size: NativeInt; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateBytesKey(const s: TCipherString; KeySize: DWORD; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateBytesKey(sour: Pointer; Size, KeySize: DWORD; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateKey64(const k: TKey64; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateKey128(const k1, k2: TKey64; var output: TCipherKeyBuffer); overload; static;
 
-    class function GetKeyStyle(const p: PCipherKeyBuffer): TCipherKeyStyle; overload;
+    class procedure GenerateKey(const k: TKey64; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateKey(const k1, k2, k3: TKey64; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateKey(const k: TKey128; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateKey(const k: TKey256; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateKey(const k1, k2: DWORD; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateKey(const k: DWORD; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateKey(const key: PByte; Size: DWORD; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateKey(cs: TCipherSecurity; buffPtr: Pointer; Size: NativeInt; var output: TCipherKeyBuffer); overload; static;
+    class procedure GenerateKey(cs: TCipherSecurity; s: TCipherString; var output: TCipherKeyBuffer); overload; static;
 
-    class function GetKey(const KeyBuffPtr: PCipherKeyBuffer; var k: TKey64): Boolean; overload;
-    class function GetKey(const KeyBuffPtr: PCipherKeyBuffer; var k1, k2, k3: TKey64): Boolean; overload;
-    class function GetKey(const KeyBuffPtr: PCipherKeyBuffer; var k: TKey128): Boolean; overload;
-    class function GetKey(const KeyBuffPtr: PCipherKeyBuffer; var k: TKey256): Boolean; overload;
-    class function GetKey(const KeyBuffPtr: PCipherKeyBuffer; var k1, k2: DWORD): Boolean; overload;
-    class function GetKey(const KeyBuffPtr: PCipherKeyBuffer; var k: DWORD): Boolean; overload;
-    class function GetKey(const KeyBuffPtr: PCipherKeyBuffer; var key: TBytes): Boolean; overload;
+    class function GetKeyStyle(const p: PCipherKeyBuffer): TCipherKeyStyle; overload; static;
 
-    class procedure EncryptTail(TailPtr: Pointer; TailSize: NativeInt);
-    class function DES64(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
-    class function DES128(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
-    class function DES192(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
-    class function Blowfish(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
-    class function LBC(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
-    class function LQC(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
-    class function RNG32(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer): Boolean;
-    class function RNG64(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer): Boolean;
-    class function LSC(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer): Boolean;
-    class function XXTea512(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
-    class function RC6(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
-    class function Serpent(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
-    class function Mars(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
-    class function Rijndael(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
-    class function TwoFish(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
-    class function AES128(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
-    class function AES192(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
-    class function AES256(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
-    class procedure BlockCBC(sour: Pointer; Size: NativeInt; boxBuff: Pointer; boxSiz: NativeInt);
+    class function GetKey(const KeyBuffPtr: PCipherKeyBuffer; var k: TKey64): Boolean; overload; static;
+    class function GetKey(const KeyBuffPtr: PCipherKeyBuffer; var k1, k2, k3: TKey64): Boolean; overload; static;
+    class function GetKey(const KeyBuffPtr: PCipherKeyBuffer; var k: TKey128): Boolean; overload; static;
+    class function GetKey(const KeyBuffPtr: PCipherKeyBuffer; var k: TKey256): Boolean; overload; static;
+    class function GetKey(const KeyBuffPtr: PCipherKeyBuffer; var k1, k2: DWORD): Boolean; overload; static;
+    class function GetKey(const KeyBuffPtr: PCipherKeyBuffer; var k: DWORD): Boolean; overload; static;
+    class function GetKey(const KeyBuffPtr: PCipherKeyBuffer; var key: TBytes): Boolean; overload; static;
 
-    class function EncryptBuffer(cs: TCipherSecurity; sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
-    class function EncryptBufferCBC(cs: TCipherSecurity; sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean;
+    class procedure EncryptTail(TailPtr: Pointer; TailSize: NativeInt); static;
+    class function DES64(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
+    class function DES128(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
+    class function DES192(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
+    class function Blowfish(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
+    class function LBC(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
+    class function LQC(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
+    class function RNG32(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer): Boolean; static;
+    class function RNG64(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer): Boolean; static;
+    class function LSC(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer): Boolean; static;
+    class function XXTea512(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
+    class function RC6(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
+    class function Serpent(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
+    class function Mars(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
+    class function Rijndael(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
+    class function TwoFish(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
+    class function AES128(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
+    class function AES192(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
+    class function AES256(sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
+    class procedure BlockCBC(sour: Pointer; Size: NativeInt; boxBuff: Pointer; boxSiz: NativeInt); static;
+
+    class function EncryptBuffer(cs: TCipherSecurity; sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
+    class function EncryptBufferCBC(cs: TCipherSecurity; sour: Pointer; Size: NativeInt; KeyBuff: PCipherKeyBuffer; Encrypt, ProcessTail: Boolean): Boolean; static;
   end;
 
 {$IFDEF Parallel}
@@ -761,7 +780,6 @@ var
   }
   ParallelTriggerCondition: Integer; // default 1024
 {$ENDIF}
-
   {
     * Initialise the global CBC salt and the default parallel-depth
     * settings. Called once from the unit's initialization section.
@@ -813,7 +831,7 @@ function SequEncryptCBC(const cs: TCipherSecurity; sour: Pointer; Size: NativeIn
   * Sequential hash helpers.
   * Generate a list of hashes (one per THashSecurity) for a given buffer.
 }
-function GenerateSequHash(hssArry: THashSecuritys; sour: Pointer; Size: NativeInt): TPascalString; overload;
+function GenerateSequHash(hssArry: THashSecuritys; sour: Pointer; Size: NativeInt): TCipherString; overload;
 procedure GenerateSequHash(hssArry: THashSecuritys; sour: Pointer; Size: NativeInt; output: TListPascalString); overload;
 procedure GenerateSequHash(hssArry: THashSecuritys; sour: Pointer; Size: NativeInt; output: TCore_Stream); overload;
 
@@ -821,7 +839,7 @@ procedure GenerateSequHash(hssArry: THashSecuritys; sour: Pointer; Size: NativeI
   * Compare a freshly computed set of hashes against a stored one.
 }
 function CompareSequHash(HashVL: THashStringList; sour: Pointer; Size: NativeInt): Boolean; overload;
-function CompareSequHash(hashData: TPascalString; sour: Pointer; Size: NativeInt): Boolean; overload;
+function CompareSequHash(hashData: TCipherString; sour: Pointer; Size: NativeInt): Boolean; overload;
 function CompareSequHash(hashData: TListPascalString; sour: Pointer; Size: NativeInt): Boolean; overload;
 function CompareSequHash(hashData: TCore_Stream; sour: Pointer; Size: NativeInt): Boolean; overload;
 
@@ -829,23 +847,23 @@ function CompareSequHash(hashData: TCore_Stream; sour: Pointer; Size: NativeInt)
   * Produce a Base64-encoded blob of the hash list, wrapped in
   * parentheses. Used as a portable memory fingerprint.
 }
-function GenerateMemoryHash(hssArry: THashSecuritys; sour: Pointer; Size: NativeInt): TPascalString;
-function CompareMemoryHash(sour: Pointer; Size: NativeInt; const hashBuff: TPascalString): Boolean;
+function GenerateMemoryHash(hssArry: THashSecuritys; sour: Pointer; Size: NativeInt): TCipherString;
+function CompareMemoryHash(sour: Pointer; Size: NativeInt; const hashBuff: TCipherString): Boolean;
 
 {
   * Password hash helpers (hash-only; no encryption).
 }
-function GeneratePasswordHash(hssArry: THashSecuritys; const passwd: TPascalString): TPascalString;
-function ComparePasswordHash(const passwd, hashBuff: TPascalString): Boolean;
+function GeneratePasswordHash(hssArry: THashSecuritys; const passwd: TCipherString): TCipherString;
+function ComparePasswordHash(const passwd, hashBuff: TCipherString): Boolean;
 
 {
   * Cipher-based password helpers.
 }
-function GeneratePassword(const ca: TCipherSecurityArray; const passwd: TPascalString): TPascalString; overload;
-function ComparePassword(const ca: TCipherSecurityArray; const passwd, passwdDataSource: TPascalString): Boolean; overload;
+function GeneratePassword(const ca: TCipherSecurityArray; const passwd: TCipherString): TCipherString; overload;
+function ComparePassword(const ca: TCipherSecurityArray; const passwd, passwdDataSource: TCipherString): Boolean; overload;
 
-function GeneratePassword(const cs: TCipherSecurity; const passwd: TPascalString): TPascalString; overload;
-function ComparePassword(const cs: TCipherSecurity; const passwd, passwdDataSource: TPascalString): Boolean; overload;
+function GeneratePassword(const cs: TCipherSecurity; const passwd: TCipherString): TCipherString; overload;
+function ComparePassword(const cs: TCipherSecurity; const passwd, passwdDataSource: TCipherString): Boolean; overload;
 
 type
   {
@@ -934,28 +952,7 @@ type
       a, b: array [0 .. 24] of UInt64;
       c, d: array [0 .. 4] of UInt64;
     end;
-  private const
-    {
-      * Round constants for the Keccak-f[1600] permutation.
-    }
-    // Round constants
-    RC: array [0 .. 23] of UInt64 = (
-      $0000000000000001, $0000000000008082, $800000000000808A, $8000000080008000,
-      $000000000000808B, $0000000080000001, $8000000080008081, $8000000000008009,
-      $000000000000008A, $0000000000000088, $0000000080008009, $000000008000000A,
-      $000000008000808B, $800000000000008B, $8000000000008089, $8000000000008003,
-      $8000000000008002, $8000000000000080, $000000000000800A, $800000008000000A,
-      $8000000080008081, $8000000000008080, $0000000080000001, $8000000080008008);
-
-    {
-      * Rho rotation offsets for the Keccak-f[1600] permutation.
-    }
-    // Rotation offsets
-    RO: array [0 .. 24] of Integer = (0, 1, 62, 28, 27, 36, 44, 6, 55, 20, 3, 10, 43, 25, 39, 41, 45, 15, 21, 8, 18, 2, 61, 56, 14);
   private
-    class function ComputeX(const x: Integer): Integer;
-    class function ComputeXY(const x, y: Integer): Integer;
-    class procedure BlockSHA3(var Context: TSHA3Context);
     class procedure InitializeSHA3(var Context: TSHA3Context; HashLength: Integer);
     class procedure SHA3(var Context: TSHA3Context; Chunk: PByte; Size: NativeInt);
     class procedure FinalizeSHA3(var Context: TSHA3Context; const output: PCCByteArray);
@@ -1359,7 +1356,7 @@ type
   {
     * TCipher_Tool_DES64 - single DES instance wrapper.
   }
-  TCipher_Tool_DES64 = class(TCipher_Tool_Base)
+  TCipher_Tool_DES64 = class sealed(TCipher_Tool_Base)
   private
     FDKey, FEkey: TDESContext;
   public
@@ -1371,7 +1368,7 @@ type
   {
     * TCipher_Tool_DES128 - 2-key Triple DES instance wrapper.
   }
-  TCipher_Tool_DES128 = class(TCipher_Tool_Base)
+  TCipher_Tool_DES128 = class sealed(TCipher_Tool_Base)
   private
     FDKey, FEkey: TTripleDESContext;
   public
@@ -1383,7 +1380,7 @@ type
   {
     * TCipher_Tool_DES192 - 3-key Triple DES instance wrapper.
   }
-  TCipher_Tool_DES192 = class(TCipher_Tool_Base)
+  TCipher_Tool_DES192 = class sealed(TCipher_Tool_Base)
   private
     FDKey, FEkey: TTripleDESContext3Key;
   public
@@ -1395,7 +1392,7 @@ type
   {
     * TCipher_Tool_BlowFish - Blowfish instance wrapper.
   }
-  TCipher_Tool_BlowFish = class(TCipher_Tool_Base)
+  TCipher_Tool_BlowFish = class sealed(TCipher_Tool_Base)
   private
     Fkey: TBFContext;
   public
@@ -1407,7 +1404,7 @@ type
   {
     * TCipher_Tool_LBC - LBC instance wrapper.
   }
-  TCipher_Tool_LBC = class(TCipher_Tool_Base)
+  TCipher_Tool_LBC = class sealed(TCipher_Tool_Base)
   private
     FDKey, FEkey: TLBCContext;
   public
@@ -1419,7 +1416,7 @@ type
   {
     * TCipher_Tool_LQC - LQC instance wrapper.
   }
-  TCipher_Tool_LQC = class(TCipher_Tool_Base)
+  TCipher_Tool_LQC = class sealed(TCipher_Tool_Base)
   private
     Fkey: TKey128;
   public
@@ -1431,7 +1428,7 @@ type
   {
     * TCipher_Tool_RNG32 - 32-bit RNG stream instance wrapper.
   }
-  TCipher_Tool_RNG32 = class(TCipher_Tool_Base)
+  TCipher_Tool_RNG32 = class sealed(TCipher_Tool_Base)
   private
     Fkey: TRNG32Context;
   public
@@ -1443,7 +1440,7 @@ type
   {
     * TCipher_Tool_RNG64 - 64-bit RNG stream instance wrapper.
   }
-  TCipher_Tool_RNG64 = class(TCipher_Tool_Base)
+  TCipher_Tool_RNG64 = class sealed(TCipher_Tool_Base)
   private
     Fkey: TRNG64Context;
   public
@@ -1455,7 +1452,7 @@ type
   {
     * TCipher_Tool_LSC - LSC stream instance wrapper.
   }
-  TCipher_Tool_LSC = class(TCipher_Tool_Base)
+  TCipher_Tool_LSC = class sealed(TCipher_Tool_Base)
   private
     Fkey: TLSCContext;
   public
@@ -1467,7 +1464,7 @@ type
   {
     * TCipher_Tool_XXTea512 - XXTEA-512 instance wrapper.
   }
-  TCipher_Tool_XXTea512 = class(TCipher_Tool_Base)
+  TCipher_Tool_XXTea512 = class sealed(TCipher_Tool_Base)
   private
     Fkey: TKey128;
   public
@@ -1479,7 +1476,7 @@ type
   {
     * TCipher_Tool_RC6 - RC6 instance wrapper.
   }
-  TCipher_Tool_RC6 = class(TCipher_Tool_Base)
+  TCipher_Tool_RC6 = class sealed(TCipher_Tool_Base)
   private
     Fkey: TRC6Key;
   public
@@ -1491,7 +1488,7 @@ type
   {
     * TCipher_Tool_Serpent - Serpent instance wrapper.
   }
-  TCipher_Tool_Serpent = class(TCipher_Tool_Base)
+  TCipher_Tool_Serpent = class sealed(TCipher_Tool_Base)
   private
     Fkey: TSerpentkey;
   public
@@ -1503,7 +1500,7 @@ type
   {
     * TCipher_Tool_Mars - MARS instance wrapper.
   }
-  TCipher_Tool_Mars = class(TCipher_Tool_Base)
+  TCipher_Tool_Mars = class sealed(TCipher_Tool_Base)
   private
     Fkey: TMarskey;
   public
@@ -1515,7 +1512,7 @@ type
   {
     * TCipher_Tool_Rijndael - Rijndael instance wrapper.
   }
-  TCipher_Tool_Rijndael = class(TCipher_Tool_Base)
+  TCipher_Tool_Rijndael = class sealed(TCipher_Tool_Base)
   private
     Fkey: TRijndaelkey;
   public
@@ -1527,7 +1524,7 @@ type
   {
     * TCipher_Tool_TwoFish - Twofish instance wrapper.
   }
-  TCipher_Tool_TwoFish = class(TCipher_Tool_Base)
+  TCipher_Tool_TwoFish = class sealed(TCipher_Tool_Base)
   private
     Fkey: TTwofishKey;
   public
@@ -1539,7 +1536,7 @@ type
   {
     * TCipher_Tool_AES128 - AES-128 instance wrapper.
   }
-  TCipher_Tool_AES128 = class(TCipher_Tool_Base)
+  TCipher_Tool_AES128 = class sealed(TCipher_Tool_Base)
   private
     FDKey, FEkey: TAESExpandedKey128;
   public
@@ -1551,7 +1548,7 @@ type
   {
     * TCipher_Tool_AES192 - AES-192 instance wrapper.
   }
-  TCipher_Tool_AES192 = class(TCipher_Tool_Base)
+  TCipher_Tool_AES192 = class sealed(TCipher_Tool_Base)
   private
     FDKey, FEkey: TAESExpandedKey192;
   public
@@ -1563,7 +1560,7 @@ type
   {
     * TCipher_Tool_AES256 - AES-256 instance wrapper.
   }
-  TCipher_Tool_AES256 = class(TCipher_Tool_Base)
+  TCipher_Tool_AES256 = class sealed(TCipher_Tool_Base)
   private
     FDKey, FEkey: TAESExpandedKey256;
   public
@@ -1580,7 +1577,7 @@ function CreateCipherClass(cs: TCipherSecurity; KeyBuffer_: TCipherKeyBuffer): T
 {
   * Factory: derive a key from a password and create a cipher instance.
 }
-function CreateCipherClassFromPassword(cs: TCipherSecurity; password_: TPascalString): TCipher_Tool_Base;
+function CreateCipherClassFromPassword(cs: TCipherSecurity; password_: TCipherString): TCipher_Tool_Base;
 
 {
   * Factory: create a cipher instance from a serialized key buffer.
@@ -1612,8 +1609,8 @@ function CreateCipherClassFromBuffer(cs: TCipherSecurity; buffPtr: Pointer; Size
   ref wiki
   https://en.wikipedia.org/wiki/SHA-3
 }
-function GenerateQuantumCryptographyPassword(const passwd: TPascalString): TPascalString;
-function CompareQuantumCryptographyPassword(const passwd, passwdDataSource: TPascalString): Boolean;
+function GenerateQuantumCryptographyPassword(const passwd: TCipherString): TCipherString;
+function CompareQuantumCryptographyPassword(const passwd, passwdDataSource: TCipherString): Boolean;
 
 {
   * QuantumCryptography for Stream support: used sha-3-512 cryptography

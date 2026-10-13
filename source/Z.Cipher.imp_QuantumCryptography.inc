@@ -29,12 +29,13 @@
  * ============================================================================
  *)
 
-function GenerateQuantumCryptographyPassword(const passwd: TPascalString): TPascalString;
+function GenerateQuantumCryptographyPassword(const passwd: TCipherString): TCipherString;
 var
   buff, cryptBuff: TBytes;
   dummy: array [0 .. 0] of Byte;
   pBuff: PByte;
   nBuff: NativeInt;
+  tmp:TPascalString;
 begin
   buff := passwd.Bytes;
   SetLength(cryptBuff, 512 div 8);
@@ -57,8 +58,8 @@ begin
 
   TSHA3.SHAKE256(@cryptBuff[0], pBuff, nBuff, 512);
 
-  umlBase64EncodeBytes(cryptBuff, Result);
-  Result := '(' + Result + ')';
+  umlBase64EncodeBytes(cryptBuff, tmp);
+  Result := '(' + tmp.Text + ')';
 
   { Wipe transient buffers. }
   FillPtr(@cryptBuff[0], Length(cryptBuff), 0);
@@ -68,9 +69,9 @@ begin
   SetLength(cryptBuff, 0);
 end;
 
-function CompareQuantumCryptographyPassword(const passwd, passwdDataSource: TPascalString): Boolean;
+function CompareQuantumCryptographyPassword(const passwd, passwdDataSource: TCipherString): Boolean;
 var
-  sour: TPascalString;
+  sour: TCipherString;
   refBuff, buff, cryptBuff: TBytes;
   dummy: array [0 .. 0] of Byte;
   pBuff: PByte;

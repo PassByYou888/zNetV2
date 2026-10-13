@@ -421,7 +421,7 @@ type
     function Dec_(var x: Cardinal; const v: Cardinal): Cardinal; overload;
   end;
 {$EndRegion 'Critical'}
-{$Region 'Swap'}
+{$Region 'Swap-Exchange'}
 {
   TSwap<T> – a simple utility class to exchange two variables of the same type.
 
@@ -432,7 +432,12 @@ type
   public
     class procedure Do_(var v1, v2: T_); static;
   end;
-{$EndRegion 'Swap'}
+
+  TExchange<T_> = class
+  public
+    class procedure Do_(var v1, v2: T_); static;
+  end;
+{$EndRegion 'Swap-Exchange'}
 {$Region 'IF'}
 {
   TIF<T> – a ternary operator replacement, returning one of two values
@@ -1201,8 +1206,9 @@ type
     property Count: NativeInt read Num;                          // Alias for Num
     function GetSum: NativeInt;                                  // Returns total count across all buckets (linear scan – O(buckets))
     property Sum: NativeInt read GetSum;                         // Alias for GetSum
-    function Get_Value_Ptr(const Key: TKey_): PValue_; overload; // Returns pointer to value for a key; inserts default if missing
-    function Get_Value_Ptr(const Key: TKey_; const Default_: TValue_): PValue_; overload; // Returns pointer; inserts given default if missing
+    function Get_Or_Create_Value_Ptr(const Key: TKey_): PValue_; overload; // Returns pointer to value for a key; inserts default if missing
+    function Get_Or_Create_Value_Ptr(const Key: TKey_; const Default_: TValue_): PValue_; overload; // Returns pointer; inserts given default if missing
+    function Get_Value_Ptr___(const Key: TKey_): PValue_;        // Get pointer; creates with given default if missing
     function Get_Default_Value(const Key: TKey_; const Default_: TValue_): TValue_; // Returns value or default if missing (does not insert)
     procedure Set_Default_Value(const Key: TKey_; const Default_: TValue_); // Same as Add with overwrite=true
     function Repeat_(): TRepeat___; overload;                    // Forward iterator over all entries
@@ -1393,8 +1399,9 @@ type
     property Count: NativeInt read Num;
     function GetSum: NativeInt;                                  // Total across all buckets (O(buckets))
     property Sum: NativeInt read GetSum;
-    function Get_Value_Ptr(const Key: TKey_): PValue_; overload; // Get pointer to value; creates with NULL_VALUE if missing
-    function Get_Value_Ptr(const Key: TKey_; const Default_: TValue_): PValue_; overload; // Get pointer; creates with given default if missing
+    function Get_Or_Create_Value_Ptr(const Key: TKey_): PValue_; overload; // Get pointer to value; creates with NULL_VALUE if missing
+    function Get_Or_Create_Value_Ptr(const Key: TKey_; const Default_: TValue_): PValue_; overload; // Get pointer; creates with given default if missing
+    function Get_Value_Ptr___(const Key: TKey_): PValue_;        // Get pointer; creates with given default if missing
     function Get_Default_Value(const Key: TKey_; const Default_: TValue_): TValue_; // Get value or default (no insertion)
     procedure Set_Default_Value(const Key: TKey_; const Default_: TValue_); // Same as Add with overwrite
     function Repeat_(): TRepeat___; overload;                    // Forward iterator over all entries
@@ -2425,10 +2432,11 @@ function AtomDec(var x: Cardinal; const v: Cardinal): Cardinal; {$IFDEF INLINE_A
 
 // --- Fast memory operations ---
 procedure FillPtrByte(const dest: Pointer; Size: NativeUInt; const Value: Byte); {$IFDEF INLINE_ASM} inline; {$ENDIF INLINE_ASM} // fill memory with 8-bit value (byte)
-procedure FillPtr(const dest: Pointer; Size: NativeUInt; const Value: Byte); {$IFDEF INLINE_ASM} inline; {$ENDIF INLINE_ASM}    // alias to FillPtrByte
-procedure FillByte(const dest: Pointer; Size: NativeUInt; const Value: Byte); {$IFDEF INLINE_ASM} inline; {$ENDIF INLINE_ASM}  // alias to FillPtrByte
-function CompareMemory(const p1, p2: Pointer; Size: NativeUInt): Boolean; {$IFDEF INLINE_ASM} inline; {$ENDIF INLINE_ASM}     // returns True if two memory blocks are identical
-procedure CopyPtr(const sour, dest: Pointer; Size: NativeUInt); {$IFDEF INLINE_ASM} inline; {$ENDIF INLINE_ASM}             // copies memory (handles overlapping)
+procedure FillPtr(const dest: Pointer; Size: NativeUInt; const Value: Byte); {$IFDEF INLINE_ASM} inline; {$ENDIF INLINE_ASM}     // alias to FillPtrByte
+procedure FillByte(const dest: Pointer; Size: NativeUInt; const Value: Byte); {$IFDEF INLINE_ASM} inline; {$ENDIF INLINE_ASM}    // alias to FillPtrByte
+function CompareMemory(const p1, p2: Pointer; Size: NativeUInt): Boolean; {$IFDEF INLINE_ASM} inline; {$ENDIF INLINE_ASM}        // returns True if two memory blocks are identical
+function CompareMemoryIs0(const p: Pointer; Size: NativeUInt): Boolean; {$IFDEF INLINE_ASM} inline; {$ENDIF INLINE_ASM}          // returns True if memory is empty
+procedure CopyPtr(const sour, dest: Pointer; Size: NativeUInt); {$IFDEF INLINE_ASM} inline; {$ENDIF INLINE_ASM}                  // copies memory (handles overlapping)
 
 // --- Exception helpers ---
 procedure RaiseInfo(const n: string); overload; // raises an exception with the given message
@@ -2566,7 +2574,6 @@ var
   // invocation (including its source location) without interfering
   // with the raise itself. Set to nil to disable.
   On_Raise_Info_Detail: procedure(const Msg: string; Caller_Address: Pointer) = nil;
-
   // boot thread
   Boot_Thread: TCore_Thread; // boot-thread
   Boot_Thread_ID: TThreadID; // boot-thread-id
@@ -2576,7 +2583,6 @@ var
   Main_Thread_ID: TThreadID; // core main-thread-id
   Main_Thread_Soft_Synchronize: Boolean; // core soft thread synchronize simulator
   Main_Thread_Sync_Tool: TSoft_Synchronize_Tool; // core synchronize tool for main-thread
-
   // Check Synchronize for main-thread
   Enabled_Check_Thread_Synchronize_System: Boolean;
   Main_Thread_Synchronize_Running: Boolean;

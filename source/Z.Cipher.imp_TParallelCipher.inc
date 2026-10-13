@@ -1474,12 +1474,12 @@ end;
  * ============================================================================
  *}
 
-function GenerateSequHash(hssArry: THashSecuritys; sour: Pointer; Size: NativeInt): TPascalString;
+function GenerateSequHash(hssArry: THashSecuritys; sour: Pointer; Size: NativeInt): TCipherString;
 var
   h: THashSecurity;
   vl: THashStringList;
   hBuff: TBytes;
-  n: SystemString;
+  n: TCipherSystemString;
 begin
   vl := THashStringList.Create;
   try
@@ -1502,7 +1502,7 @@ var
   h: THashSecurity;
   vl: THashStringList;
   hBuff: TBytes;
-  n: SystemString;
+  n: TCipherSystemString;
 begin
   vl := THashStringList.Create;
   try
@@ -1525,7 +1525,7 @@ var
   h: THashSecurity;
   vl: THashStringList;
   hBuff: TBytes;
-  n: SystemString;
+  n: TCipherSystemString;
 begin
   vl := THashStringList.Create;
   try
@@ -1547,8 +1547,8 @@ var
   ns: TListString;
   i: Integer;
   sourHash, destHash: TBytes;
-  hName: SystemString;
-  hValue: TPascalString;
+  hName: TCipherSystemString;
+  hValue: TCipherString;
   h: THashSecurity;
 begin
   Result := True;
@@ -1583,7 +1583,7 @@ begin
   end;
 end;
 
-function CompareSequHash(hashData: TPascalString; sour: Pointer; Size: NativeInt): Boolean;
+function CompareSequHash(hashData: TCipherString; sour: Pointer; Size: NativeInt): Boolean;
 var
   vl: THashStringList;
 begin
@@ -1626,23 +1626,24 @@ end;
  * GenerateMemoryHash ¡ª produce a Base64-encoded blob of the hash list,
  * wrapped in parentheses. Used as a portable fingerprint.
  *}
-function GenerateMemoryHash(hssArry: THashSecuritys; sour: Pointer; Size: NativeInt): TPascalString;
+function GenerateMemoryHash(hssArry: THashSecuritys; sour: Pointer; Size: NativeInt): TCipherString;
 var
   m64: TMS64;
+  tmp: TPascalString;
 begin
   m64 := TMS64.Create;
   try
     GenerateSequHash(hssArry, sour, Size, m64);
-    umlEncodeStreamBASE64(m64, Result);
-    Result := '(' + Result + ')';
+    umlEncodeStreamBASE64(m64, tmp);
+    Result := '(' + tmp.Text + ')';
   finally
     disposeObject(m64);
   end;
 end;
 
-function CompareMemoryHash(sour: Pointer; Size: NativeInt; const hashBuff: TPascalString): Boolean;
+function CompareMemoryHash(sour: Pointer; Size: NativeInt; const hashBuff: TCipherString): Boolean;
 var
-  n: TPascalString;
+  n: TCipherString;
   m64: TMS64;
 begin
   Result := False;
@@ -1664,10 +1665,11 @@ end;
 {
  * Password hash helpers (hash-only; no encryption).
  *}
-function GeneratePasswordHash(hssArry: THashSecuritys; const passwd: TPascalString): TPascalString;
+function GeneratePasswordHash(hssArry: THashSecuritys; const passwd: TCipherString): TCipherString;
 var
   buff: TBytes;
   m64: TMS64;
+  tmp:TPascalString;
 begin
   buff := passwd.Bytes;
   m64 := TMS64.Create;
@@ -1686,8 +1688,8 @@ begin
       begin
         GenerateSequHash(hssArry, @buff[0], Length(buff), m64);
       end;
-    umlEncodeStreamBASE64(m64, Result);
-    Result := '(' + Result + ')';
+    umlEncodeStreamBASE64(m64, tmp);
+    Result := '(' + tmp.Text + ')';
   finally
     disposeObject(m64);
     if Length(buff) > 0 then
@@ -1696,9 +1698,9 @@ begin
   end;
 end;
 
-function ComparePasswordHash(const passwd, hashBuff: TPascalString): Boolean;
+function ComparePasswordHash(const passwd, hashBuff: TCipherString): Boolean;
 var
-  n: TPascalString;
+  n: TCipherString;
   buff: TBytes;
   m64: TMS64;
 begin
@@ -1728,10 +1730,11 @@ end;
 {
  * Cipher-based password helpers.
  *}
-function GeneratePassword(const ca: TCipherSecurityArray; const passwd: TPascalString): TPascalString;
+function GeneratePassword(const ca: TCipherSecurityArray; const passwd: TCipherString): TCipherString;
 var
   KeyBuff: TBytes;
   buff: TBytes;
+  tmp:TPascalString;
 begin
   KeyBuff := passwd.Bytes;
   buff := passwd.Bytes;
@@ -1748,8 +1751,8 @@ begin
     end;
 
   SequEncryptCBC(ca, @buff[0], Length(buff), KeyBuff, True, False);
-  umlBase64EncodeBytes(buff, Result);
-  Result := '(' + Result + ')';
+  umlBase64EncodeBytes(buff, tmp);
+  Result := '(' + tmp.Text + ')';
 
   if Length(buff) > 0 then FillPtr(@buff[0], Length(buff), 0);
   if Length(KeyBuff) > 0 then FillPtr(@KeyBuff[0], Length(KeyBuff), 0);
@@ -1757,9 +1760,9 @@ begin
   SetLength(KeyBuff, 0);
 end;
 
-function ComparePassword(const ca: TCipherSecurityArray; const passwd, passwdDataSource: TPascalString): Boolean;
+function ComparePassword(const ca: TCipherSecurityArray; const passwd, passwdDataSource: TCipherString): Boolean;
 var
-  sour: TPascalString;
+  sour: TCipherString;
   refBuff: TBytes;
   KeyBuff: TBytes;
 begin
@@ -1794,10 +1797,11 @@ begin
     end;
 end;
 
-function GeneratePassword(const cs: TCipherSecurity; const passwd: TPascalString): TPascalString;
+function GeneratePassword(const cs: TCipherSecurity; const passwd: TCipherString): TCipherString;
 var
   KeyBuff: TBytes;
   buff: TBytes;
+  tmp:TPascalString;
 begin
   KeyBuff := passwd.Bytes;
   buff := passwd.Bytes;
@@ -1809,8 +1813,8 @@ begin
     end;
 
   SequEncryptCBC(cs, @buff[0], Length(buff), KeyBuff, True, False);
-  umlBase64EncodeBytes(buff, Result);
-  Result := '(' + Result + ')';
+  umlBase64EncodeBytes(buff, tmp);
+  Result := '(' + tmp.Text + ')';
 
   if Length(buff) > 0 then FillPtr(@buff[0], Length(buff), 0);
   if Length(KeyBuff) > 0 then FillPtr(@KeyBuff[0], Length(KeyBuff), 0);
@@ -1818,9 +1822,9 @@ begin
   SetLength(KeyBuff, 0);
 end;
 
-function ComparePassword(const cs: TCipherSecurity; const passwd, passwdDataSource: TPascalString): Boolean;
+function ComparePassword(const cs: TCipherSecurity; const passwd, passwdDataSource: TCipherString): Boolean;
 var
-  sour: TPascalString;
+  sour: TCipherString;
   refBuff: TBytes;
   KeyBuff: TBytes;
 begin

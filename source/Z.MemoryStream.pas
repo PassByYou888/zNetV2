@@ -402,17 +402,13 @@ type
     procedure WriteSingle(const buff: Single);
     procedure WriteDouble(const buff: Double);
     procedure WriteCurrency(const buff: Currency);
-    { *
-      * WriteString: Writes a TPascalString as UTF‑8.
-      * Format: 4‑byte length (UInt32) followed by the UTF‑8 bytes.
-    }
-    procedure WriteString(const buff: TPascalString);
-    { *
-      * WriteANSI: Writes the ANSI (system code page) bytes of the string.
-      * No length prefix is written.
-    }
+    procedure WriteString(const buff: TPascalString); overload;
     procedure WriteANSI(const buff: TPascalString); overload;
     procedure WriteANSI(const buff: TPascalString; const L: Integer); overload;
+    procedure WriteUString(const buff: TUPascalString); overload;
+    procedure WriteUANSI(const buff: TUPascalString); overload;
+    procedure WriteUANSI(const buff: TUPascalString; const L: Integer); overload;
+
     procedure WriteMD5(const buff: TMD5);
 
     { ****** Typed read methods ********** }
@@ -682,9 +678,12 @@ type
     procedure WriteSingle(const buff: Single);
     procedure WriteDouble(const buff: Double);
     procedure WriteCurrency(const buff: Currency);
-    procedure WriteString(const buff: TPascalString);
+    procedure WriteString(const buff: TPascalString); overload;
     procedure WriteANSI(const buff: TPascalString); overload;
     procedure WriteANSI(const buff: TPascalString; const L: Integer); overload;
+    procedure WriteUString(const buff: TUPascalString); overload;
+    procedure WriteUANSI(const buff: TUPascalString); overload;
+    procedure WriteUANSI(const buff: TUPascalString; const L: Integer); overload;
     procedure WriteMD5(const buff: TMD5);
 
     function ReadBool: Boolean;
@@ -868,7 +867,7 @@ procedure DoStatus(const v: TMem64); overload;
 
 implementation
 
-uses Z.UnicodeMixedLib, Z.Status, Z.Compress, Z.Instance.Tool, Z.LZ4_Pas, Z.Snappy_Pas;
+uses Z.Status, Z.Compress, Z.Instance.Tool, Z.LZ4_Pas, Z.Snappy_Pas, Z.MD5;
 
 { * TMS64 implementation }
 
@@ -924,7 +923,7 @@ begin
           else
               Result := System.ReallocMemory(Result, NewCapacity);
           if Result = nil then
-              RaiseInfo('%s Out of memory while expanding memory stream', [umlSizeToStr(NewCapacity).Text]);
+              RaiseInfo('%d Out of memory while expanding memory stream', [NewCapacity]);
         end;
     end;
 end;
@@ -932,7 +931,7 @@ end;
 procedure TMS64.SetDelta(const Value: NativeInt);
 { * Clamps the delta between 64 and 1MB (1024*1024). }
 begin
-  FDelta := umlClamp(Value, 64, 1024 * 1024);
+  FDelta := Clamp(Value, 64, 1024 * 1024);
 end;
 
 constructor TMS64.Create;
@@ -1136,7 +1135,7 @@ end;
 function TMS64.ToMD5: TMD5;
 { * Computes MD5 over the entire buffer. }
 begin
-  Result := umlMD5(Memory, Size);
+  Result := FastMD5(Memory, Size);
 end;
 
 function TMS64.Same(source: TMem64): Boolean;
@@ -1701,6 +1700,50 @@ begin
     end;
 end;
 
+procedure TMS64.WriteUString(const buff: TUPascalString);
+{ *
+  * Writes a TUPascalString as UTF‑8 with a 4‑byte length prefix.
+  * Example:
+  *   ms.WriteString('Hello'); // writes length=5 then bytes.
+}
+var
+  b: TBytes;
+begin
+  b := buff.Bytes;
+  WriteUInt32(Length(b));
+  if Length(b) > 0 then
+    begin
+      WritePtr(@b[0], Length(b));
+      SetLength(b, 0);
+    end;
+end;
+
+procedure TMS64.WriteUANSI(const buff: TUPascalString);
+{ * Writes the ANSI bytes without length prefix. }
+var
+  b: TBytes;
+begin
+  b := buff.ANSI;
+  if Length(b) > 0 then
+    begin
+      WritePtr(@b[0], Length(b));
+      SetLength(b, 0);
+    end;
+end;
+
+procedure TMS64.WriteUANSI(const buff: TUPascalString; const L: Integer);
+{ * Writes exactly L ANSI bytes (truncates or pads if necessary). }
+var
+  b: TBytes;
+begin
+  b := buff.ANSI;
+  if L > 0 then
+    begin
+      WritePtr(@b[0], L);
+      SetLength(b, 0);
+    end;
+end;
+
 procedure TMS64.WriteMD5(const buff: TMD5);
 begin
   WritePtr(@buff, 16);
@@ -1798,6 +1841,7 @@ var
 begin
   try
     L := ReadUInt32;
+    L := Min(L, Max(Size - Position, 0));
     if L > 0 then
       begin
         SetLength(b, L);
@@ -1817,6 +1861,7 @@ var
 begin
   try
     L := ReadUInt32;
+    L := Min(L, Max(Size - Position, 0));
     if L > 0 then
       begin
         SetLength(Result, L);
@@ -1833,16 +1878,12 @@ procedure TMS64.IgnoreReadString;
 { * Skips over a string without reading its data. }
 var
   L: Cardinal;
-  b: TBytes;
 begin
   try
     L := ReadUInt32;
+    L := Min(L, Max(Size - Position, 0));
     if L > 0 then
-      begin
-        SetLength(b, L);
-        ReadPtr(@b[0], L);
-        SetLength(b, 0);
-      end;
+        Position := Position + L;
   except
   end;
 end;
@@ -2053,7 +2094,7 @@ begin
           else
               Result := System.ReallocMemory(Result, NewCapacity);
           if Result = nil then
-              RaiseInfo('%s Out of memory while expanding memory stream', [umlSizeToStr(NewCapacity).Text]);
+              RaiseInfo('%d Out of memory while expanding memory stream', [NewCapacity]);
         end;
     end;
 end;
@@ -2065,7 +2106,7 @@ end;
 
 procedure TMem64.SetDelta(const Value: NativeInt);
 begin
-  FDelta := umlClamp(Value, 64, 1024 * 1024);
+  FDelta := Clamp(Value, 64, 1024 * 1024);
 end;
 
 function TMem64.GetMemory_: Pointer;
@@ -2286,7 +2327,7 @@ end;
 
 function TMem64.ToMD5: TMD5;
 begin
-  Result := umlMD5(Memory, Size);
+  Result := FastMD5(Memory, Size);
 end;
 
 function TMem64.Same(source: TMem64): Boolean;
@@ -2697,6 +2738,43 @@ begin
     end;
 end;
 
+procedure TMem64.WriteUString(const buff: TUPascalString);
+var
+  b: TBytes;
+begin
+  b := buff.Bytes;
+  WriteUInt32(Length(b));
+  if Length(b) > 0 then
+    begin
+      WritePtr(@b[0], Length(b));
+      SetLength(b, 0);
+    end;
+end;
+
+procedure TMem64.WriteUANSI(const buff: TUPascalString);
+var
+  b: TBytes;
+begin
+  b := buff.ANSI;
+  if Length(b) > 0 then
+    begin
+      WritePtr(@b[0], Length(b));
+      SetLength(b, 0);
+    end;
+end;
+
+procedure TMem64.WriteUANSI(const buff: TUPascalString; const L: Integer);
+var
+  b: TBytes;
+begin
+  b := buff.ANSI;
+  if L > 0 then
+    begin
+      WritePtr(@b[0], L);
+      SetLength(b, 0);
+    end;
+end;
+
 procedure TMem64.WriteMD5(const buff: TMD5);
 begin
   WritePtr(@buff, 16);
@@ -2783,6 +2861,7 @@ var
   b: TBytes;
 begin
   L := ReadUInt32;
+  L := Min(L, Max(Size - Position, 0));
   if L > 0 then
     begin
       try
@@ -2802,6 +2881,7 @@ var
 begin
   try
     L := ReadUInt32;
+    L := Min(L, Max(Size - Position, 0));
     if L > 0 then
       begin
         SetLength(Result, L);
@@ -2817,18 +2897,11 @@ end;
 procedure TMem64.IgnoreReadString;
 var
   L: Cardinal;
-  b: TBytes;
 begin
   L := ReadUInt32;
+  L := Min(L, Max(Size - Position, 0));
   if L > 0 then
-    begin
-      try
-        SetLength(b, L);
-        ReadPtr(@b[0], L);
-        SetLength(b, 0);
-      except
-      end;
-    end;
+      Position := Position + L;
 end;
 
 function TMem64.ReadANSI(L: Integer): TPascalString;
@@ -3270,7 +3343,7 @@ end;
 procedure ParallelCompressMemory(const scm: TSelectCompressionMethod; const StripNum_: Integer; const sour: TMS64; const dest: TCore_Stream);
 { * Uses up to 4 threads (or ParallelGranularity). }
 begin
-  ParallelCompressMemory(umlMin(4, Get_Parallel_Granularity), scm, StripNum_, sour, dest);
+  ParallelCompressMemory(Min(4, Get_Parallel_Granularity), scm, StripNum_, sour, dest);
 end;
 
 procedure ParallelCompressMemory(const scm: TSelectCompressionMethod; const sour: TMS64; const dest: TCore_Stream);
@@ -3426,7 +3499,7 @@ end;
 procedure ParallelDecompressStream(const sour_, dest_: TCore_Stream);
 { * Uses up to 4 threads. }
 begin
-  ParallelDecompressStream(umlMin(4, Get_Parallel_Granularity), sour_, dest_);
+  ParallelDecompressStream(Min(4, Get_Parallel_Granularity), sour_, dest_);
 end;
 
 procedure ParallelCompressFile(const sour, dest: SystemString);

@@ -1,4 +1,4 @@
-{$IFDEF FPC}
+ï»¿{$IFDEF FPC}
   {$UNDEF FPC_DEBUG}
 
   {$IFDEF FPC_DELPHI_MODE}
@@ -107,13 +107,13 @@
     {$DEFINE release}
     {$DEFINE INLINE_ASM}
     {$OPTIMIZATION LEVEL2}
-    {$S-}   { No stack checks ¨C faster, but risk of silent stack overflow }
+    {$S-}   { No stack checks â€“ faster, but risk of silent stack overflow }
   {$ENDIF FPC_DEBUG}
 
   {$CODEPAGE UTF8}
   {$PACKENUM 4}    
-  {$R-}   { No range checks ¨C faster, assumes all indices are valid }
-  {$I-}   { No I/O checks ¨C faster, use IOResult to handle errors manually }
+  {$R-}   { No range checks â€“ faster, assumes all indices are valid }
+  {$I-}   { No I/O checks â€“ faster, use IOResult to handle errors manually }
 
 {$ELSE FPC} { IF DELPHI }
   {$DEFINE Delphi}

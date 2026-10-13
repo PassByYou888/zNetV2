@@ -7,15 +7,15 @@
   *   2. HashToString(hash: TBytes; ...): guard against empty TBytes so
   *      @hash[0] is never dereferenced when Length = 0.
   *   3. CopyKey: guard against empty TCipherKeyBuffer.
-  *   4. GenerateKeyXX(const s: TPascalString; ...) family: empty s.Bytes
+  *   4. GenerateKeyXX(const s: TCipherString; ...) family: empty s.Bytes
   *      would make GenerateLMDKey dereference Bytes_[0] out of bounds.
   *      Fixed by explicitly zeroing the key material via FillPtr when the
-  *      input string is empty.
+  *      input TCipherSystemString is empty.
   *   5. GenerateKeyXX(sour: Pointer; Size: NativeInt; ...) family:
   *      guard Size <= 0 before dereferencing sour^.
   *   6. GenerateKey(const key: PByte; Size: DWORD; ...):
   *      guard Size = 0 / key = nil.
-  *   7. GenerateKey(cs, s: TPascalString): guard empty s before @buff[0].
+  *   7. GenerateKey(cs, s: TCipherString): guard empty s before @buff[0].
   *   8. GetKey(...; var key: TBytes): guard against zero-length stored key.
   *
   * Conventions (project-wide):
@@ -43,7 +43,7 @@ begin
   Result := arry[umlRR(Low(arry), High(arry))];
 end;
 
-class function TCipher.NameToHashSecurity(n: SystemString; var hash: THashSecurity): Boolean;
+class function TCipher.NameToHashSecurity(n: TCipherSystemString; var hash: THashSecurity): Boolean;
 var
   h: THashSecurity;
 begin
@@ -57,17 +57,17 @@ begin
       end;
 end;
 
-class function TCipher.BuffToString(buff: Pointer; Size: NativeInt): TPascalString;
+class function TCipher.BuffToString(buff: Pointer; Size: NativeInt): TCipherString;
 begin
   HashToString(buff, Size, Result);
 end;
 
-class function TCipher.StringToBuff(const Hex: TPascalString; var Buf; BufSize: Cardinal): Boolean;
+class function TCipher.StringToBuff(const Hex: TCipherString; var Buf; BufSize: Cardinal): Boolean;
 begin
   Result := HexToBuffer(Hex, Buf, BufSize);
 end;
 
-class procedure TCipher.HashToString(hash: Pointer; Size: NativeInt; var output: TPascalString);
+class procedure TCipher.HashToString(hash: Pointer; Size: NativeInt; var output: TCipherString);
 const
   HexArr: array [0 .. 15] of U_Char = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f');
 var
@@ -87,47 +87,47 @@ begin
     end;
 end;
 
-class procedure TCipher.HashToString(hash: TSHA3_224_Digest; var output: TPascalString);
+class procedure TCipher.HashToString(hash: TSHA3_224_Digest; var output: TCipherString);
 begin
   HashToString(@hash[0], SizeOf(hash), output);
 end;
 
-class procedure TCipher.HashToString(hash: TSHA3_256_Digest; var output: TPascalString);
+class procedure TCipher.HashToString(hash: TSHA3_256_Digest; var output: TCipherString);
 begin
   HashToString(@hash[0], SizeOf(hash), output);
 end;
 
-class procedure TCipher.HashToString(hash: TSHA3_384_Digest; var output: TPascalString);
+class procedure TCipher.HashToString(hash: TSHA3_384_Digest; var output: TCipherString);
 begin
   HashToString(@hash[0], SizeOf(hash), output);
 end;
 
-class procedure TCipher.HashToString(hash: TSHA3_512_Digest; var output: TPascalString);
+class procedure TCipher.HashToString(hash: TSHA3_512_Digest; var output: TCipherString);
 begin
   HashToString(@hash[0], SizeOf(hash), output);
 end;
 
-class procedure TCipher.HashToString(hash: TSHA512Digest; var output: TPascalString);
+class procedure TCipher.HashToString(hash: TSHA512Digest; var output: TCipherString);
 begin
   HashToString(@hash[0], SizeOf(hash), output);
 end;
 
-class procedure TCipher.HashToString(hash: TSHA256Digest; var output: TPascalString);
+class procedure TCipher.HashToString(hash: TSHA256Digest; var output: TCipherString);
 begin
   HashToString(@hash[0], SizeOf(hash), output);
 end;
 
-class procedure TCipher.HashToString(hash: TSHA1Digest; var output: TPascalString);
+class procedure TCipher.HashToString(hash: TSHA1Digest; var output: TCipherString);
 begin
   HashToString(@hash[0], SizeOf(hash), output);
 end;
 
-class procedure TCipher.HashToString(hash: TMD5Digest; var output: TPascalString);
+class procedure TCipher.HashToString(hash: TMD5Digest; var output: TCipherString);
 begin
   HashToString(@hash[0], SizeOf(hash), output);
 end;
 
-class procedure TCipher.HashToString(hash: TBytes; var output: TPascalString);
+class procedure TCipher.HashToString(hash: TBytes; var output: TCipherString);
 begin
   { FIX: guard empty TBytes to avoid @hash[0] out-of-bounds access. }
   if Length(hash) = 0 then
@@ -138,9 +138,9 @@ begin
   HashToString(@hash[0], Length(hash), output);
 end;
 
-class procedure TCipher.HashToString(hash: TBytes; var output: SystemString);
+class procedure TCipher.HashToString(hash: TBytes; var output: TCipherSystemString);
 var
-  s: TPascalString;
+  s: TCipherString;
 begin
   if Length(hash) = 0 then
     begin
@@ -149,6 +149,83 @@ begin
     end;
   HashToString(@hash[0], Length(hash), s);
   output := s.Text;
+end;
+
+class function TCipher.HashToString(hash: TSHA3_224_Digest): TCipherSystemString;
+var
+  s: TCipherString;
+begin
+  HashToString(@hash[0], SizeOf(hash), s);
+  Result := s.Text;
+end;
+
+class function TCipher.HashToString(hash: TSHA3_256_Digest): TCipherSystemString;
+var
+  s: TCipherString;
+begin
+  HashToString(@hash[0], SizeOf(hash), s);
+  Result := s.Text;
+end;
+
+class function TCipher.HashToString(hash: TSHA3_384_Digest): TCipherSystemString;
+var
+  s: TCipherString;
+begin
+  HashToString(@hash[0], SizeOf(hash), s);
+  Result := s.Text;
+end;
+
+class function TCipher.HashToString(hash: TSHA3_512_Digest): TCipherSystemString;
+var
+  s: TCipherString;
+begin
+  HashToString(@hash[0], SizeOf(hash), s);
+  Result := s.Text;
+end;
+
+class function TCipher.HashToString(hash: TSHA512Digest): TCipherSystemString;
+var
+  s: TCipherString;
+begin
+  HashToString(@hash[0], SizeOf(hash), s);
+  Result := s.Text;
+end;
+
+class function TCipher.HashToString(hash: TSHA256Digest): TCipherSystemString;
+var
+  s: TCipherString;
+begin
+  HashToString(@hash[0], SizeOf(hash), s);
+  Result := s.Text;
+end;
+
+class function TCipher.HashToString(hash: TSHA1Digest): TCipherSystemString;
+var
+  s: TCipherString;
+begin
+  HashToString(@hash[0], SizeOf(hash), s);
+  Result := s.Text;
+end;
+
+class function TCipher.HashToString(hash: TMD5Digest): TCipherSystemString;
+var
+  s: TCipherString;
+begin
+  HashToString(@hash[0], SizeOf(hash), s);
+  Result := s.Text;
+end;
+
+class function TCipher.HashToString(hash: TBytes): TCipherSystemString;
+var
+  s: TCipherString;
+begin
+  if Length(hash) = 0 then
+    begin
+      Result := '';
+      Exit;
+    end;
+  HashToString(@hash[0], Length(hash), s);
+  Result := s.Text;
 end;
 
 class function TCipher.CompareHash(h1, h2: TSHA3_224_Digest): Boolean;
@@ -416,7 +493,7 @@ begin
   end;
 end;
 
-class function TCipher.GenerateHashString(hs: THashSecurity; sour: Pointer; Size: NativeInt): TPascalString;
+class function TCipher.GenerateHashString(hs: THashSecurity; sour: Pointer; Size: NativeInt): TCipherString;
 var
   h: TBytes;
 begin
@@ -425,17 +502,17 @@ begin
   SetLength(h, 0);
 end;
 
-class function TCipher.BufferToHex(const Buf; BufSize: Cardinal): TPascalString;
+class function TCipher.BufferToHex(const Buf; BufSize: Cardinal): TCipherString;
 begin
   Result := BuffToString(@Buf, BufSize);
 end;
 
-class function TCipher.HexToBuffer(const Hex: TPascalString; var Buf; BufSize: Cardinal): Boolean;
+class function TCipher.HexToBuffer(const Hex: TCipherString; var Buf; BufSize: Cardinal): Boolean;
 var
   i, c: Integer;
   tmp: TMem64;
   num: Integer;
-  cc: SystemChar;
+  cc: TCipherChar;
 begin
   Result := True;
   FillPtr(@Buf, BufSize, 0);
@@ -446,18 +523,18 @@ begin
       if Hex.L mod 2 > 0 then
         begin
           cc := '0';
-          tmp.Write64(cc, SizeOf(SystemChar));
+          tmp.Write64(cc, SizeOf(TCipherChar));
         end;
       for cc in Hex.buff do
         if CharIn(cc, cHex) then
-            tmp.Write64(cc, SizeOf(SystemChar));
+            tmp.Write64(cc, SizeOf(TCipherChar));
 
-      num := umlMin((tmp.Size div SizeOf(SystemChar)) shr 1, BufSize);
+      num := umlMin((tmp.Size div SizeOf(TCipherChar)) shr 1, BufSize);
       for i := 0 to num - 1 do
         begin
           Val('$' +
-              PSystemChar(tmp.PositionAsPtr((i * 2) * SizeOf(SystemChar)))^ +
-              PSystemChar(tmp.PositionAsPtr((i * 2 + 1) * SizeOf(SystemChar)))^,
+              PSystemChar(tmp.PositionAsPtr((i * 2) * SizeOf(TCipherChar)))^ +
+              PSystemChar(tmp.PositionAsPtr((i * 2 + 1) * SizeOf(TCipherChar)))^,
             TCCByteArray(Buf)[i], c);
           Result := Result and (c = 0);
         end;
@@ -480,14 +557,14 @@ begin
 end;
 
 { ===============================================================================
-  Key generation ¡ª string sources
+  Key generation ¡ª TCipherSystemString sources
 
   Empty input strings are treated as "all-zero key material". We must NOT
   call THashMD.GenerateLMDKey with an empty TBytes because it would
   dereference Bytes_[0] out of bounds.
   =============================================================================== }
 
-class procedure TCipher.GenerateKey64(const s: TPascalString; var output: TCipherKeyBuffer);
+class procedure TCipher.GenerateKey64(const s: TCipherString; var output: TCipherKeyBuffer);
 var
   bytes_: TBytes;
 begin
@@ -510,7 +587,7 @@ begin
       THashMD.HashLMD((@output[1])^, cKey64Size, sour^, Size);
 end;
 
-class procedure TCipher.GenerateKey128(const s: TPascalString; var output: TCipherKeyBuffer);
+class procedure TCipher.GenerateKey128(const s: TCipherString; var output: TCipherKeyBuffer);
 var
   bytes_: TBytes;
 begin
@@ -533,7 +610,7 @@ begin
       THashMD.HashLMD((@output[1])^, cKey128Size, sour^, Size);
 end;
 
-class procedure TCipher.GenerateKey256(const s: TPascalString; var output: TCipherKeyBuffer);
+class procedure TCipher.GenerateKey256(const s: TCipherString; var output: TCipherKeyBuffer);
 var
   bytes_: TBytes;
 begin
@@ -556,7 +633,7 @@ begin
       THashMD.HashLMD((@output[1])^, cKey256Size, sour^, Size);
 end;
 
-class procedure TCipher.Generate3Key64(const s: TPascalString; var output: TCipherKeyBuffer);
+class procedure TCipher.Generate3Key64(const s: TCipherString; var output: TCipherKeyBuffer);
 var
   bytes_: TBytes;
 begin
@@ -579,7 +656,7 @@ begin
       THashMD.HashLMD((@output[1])^, cKey192Size, sour^, Size);
 end;
 
-class procedure TCipher.Generate2IntKey(const s: TPascalString; var output: TCipherKeyBuffer);
+class procedure TCipher.Generate2IntKey(const s: TCipherString; var output: TCipherKeyBuffer);
 var
   bytes_: TBytes;
 begin
@@ -602,7 +679,7 @@ begin
       THashMD.HashLMD((@output[1])^, cKey2DWORDSize, sour^, Size);
 end;
 
-class procedure TCipher.GenerateIntKey(const s: TPascalString; var output: TCipherKeyBuffer);
+class procedure TCipher.GenerateIntKey(const s: TCipherString; var output: TCipherKeyBuffer);
 var
   bytes_: TBytes;
 begin
@@ -625,7 +702,7 @@ begin
       THashMD.HashLMD((@output[1])^, cKeyDWORDSize, sour^, Size);
 end;
 
-class procedure TCipher.GenerateBytesKey(const s: TPascalString; KeySize: DWORD; var output: TCipherKeyBuffer);
+class procedure TCipher.GenerateBytesKey(const s: TCipherString; KeySize: DWORD; var output: TCipherKeyBuffer);
 var
   bytes_: TBytes;
 begin
@@ -738,7 +815,7 @@ begin
   end;
 end;
 
-class procedure TCipher.GenerateKey(cs: TCipherSecurity; s: TPascalString; var output: TCipherKeyBuffer);
+class procedure TCipher.GenerateKey(cs: TCipherSecurity; s: TCipherString; var output: TCipherKeyBuffer);
 var
   buff: TBytes;
   key: TBytes;

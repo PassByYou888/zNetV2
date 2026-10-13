@@ -581,7 +581,6 @@ type
 {$ELSE FPC}
   TOnBatchProc = reference to procedure(bPos, ePos: Integer; sour, dest: PPascalString; var Accept: Boolean);
 {$ENDIF FPC}
-
   { TOnBatchProc – callback for batch replacement, invoked for each match. Parameters: bPos, ePos (source positions), sour, dest (pointers to the matched pattern and its replacement), and Accept (can be used to abort). }
 function umlBuildBatch(L: THashStringList): TArrayBatch; overload; { Build a batch array from a THashStringList (key->value). }
 function umlBuildBatch(L: THashVariantList): TArrayBatch; overload; { Build a batch array from a THashVariantList (key->value). }
@@ -690,16 +689,18 @@ function umlBase64Encode(InBuffer: PByte; InSize: Integer; OutBuffer: PByte; var
 function umlBase64Decode(InBuffer: PByte; InSize: Integer; OutBuffer: PByte; var OutSize: Integer; LiberalMode: Boolean): Integer; { High-level Base64 decode with liberal mode (ignore invalid chars). }
 procedure umlBase64EncodeBytes(var sour, dest: TBytes); overload; { Base64 encode a TBytes array to another TBytes. }
 procedure umlBase64DecodeBytes(var sour, dest: TBytes); overload; { Base64 decode a TBytes array to another TBytes. }
+
 procedure umlBase64EncodeBytes(var sour: TBytes; var dest: TPascalString); overload; { Base64 encode a TBytes array to a TPascalString. }
 procedure umlBase64DecodeBytes(const sour: TPascalString; var dest: TBytes); overload; { Base64 decode a TPascalString to a TBytes. }
 procedure umlDecodeLineBASE64(const buffer: TPascalString; var output: TPascalString); overload; { Decode a Base64 string and store result in output TPascalString. }
 procedure umlEncodeLineBASE64(const buffer: TPascalString; var output: TPascalString); overload; { Encode a TPascalString to Base64. }
 function umlDecodeLineBASE64(const buffer: TPascalString): TPascalString; overload; { Return decoded Base64 string as TPascalString. }
 function umlEncodeLineBASE64(const buffer: TPascalString): TPascalString; overload; { Return encoded Base64 string. }
-procedure umlDecodeStreamBASE64(const buffer: TPascalString; output: TCore_Stream); { Decode Base64 from a TPascalString and write decoded bytes to a stream. }
-procedure umlEncodeStreamBASE64(buffer: TCore_Stream; var output: TPascalString); { Encode a stream's content to Base64 and return as a string. }
-function umlDivisionBase64Text(const buffer: TPascalString; width: Integer; DivisionAsPascalString: Boolean): TPascalString; { Format a Base64 string with line breaks at specified width, optionally as Pascal string literal. }
-function umlTestBase64(const text: TPascalString): Boolean; { Test if a string appears to be valid Base64 (can decode without error). }
+procedure umlDecodeStreamBASE64(const buffer: TPascalString; output: TCore_Stream); overload; { Decode Base64 from a TPascalString and write decoded bytes to a stream. }
+procedure umlEncodeStreamBASE64(buffer: TCore_Stream; var output: TPascalString); overload; { Encode a stream's content to Base64 and return as a string. }
+function umlDivisionBase64Text(const buffer: TPascalString; width: Integer; DivisionAsPascalString: Boolean): TPascalString; overload; { Format a Base64 string with line breaks at specified width, optionally as Pascal string literal. }
+function umlTestBase64(const text: TPascalString): Boolean; overload; { Test if a string appears to be valid Base64 (can decode without error). }
+
 
 type
   TMD5_Pool = TGenericsList<TMD5>; { TMD5_Pool – generic list of MD5 digests. }
@@ -774,6 +775,7 @@ procedure umlCacheFileMD5(FileName: U_String); { Asynchronously cache MD5 of a f
 procedure umlCacheFileMD5FromDirectory(Directory_, Filter_: U_String); { Asynchronously cache MD5 of all files in a directory matching a filter. }
 
 {$REGION 'crc16define'}
+
 
 const
   CRC16Table: array [0 .. 255] of Word = (
@@ -1184,7 +1186,7 @@ begin
         end;
       varBoolean: Result := umlBoolToStr(v);
       else
-        Result := VarToStr(v);
+          Result := VarToStr(v);
     end;
   except
     try
@@ -4230,12 +4232,12 @@ end;
 
 function umlIntToStr(Parameter: Int128): TPascalString;
 begin
-  Result := Parameter.ToString;
+  Result := Parameter.ToString.Text;
 end;
 
 function umlIntToStr(Parameter: UInt128): TPascalString;
 begin
-  Result := Parameter.ToString;
+  Result := Parameter.ToString.Text;
 end;
 
 function umlIntToStr(Parameter: Integer): TPascalString;
@@ -4438,7 +4440,7 @@ end;
 function umlStrToInt128(const V_: TPascalString; _Def: Int128): Int128;
 begin
   try
-      Result := Int128(V_.Text);
+      Result := Int128(V_.text);
   except
       Result := _Def;
   end;
@@ -5660,7 +5662,7 @@ begin
                   end;
               end;
             else
-              Result.Append(psSrc[i]);
+                Result.Append(psSrc[i]);
           end;
           inc(i);
         end;
@@ -5769,7 +5771,7 @@ begin
   zj.S['host'] := host;
   zj.S['port'] := port;
   zj.S['path'] := path;
-  Result := zj.ToJSONString(True);
+  Result := zj.ToJSONString(True).Text;
   DisposeObject(zj);
 end;
 
@@ -5977,7 +5979,7 @@ begin
         cont.EOLSize := 1;
       end;
     else
-      cont.EOLSize := 0;
+        cont.EOLSize := 0;
   end;
 
   Result := True;

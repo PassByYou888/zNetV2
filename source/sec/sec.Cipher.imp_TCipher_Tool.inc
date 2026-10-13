@@ -114,7 +114,7 @@ var
   buff: TBytes;
 begin
   {
-   * Serialize the string to UTF-8 bytes, encrypt in place, then wrap
+   * Serialize the TCipherSystemString to UTF-8 bytes, encrypt in place, then wrap
    * the result in Base64.
    *}
   buff := Data_.Bytes;
@@ -1395,7 +1395,7 @@ begin
   Result.FCipherSecurity := cs;
 end;
 
-function CreateCipherClassFromPassword(cs: TCipherSecurity; password_: TPascalString): TCipher_Tool_Base;
+function CreateCipherClassFromPassword(cs: TCipherSecurity; password_: TCipherString): TCipher_Tool_Base;
 var
   k: TCipherKeyBuffer;
 begin

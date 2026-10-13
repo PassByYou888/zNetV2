@@ -377,12 +377,12 @@ begin
         Inc(Result, FHash_Buffer[i].L.Num);
 end;
 
-function TBig_Hash_Pair_Pool<TKey_, TValue_>.Get_Value_Ptr(const Key: TKey_): PValue_;
+function TBig_Hash_Pair_Pool<TKey_, TValue_>.Get_Or_Create_Value_Ptr(const Key: TKey_): PValue_;
 begin
-  Result := Get_Value_Ptr(Key, FNULL_VALUE);
+  Result := Get_Or_Create_Value_Ptr(Key, FNULL_VALUE);
 end;
 
-function TBig_Hash_Pair_Pool<TKey_, TValue_>.Get_Value_Ptr(const Key: TKey_; const Default_: TValue_): PValue_;
+function TBig_Hash_Pair_Pool<TKey_, TValue_>.Get_Or_Create_Value_Ptr(const Key: TKey_; const Default_: TValue_): PValue_;
 var
   Key_Hash_: THash;
   L: TValue_Pair_Pool__;
@@ -412,6 +412,33 @@ begin
     begin
       p := Add(Key, Default_, False);
       Result := @p^.Data.Second;
+    end;
+end;
+
+function TBig_Hash_Pair_Pool<TKey_, TValue_>.Get_Value_Ptr___(const Key: TKey_): PValue_;
+var
+  Key_Hash_: THash;
+  L: TValue_Pair_Pool__;
+  i: NativeInt;
+  p: PPair_Pool_Value__;
+begin
+  Result := nil;
+  L := Get_Value_List(Key, Key_Hash_);
+  if L.L.Num > 0 then
+    begin
+      i := 0;
+      p := L.L.First;
+      while i < L.L.Num do
+        begin
+          if (Key_Hash_ = p^.Data.Fourth) and Compare_Key(Key, p^.Data.Primary) then
+            begin
+              L.L.MoveToFirst(p);
+              Result := @p^.Data.Second;
+              Exit;
+            end;
+          Inc(i);
+          p := p^.Next;
+        end;
     end;
 end;
 
@@ -1252,12 +1279,12 @@ begin
   end;
 end;
 
-function TCritical_Big_Hash_Pair_Pool<TKey_, TValue_>.Get_Value_Ptr(const Key: TKey_): PValue_;
+function TCritical_Big_Hash_Pair_Pool<TKey_, TValue_>.Get_Or_Create_Value_Ptr(const Key: TKey_): PValue_;
 begin
-  Result := Get_Value_Ptr(Key, FNULL_VALUE);
+  Result := Get_Or_Create_Value_Ptr(Key, FNULL_VALUE);
 end;
 
-function TCritical_Big_Hash_Pair_Pool<TKey_, TValue_>.Get_Value_Ptr(const Key: TKey_; const Default_: TValue_): PValue_;
+function TCritical_Big_Hash_Pair_Pool<TKey_, TValue_>.Get_Or_Create_Value_Ptr(const Key: TKey_; const Default_: TValue_): PValue_;
 var
   Key_Hash_: THash;
   L: TValue_Pair_Pool__;
@@ -1289,6 +1316,38 @@ begin
       begin
         p := Add(Key, Default_, False);
         Result := @p^.Data.Second;
+      end;
+  finally
+      FCritical__.UnLock;
+  end;
+end;
+
+function TCritical_Big_Hash_Pair_Pool<TKey_, TValue_>.Get_Value_Ptr___(const Key: TKey_): PValue_;
+var
+  Key_Hash_: THash;
+  L: TValue_Pair_Pool__;
+  i: NativeInt;
+  p: PPair_Pool_Value__;
+begin
+  Result := nil;
+  FCritical__.Lock;
+  try
+    L := Get_Value_List(Key, Key_Hash_);
+    if L.L.Num > 0 then
+      begin
+        i := 0;
+        p := L.L.First;
+        while i < L.L.Num do
+          begin
+            if (Key_Hash_ = p^.Data.Fourth) and Compare_Key(Key, p^.Data.Primary) then
+              begin
+                L.L.MoveToFirst(p);
+                Result := @p^.Data.Second;
+                Exit;
+              end;
+            Inc(i);
+            p := p^.Next;
+          end;
       end;
   finally
       FCritical__.UnLock;

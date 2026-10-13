@@ -44,9 +44,7 @@ function IsEqual__(const Val1, Val2, Epsilon_: Double): Boolean; overload;
 type
   TString_Num_Analysis_Tool = class;
 
-  TPascalString_Hash_Pool__ = TBig_Hash_Pair_Pool<TPascalString, TPascalString>;
-
-  TPascalString_Hash_Pool = class(TPascalString_Hash_Pool__)
+  TPascalString_Hash_Pool = class(TBig_Hash_Pair_Pool<TPascalString, TPascalString>)
   private
     FMaxNameSize: Integer;
     FMinNameSize: Integer;
@@ -537,7 +535,7 @@ var
 begin
   if Value_ = 0 then
       exit;
-  p := Get_Value_Ptr(Key_);
+  p := Get_Or_Create_Value_Ptr(Key_);
   p^ := p^ + Value_;
 end;
 
@@ -631,7 +629,7 @@ var
 begin
   if Value_ = 0 then
       exit;
-  p := Get_Value_Ptr(Key_);
+  p := Get_Or_Create_Value_Ptr(Key_);
   p^ := p^ + Value_;
 end;
 

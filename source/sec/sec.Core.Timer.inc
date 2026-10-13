@@ -119,7 +119,7 @@ procedure Reset_Timer(Bind_: TCore_Object);
 var
   p: TTimer_Event_Pool__.PValue_;
 begin
-  p := Timer_Event_Pool__.Get_Value_Ptr(Bind_);
+  p := Timer_Event_Pool__.Get_Or_Create_Value_Ptr(Bind_);
   if p <> nil then
       p^.LastTimer := GetTimeTick();
 end;

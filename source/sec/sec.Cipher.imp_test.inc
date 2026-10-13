@@ -33,7 +33,7 @@
  *)
 
 const
-  _CT_HEX: array [0 .. 15] of SystemChar =
+  _CT_HEX: array [0 .. 15] of TCipherChar =
     ('0', '1', '2', '3', '4', '5', '6', '7',
      '8', '9', 'a', 'b', 'c', 'd', 'e', 'f');
 
@@ -47,15 +47,15 @@ var
  *  Section 0: Helpers
  * ============================================================================ }
 
-procedure _CT_Log(const S: SystemString);
+procedure _CT_Log(const S: TCipherSystemString);
 begin
   DoStatus(S);
 end;
 
-function _CT_HexToBytes(const H: SystemString): TBytes;
+function _CT_HexToBytes(const H: TCipherSystemString): TBytes;
 var
   i, n, hi, lo: Integer;
-  c: SystemChar;
+  c: TCipherChar;
   haveHi: Boolean;
 begin
   SetLength(Result, Length(H));
@@ -89,7 +89,7 @@ begin
   SetLength(Result, n);
 end;
 
-function _CT_BytesToHex(const B: TBytes): SystemString;
+function _CT_BytesToHex(const B: TBytes): TCipherSystemString;
 var
   i: Integer;
 begin
@@ -116,19 +116,19 @@ begin
       Result := @_CT_Dummy[0];
 end;
 
-procedure _CT_Pass(const Name: SystemString);
+procedure _CT_Pass(const Name: TCipherSystemString);
 begin
   Inc(_CT_PassCount);
   DoStatus('[PASS] ' + Name);
 end;
 
-procedure _CT_Fail(const Name: SystemString);
+procedure _CT_Fail(const Name: TCipherSystemString);
 begin
   Inc(_CT_FailCount);
   DoStatus('[FAIL] ' + Name);
 end;
 
-procedure _CT_CompareHex(const Name, ExpectedHex: SystemString; const Got: TBytes);
+procedure _CT_CompareHex(const Name, ExpectedHex: TCipherSystemString; const Got: TBytes);
 var
   exp: TBytes;
   ok: Boolean;
@@ -149,7 +149,7 @@ begin
       _CT_Fail(Name + ' expected=' + ExpectedHex + ' got=' + _CT_BytesToHex(Got));
 end;
 
-procedure _CT_CompareHexFixed(const Name, ExpectedHex: SystemString;
+procedure _CT_CompareHexFixed(const Name, ExpectedHex: TCipherSystemString;
   const P: Pointer; const Size: Integer);
 var
   b: TBytes;
@@ -894,7 +894,7 @@ var
   hs: THashSecurity;
   i, expectedLen: Integer;
   ok: Boolean;
-  name: SystemString;
+  name: TCipherSystemString;
 begin
   _CT_Log('');
   _CT_Log('--- [B] Hash output size check (all THashSecurity) ---');
@@ -948,7 +948,7 @@ var
   k: TCipherKeyBuffer;
   key, orig, work: TBytes;
   i, n, s: Integer;
-  label_: SystemString;
+  label_: TCipherSystemString;
 begin
   _CT_Log('');
   _CT_Log('--- [C] Cipher round-trip (all TCipherSecurity, multiple sizes) ---');
@@ -994,7 +994,7 @@ end;
 
 procedure _CT_PasswordTests;
 var
-  pwd, wrong, hash, enc: TPascalString;
+  pwd, wrong, hash, enc: TCipherString;
   csArray: TCipherSecurityArray;
   i: Integer;
 begin
@@ -1074,8 +1074,8 @@ var
   k: TCipherKeyBuffer;
   i: Integer;
   ok: Boolean;
-  mh: TPascalString;
-  ss: TPascalString;
+  mh: TCipherString;
+  ss: TCipherString;
   stream_: TMS64;
 begin
   _CT_Log('');
@@ -1095,9 +1095,9 @@ begin
 
     ss := GenerateSequHash(TCipher.CAllHash, @buff[0], Length(buff));
     if CompareSequHash(ss, @buff[0], Length(buff)) then
-        _CT_Pass('Sequence hash positive (TPascalString)')
+        _CT_Pass('Sequence hash positive (TCipherString)')
     else
-        _CT_Fail('Sequence hash positive (TPascalString)');
+        _CT_Fail('Sequence hash positive (TCipherString)');
 
     stream_ := TMS64.Create;
     try
@@ -1510,8 +1510,8 @@ end;
 procedure _CT_HexHelperTests;
 var
   b, h1, h2: TBytes;
-  s, sHex: TPascalString;
-  ss: SystemString;
+  s, sHex: TCipherString;
+  ss: TCipherSystemString;
   buf: array [0 .. 31] of Byte;
   ok: Boolean;
   i: Integer;
@@ -1568,9 +1568,9 @@ begin
 
   TCipher.HashToString(h1, ss);
   if ss = 'deadbeef' then
-      _CT_Pass('HashToString(TBytes -> SystemString)')
+      _CT_Pass('HashToString(TBytes -> TCipherSystemString)')
   else
-      _CT_Fail('HashToString(TBytes -> SystemString)');
+      _CT_Fail('HashToString(TBytes -> TCipherSystemString)');
 
   TCipher.HashToString(@h1[0], Length(h1), s);
   if s.Text = 'deadbeef' then
@@ -1764,31 +1764,31 @@ begin
     end;
 
   TCipher.GenerateKey64('seed', k);
-  _CT_Pass('GenerateKey64(string)');
+  _CT_Pass('GenerateKey64(TCipherSystemString)');
   TCipher.GenerateKey64(@rawBuf[0], 32, k);
   _CT_Pass('GenerateKey64(pointer)');
   TCipher.GenerateKey128('seed', k);
-  _CT_Pass('GenerateKey128(string)');
+  _CT_Pass('GenerateKey128(TCipherSystemString)');
   TCipher.GenerateKey128(@rawBuf[0], 32, k);
   _CT_Pass('GenerateKey128(pointer)');
   TCipher.GenerateKey256('seed', k);
-  _CT_Pass('GenerateKey256(string)');
+  _CT_Pass('GenerateKey256(TCipherSystemString)');
   TCipher.GenerateKey256(@rawBuf[0], 32, k);
   _CT_Pass('GenerateKey256(pointer)');
   TCipher.Generate3Key64('seed', k);
-  _CT_Pass('Generate3Key64(string)');
+  _CT_Pass('Generate3Key64(TCipherSystemString)');
   TCipher.Generate3Key64(@rawBuf[0], 32, k);
   _CT_Pass('Generate3Key64(pointer)');
   TCipher.Generate2IntKey('seed', k);
-  _CT_Pass('Generate2IntKey(string)');
+  _CT_Pass('Generate2IntKey(TCipherSystemString)');
   TCipher.Generate2IntKey(@rawBuf[0], 32, k);
   _CT_Pass('Generate2IntKey(pointer)');
   TCipher.GenerateIntKey('seed', k);
-  _CT_Pass('GenerateIntKey(string)');
+  _CT_Pass('GenerateIntKey(TCipherSystemString)');
   TCipher.GenerateIntKey(@rawBuf[0], 32, k);
   _CT_Pass('GenerateIntKey(pointer)');
   TCipher.GenerateBytesKey('seed', 24, k);
-  _CT_Pass('GenerateBytesKey(string, 24)');
+  _CT_Pass('GenerateBytesKey(TCipherSystemString, 24)');
   TCipher.GenerateBytesKey(@rawBuf[0], 32, 24, k);
   _CT_Pass('GenerateBytesKey(pointer, 32, 24)');
   TCipher.GenerateNoneKey(k);
@@ -1844,8 +1844,8 @@ var
   k: TCipherKeyBuffer;
   orig, work: TBytes;
   c: TCipher_Tool_Base;
-  csName: SystemString;
-  s, s2: TPascalString;
+  csName: TCipherSystemString;
+  s, s2: TCipherString;
   i: Integer;
   lvl: Integer;
 begin
@@ -1950,7 +1950,7 @@ var
   sz: Integer;
   i, n, s: Integer;
   ok: Boolean;
-  failName: SystemString;
+  failName: TCipherSystemString;
 begin
   _CT_Log('');
   _CT_Log('--- [N] Boundary and edge-case tests ---');
@@ -2066,7 +2066,7 @@ end;
 
 procedure _CT_ReportHeader;
 var
-  platformStr: SystemString;
+  platformStr: TCipherSystemString;
 begin
 {$IFDEF CPU64}
   platformStr := '64-bit';
