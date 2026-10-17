@@ -31,6 +31,9 @@ interface
 
 uses
   Classes, SysUtils,
+{$IFDEF UNIX}{$IFNDEF ANDROID}{$IFNDEF IOS}
+  BaseUnix, Unix, ctypes,
+{$ENDIF}{$ENDIF}{$ENDIF}
   sec.Core, sec.PascalStrings, sec.Status, sec.UnicodeMixedLib;
 
 type
@@ -142,7 +145,6 @@ implementation
 {$ENDIF}{$ENDIF}{$ENDIF}
 
 {$IFDEF MSWINDOWS} uses Windows; {$ENDIF}
-{$IFDEF UNIX} uses BaseUnix, Unix; {$ENDIF}
 
 
 const
@@ -1426,7 +1428,7 @@ end;
 
 function TShellRunner.Start: Boolean;
 var
-  StdinP, StdoutP, StderrP: array [0 .. 1] of cint;
+  StdinP, StdoutP, StderrP: TFilDes;
   PID: TPid;
   cmdA, pathA, shellA, dashC: AnsiString;
   Argv: array [0 .. 3] of PAnsiChar;
@@ -1437,16 +1439,16 @@ begin
     begin
       FLastError := 'process already running'; Exit;
     end;
-  if FpPipe(@StdinP) <> 0 then
+  if FpPipe(StdinP) <> 0 then
     begin
       FLastError := 'pipe(stdin) failed: ' + IntToStr(fpgeterrno); Exit;
     end;
-  if FpPipe(@StdoutP) <> 0 then
+  if FpPipe(StdoutP) <> 0 then
     begin
       FpClose(StdinP[0]); FpClose(StdinP[1]);
       FLastError := 'pipe(stdout) failed: ' + IntToStr(fpgeterrno); Exit;
     end;
-  if FpPipe(@StderrP) <> 0 then
+  if FpPipe(StderrP) <> 0 then
     begin
       FpClose(StdinP[0]); FpClose(StdinP[1]);
       FpClose(StdoutP[0]); FpClose(StdoutP[1]);
@@ -2217,7 +2219,7 @@ end;
 initialization
 
 {$IFDEF UNIX}{$IFNDEF ANDROID}{$IFNDEF IOS}
-  FpSignal(SIGPIPE, SIG_IGN);
+  FpSignal(SIGPIPE, signalhandler_t(SIG_IGN));
 {$ENDIF}{$ENDIF}{$ENDIF}
 
 
