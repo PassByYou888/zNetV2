@@ -31,7 +31,7 @@ begin
   FThreadID := ThreadID_;
   FSyncPool := TThread_Post_Data_Order_Struct__.Create;
   FSyncPool.OnFree := FreeThreadProgressPostData;
-  FProgressing := TAtomBool.Create(False);
+  FProgressing := TAtomInteger.Create(0);
   FOneStep := True;
   FResetRandomSeed := False;
 end;
@@ -48,159 +48,161 @@ begin
   inherited Destroy;
 end;
 
-function TThreadPost.Count: NativeInt;
+function TThreadPost.Count: nativeint;
 begin
   FCritical.Acquire;
   Result := FSyncPool.Num;
   FCritical.Release;
 end;
 
-function TThreadPost.Busy: Boolean;
+function TThreadPost.Busy: boolean;
 begin
-  Result := (Count > 0) or (FProgressing.V);
+  Result := (Count > 0) or (FProgressing.V > 0);
 end;
 
-function TThreadPost.Progress(ThreadID_: TThreadID): NativeInt;
+function TThreadPost.Progress(ThreadID_: TThreadID): nativeint;
 var
-  i: Integer;
+  i: integer;
   temp: TThread_Post_Data_Order_Struct__;
   t_: TThread_Post_Data;
 begin
   Result := 0;
   if ThreadID_ <> FThreadID then
-      exit;
+    exit;
 
   if FOneStep then
+  begin
+    if FSyncPool.Current <> nil then
     begin
-      if FSyncPool.Current <> nil then
-        begin
-          FProgressing.V := True;
-          FCritical.Acquire;
-          t_ := FSyncPool.Current^.Data^;
-          FSyncPool.Next;
-          FCritical.Release;
+      FProgressing.UnLock(FProgressing.LockP^ + 1);
+      FCritical.Acquire;
+      t_ := FSyncPool.Current^.Data^;
+      FSyncPool.Next;
+      FCritical.Release;
 
-          if FResetRandomSeed then
-              SetMT19937Seed(0);
+      if FResetRandomSeed then
+        SetMT19937Seed(0);
 
-          try
-            if t_.IsRuning <> nil then
-                t_.IsRuning^ := True;
-            if t_.IsExit <> nil then
-                t_.IsExit^ := False;
-          except
-          end;
-
-          try
-            if Assigned(t_.On_C1) then
-                t_.On_C1()
-            else if Assigned(t_.On_C2) then
-                t_.On_C2(t_.Data1)
-            else if Assigned(t_.On_C3) then
-                t_.On_C3(t_.Data1, t_.Data2, t_.Data3);
-            if Assigned(t_.On_C4) then
-                t_.On_C4(t_.Data1, t_.Data2)
-            else if Assigned(t_.On_M1) then
-                t_.On_M1()
-            else if Assigned(t_.On_M2) then
-                t_.On_M2(t_.Data1)
-            else if Assigned(t_.On_M3) then
-                t_.On_M3(t_.Data1, t_.Data2, t_.Data3)
-            else if Assigned(t_.On_M4) then
-                t_.On_M4(t_.Data1, t_.Data2)
-            else if Assigned(t_.On_P1) then
-                t_.On_P1();
-            if Assigned(t_.On_P2) then
-                t_.On_P2(t_.Data1)
-            else if Assigned(t_.On_P3) then
-                t_.On_P3(t_.Data1, t_.Data2, t_.Data3);
-            if Assigned(t_.On_P4) then
-                t_.On_P4(t_.Data1, t_.Data2);
-          except
-          end;
-
-          try
-            if t_.IsRuning <> nil then
-                t_.IsRuning^ := False;
-            if t_.IsExit <> nil then
-                t_.IsExit^ := True;
-          except
-          end;
-
-          FProgressing.V := False;
-          Result := 1;
-        end;
-    end
-  else
-    while (not FProgressing.V) and (Count > 0) do
-      begin
-        FProgressing.V := True;
-        FCritical.Acquire;
-        temp := FSyncPool;
-        FSyncPool := TThread_Post_Data_Order_Struct__.Create;
-        FCritical.Release;
-        Result := temp.Num;
-        while temp.Current <> nil do
-          begin
-            if FResetRandomSeed then
-                SetMT19937Seed(0);
-
-            try
-              if temp.Current^.Data^.IsRuning <> nil then
-                  temp.Current^.Data^.IsRuning^ := True;
-              if temp.Current^.Data^.IsExit <> nil then
-                  temp.Current^.Data^.IsExit^ := False;
-            except
-            end;
-
-            try
-              if Assigned(temp.Current^.Data^.On_C1) then
-                  temp.Current^.Data^.On_C1()
-              else if Assigned(temp.Current^.Data^.On_C2) then
-                  temp.Current^.Data^.On_C2(temp.Current^.Data^.Data1)
-              else if Assigned(temp.Current^.Data^.On_C3) then
-                  temp.Current^.Data^.On_C3(temp.Current^.Data^.Data1, temp.Current^.Data^.Data2, temp.Current^.Data^.Data3)
-              else if Assigned(temp.Current^.Data^.On_C4) then
-                  temp.Current^.Data^.On_C4(temp.Current^.Data^.Data1, temp.Current^.Data^.Data2)
-              else if Assigned(temp.Current^.Data^.On_M1) then
-                  temp.Current^.Data^.On_M1()
-              else if Assigned(temp.Current^.Data^.On_M2) then
-                  temp.Current^.Data^.On_M2(temp.Current^.Data^.Data1)
-              else if Assigned(temp.Current^.Data^.On_M3) then
-                  temp.Current^.Data^.On_M3(temp.Current^.Data^.Data1, temp.Current^.Data^.Data2, temp.Current^.Data^.Data3)
-              else if Assigned(temp.Current^.Data^.On_M4) then
-                  temp.Current^.Data^.On_M4(temp.Current^.Data^.Data1, temp.Current^.Data^.Data2)
-              else if Assigned(temp.Current^.Data^.On_P1) then
-                  temp.Current^.Data^.On_P1()
-              else if Assigned(temp.Current^.Data^.On_P2) then
-                  temp.Current^.Data^.On_P2(temp.Current^.Data^.Data1)
-              else if Assigned(temp.Current^.Data^.On_P3) then
-                  temp.Current^.Data^.On_P3(temp.Current^.Data^.Data1, temp.Current^.Data^.Data2, temp.Current^.Data^.Data3)
-              else if Assigned(temp.Current^.Data^.On_P4) then
-                  temp.Current^.Data^.On_P4(temp.Current^.Data^.Data1, temp.Current^.Data^.Data2);
-            except
-            end;
-
-            try
-              if temp.Current^.Data^.IsRuning <> nil then
-                  temp.Current^.Data^.IsRuning^ := False;
-              if temp.Current^.Data^.IsExit <> nil then
-                  temp.Current^.Data^.IsExit^ := True;
-            except
-            end;
-            temp.Next;
-          end;
-        DisposeObject(temp);
-        FProgressing.V := False;
+      try
+        if t_.IsRuning <> nil then
+          t_.IsRuning^ := True;
+        if t_.IsExit <> nil then
+          t_.IsExit^ := False;
+      except
       end;
+
+      try
+        if Assigned(t_.On_C1) then
+          t_.On_C1()
+        else if Assigned(t_.On_C2) then
+          t_.On_C2(t_.Data1)
+        else if Assigned(t_.On_C3) then
+          t_.On_C3(t_.Data1, t_.Data2, t_.Data3);
+        if Assigned(t_.On_C4) then
+          t_.On_C4(t_.Data1, t_.Data2)
+        else if Assigned(t_.On_M1) then
+          t_.On_M1()
+        else if Assigned(t_.On_M2) then
+          t_.On_M2(t_.Data1)
+        else if Assigned(t_.On_M3) then
+          t_.On_M3(t_.Data1, t_.Data2, t_.Data3)
+        else if Assigned(t_.On_M4) then
+          t_.On_M4(t_.Data1, t_.Data2)
+        else if Assigned(t_.On_P1) then
+          t_.On_P1();
+        if Assigned(t_.On_P2) then
+          t_.On_P2(t_.Data1)
+        else if Assigned(t_.On_P3) then
+          t_.On_P3(t_.Data1, t_.Data2, t_.Data3);
+        if Assigned(t_.On_P4) then
+          t_.On_P4(t_.Data1, t_.Data2);
+      except
+      end;
+
+      try
+        if t_.IsRuning <> nil then
+          t_.IsRuning^ := False;
+        if t_.IsExit <> nil then
+          t_.IsExit^ := True;
+      except
+      end;
+
+      FProgressing.UnLock(FProgressing.LockP^ - 1);
+      Result := 1;
+    end;
+  end
+  else
+    while (Count > 0) do
+    begin
+      FProgressing.UnLock(FProgressing.LockP^ + 1);
+
+      temp := TThread_Post_Data_Order_Struct__.Create;
+      FCritical.Acquire;
+      temp.SwapInstance(FSyncPool);
+      FCritical.Release;
+
+      Result := temp.Num;
+      while temp.Current <> nil do
+      begin
+        if FResetRandomSeed then
+          SetMT19937Seed(0);
+
+        try
+          if temp.Current^.Data^.IsRuning <> nil then
+            temp.Current^.Data^.IsRuning^ := True;
+          if temp.Current^.Data^.IsExit <> nil then
+            temp.Current^.Data^.IsExit^ := False;
+        except
+        end;
+
+        try
+          if Assigned(temp.Current^.Data^.On_C1) then
+            temp.Current^.Data^.On_C1()
+          else if Assigned(temp.Current^.Data^.On_C2) then
+            temp.Current^.Data^.On_C2(temp.Current^.Data^.Data1)
+          else if Assigned(temp.Current^.Data^.On_C3) then
+            temp.Current^.Data^.On_C3(temp.Current^.Data^.Data1, temp.Current^.Data^.Data2, temp.Current^.Data^.Data3)
+          else if Assigned(temp.Current^.Data^.On_C4) then
+            temp.Current^.Data^.On_C4(temp.Current^.Data^.Data1, temp.Current^.Data^.Data2)
+          else if Assigned(temp.Current^.Data^.On_M1) then
+            temp.Current^.Data^.On_M1()
+          else if Assigned(temp.Current^.Data^.On_M2) then
+            temp.Current^.Data^.On_M2(temp.Current^.Data^.Data1)
+          else if Assigned(temp.Current^.Data^.On_M3) then
+            temp.Current^.Data^.On_M3(temp.Current^.Data^.Data1, temp.Current^.Data^.Data2, temp.Current^.Data^.Data3)
+          else if Assigned(temp.Current^.Data^.On_M4) then
+            temp.Current^.Data^.On_M4(temp.Current^.Data^.Data1, temp.Current^.Data^.Data2)
+          else if Assigned(temp.Current^.Data^.On_P1) then
+            temp.Current^.Data^.On_P1()
+          else if Assigned(temp.Current^.Data^.On_P2) then
+            temp.Current^.Data^.On_P2(temp.Current^.Data^.Data1)
+          else if Assigned(temp.Current^.Data^.On_P3) then
+            temp.Current^.Data^.On_P3(temp.Current^.Data^.Data1, temp.Current^.Data^.Data2, temp.Current^.Data^.Data3)
+          else if Assigned(temp.Current^.Data^.On_P4) then
+            temp.Current^.Data^.On_P4(temp.Current^.Data^.Data1, temp.Current^.Data^.Data2);
+        except
+        end;
+
+        try
+          if temp.Current^.Data^.IsRuning <> nil then
+            temp.Current^.Data^.IsRuning^ := False;
+          if temp.Current^.Data^.IsExit <> nil then
+            temp.Current^.Data^.IsExit^ := True;
+        except
+        end;
+        temp.Next;
+      end;
+      DisposeObject(temp);
+      FProgressing.UnLock(FProgressing.LockP^ - 1);
+    end;
 end;
 
-function TThreadPost.Progress(Thread_: TThread): NativeInt;
+function TThreadPost.Progress(Thread_: TThread): nativeint;
 begin
   Result := Progress(Thread_.ThreadID);
 end;
 
-function TThreadPost.Progress(): Integer;
+function TThreadPost.Progress(): integer;
 begin
   Result := Progress(TThread.CurrentThread);
 end;
@@ -243,9 +245,9 @@ begin
 
   try
     if t_.IsRuning <> nil then
-        t_.IsRuning^ := True;
+      t_.IsRuning^ := True;
     if t_.IsExit <> nil then
-        t_.IsExit^ := False;
+      t_.IsExit^ := False;
   except
   end;
 
@@ -279,9 +281,9 @@ begin
 
   try
     if t_.IsRuning <> nil then
-        t_.IsRuning^ := True;
+      t_.IsRuning^ := True;
     if t_.IsExit <> nil then
-        t_.IsExit^ := False;
+      t_.IsExit^ := False;
   except
   end;
 
@@ -290,7 +292,7 @@ begin
   FCritical.Release;
 end;
 
-procedure TThreadPost.PostC3(Data1: Pointer; Data2: TCore_Object; Data3: Variant; OnSync: TThreadPost_C3);
+procedure TThreadPost.PostC3(Data1: Pointer; Data2: TCore_Object; Data3: variant; OnSync: TThreadPost_C3);
 var
   t_: TThread_Post_Data;
 begin
@@ -304,7 +306,7 @@ begin
   FCritical.Release;
 end;
 
-procedure TThreadPost.PostC3(Data1: Pointer; Data2: TCore_Object; Data3: Variant; OnSync: TThreadPost_C3; IsRuning_, IsExit_: PBoolean);
+procedure TThreadPost.PostC3(Data1: Pointer; Data2: TCore_Object; Data3: variant; OnSync: TThreadPost_C3; IsRuning_, IsExit_: PBoolean);
 var
   t_: TThread_Post_Data;
 begin
@@ -319,9 +321,9 @@ begin
 
   try
     if t_.IsRuning <> nil then
-        t_.IsRuning^ := True;
+      t_.IsRuning^ := True;
     if t_.IsExit <> nil then
-        t_.IsExit^ := False;
+      t_.IsExit^ := False;
   except
   end;
 
@@ -357,9 +359,9 @@ begin
 
   try
     if t_.IsRuning <> nil then
-        t_.IsRuning^ := True;
+      t_.IsRuning^ := True;
     if t_.IsExit <> nil then
-        t_.IsExit^ := False;
+      t_.IsExit^ := False;
   except
   end;
 
@@ -391,9 +393,9 @@ begin
 
   try
     if t_.IsRuning <> nil then
-        t_.IsRuning^ := True;
+      t_.IsRuning^ := True;
     if t_.IsExit <> nil then
-        t_.IsExit^ := False;
+      t_.IsExit^ := False;
   except
   end;
 
@@ -427,9 +429,9 @@ begin
 
   try
     if t_.IsRuning <> nil then
-        t_.IsRuning^ := True;
+      t_.IsRuning^ := True;
     if t_.IsExit <> nil then
-        t_.IsExit^ := False;
+      t_.IsExit^ := False;
   except
   end;
 
@@ -438,7 +440,7 @@ begin
   FCritical.Release;
 end;
 
-procedure TThreadPost.PostM3(Data1: Pointer; Data2: TCore_Object; Data3: Variant; OnSync: TThreadPost_M3);
+procedure TThreadPost.PostM3(Data1: Pointer; Data2: TCore_Object; Data3: variant; OnSync: TThreadPost_M3);
 var
   t_: TThread_Post_Data;
 begin
@@ -452,7 +454,7 @@ begin
   FCritical.Release;
 end;
 
-procedure TThreadPost.PostM3(Data1: Pointer; Data2: TCore_Object; Data3: Variant; OnSync: TThreadPost_M3; IsRuning_, IsExit_: PBoolean);
+procedure TThreadPost.PostM3(Data1: Pointer; Data2: TCore_Object; Data3: variant; OnSync: TThreadPost_M3; IsRuning_, IsExit_: PBoolean);
 var
   t_: TThread_Post_Data;
 begin
@@ -467,9 +469,9 @@ begin
 
   try
     if t_.IsRuning <> nil then
-        t_.IsRuning^ := True;
+      t_.IsRuning^ := True;
     if t_.IsExit <> nil then
-        t_.IsExit^ := False;
+      t_.IsExit^ := False;
   except
   end;
 
@@ -505,9 +507,9 @@ begin
 
   try
     if t_.IsRuning <> nil then
-        t_.IsRuning^ := True;
+      t_.IsRuning^ := True;
     if t_.IsExit <> nil then
-        t_.IsExit^ := False;
+      t_.IsExit^ := False;
   except
   end;
 
@@ -539,9 +541,9 @@ begin
 
   try
     if t_.IsRuning <> nil then
-        t_.IsRuning^ := True;
+      t_.IsRuning^ := True;
     if t_.IsExit <> nil then
-        t_.IsExit^ := False;
+      t_.IsExit^ := False;
   except
   end;
 
@@ -575,9 +577,9 @@ begin
 
   try
     if t_.IsRuning <> nil then
-        t_.IsRuning^ := True;
+      t_.IsRuning^ := True;
     if t_.IsExit <> nil then
-        t_.IsExit^ := False;
+      t_.IsExit^ := False;
   except
   end;
 
@@ -586,7 +588,7 @@ begin
   FCritical.Release;
 end;
 
-procedure TThreadPost.PostP3(Data1: Pointer; Data2: TCore_Object; Data3: Variant; OnSync: TThreadPost_P3);
+procedure TThreadPost.PostP3(Data1: Pointer; Data2: TCore_Object; Data3: variant; OnSync: TThreadPost_P3);
 var
   t_: TThread_Post_Data;
 begin
@@ -600,7 +602,7 @@ begin
   FCritical.Release;
 end;
 
-procedure TThreadPost.PostP3(Data1: Pointer; Data2: TCore_Object; Data3: Variant; OnSync: TThreadPost_P3; IsRuning_, IsExit_: PBoolean);
+procedure TThreadPost.PostP3(Data1: Pointer; Data2: TCore_Object; Data3: variant; OnSync: TThreadPost_P3; IsRuning_, IsExit_: PBoolean);
 var
   t_: TThread_Post_Data;
 begin
@@ -615,9 +617,9 @@ begin
 
   try
     if t_.IsRuning <> nil then
-        t_.IsRuning^ := True;
+      t_.IsRuning^ := True;
     if t_.IsExit <> nil then
-        t_.IsExit^ := False;
+      t_.IsExit^ := False;
   except
   end;
 
@@ -653,9 +655,9 @@ begin
 
   try
     if t_.IsRuning <> nil then
-        t_.IsRuning^ := True;
+      t_.IsRuning^ := True;
     if t_.IsExit <> nil then
-        t_.IsExit^ := False;
+      t_.IsExit^ := False;
   except
   end;
 
@@ -668,191 +670,191 @@ end;
 procedure TThreadPost.Sync_Wait_PostC1(OnSync: TThreadPost_C1);
 var
   Current_Thread_ID_: TThreadID;
-  IsRuning_, IsExit_: Boolean;
+  IsRuning_, IsExit_: boolean;
 begin
   Current_Thread_ID_ := TCore_Thread.CurrentThread.ThreadID;
   PostC1(OnSync, @IsRuning_, @IsExit_);
   while IsRuning_ do
     if Current_Thread_ID_ = FThreadID then
-        Progress(Current_Thread_ID_)
+      Progress(Current_Thread_ID_)
     else if Current_Thread_ID_ = Main_Thread_ID then
-        CheckThread(1)
+      CheckThread(1)
     else
-        TCompute.Sleep(1);
+      TCompute.Sleep(1);
 end;
 
 procedure TThreadPost.Sync_Wait_PostC2(Data1: Pointer; OnSync: TThreadPost_C2);
 var
   Current_Thread_ID_: TThreadID;
-  IsRuning_, IsExit_: Boolean;
+  IsRuning_, IsExit_: boolean;
 begin
   Current_Thread_ID_ := TCore_Thread.CurrentThread.ThreadID;
   PostC2(Data1, OnSync, @IsRuning_, @IsExit_);
   while IsRuning_ do
     if Current_Thread_ID_ = FThreadID then
-        Progress(Current_Thread_ID_)
+      Progress(Current_Thread_ID_)
     else if Current_Thread_ID_ = Main_Thread_ID then
-        CheckThread(1)
+      CheckThread(1)
     else
-        TCompute.Sleep(1);
+      TCompute.Sleep(1);
 end;
 
-procedure TThreadPost.Sync_Wait_PostC3(Data1: Pointer; Data2: TCore_Object; Data3: Variant; OnSync: TThreadPost_C3);
+procedure TThreadPost.Sync_Wait_PostC3(Data1: Pointer; Data2: TCore_Object; Data3: variant; OnSync: TThreadPost_C3);
 var
   Current_Thread_ID_: TThreadID;
-  IsRuning_, IsExit_: Boolean;
+  IsRuning_, IsExit_: boolean;
 begin
   Current_Thread_ID_ := TCore_Thread.CurrentThread.ThreadID;
   PostC3(Data1, Data2, Data3, OnSync, @IsRuning_, @IsExit_);
   while IsRuning_ do
     if Current_Thread_ID_ = FThreadID then
-        Progress(Current_Thread_ID_)
+      Progress(Current_Thread_ID_)
     else if Current_Thread_ID_ = Main_Thread_ID then
-        CheckThread(1)
+      CheckThread(1)
     else
-        TCompute.Sleep(1);
+      TCompute.Sleep(1);
 end;
 
 procedure TThreadPost.Sync_Wait_PostC4(Data1: Pointer; Data2: TCore_Object; OnSync: TThreadPost_C4);
 var
   Current_Thread_ID_: TThreadID;
-  IsRuning_, IsExit_: Boolean;
+  IsRuning_, IsExit_: boolean;
 begin
   Current_Thread_ID_ := TCore_Thread.CurrentThread.ThreadID;
   PostC4(Data1, Data2, OnSync, @IsRuning_, @IsExit_);
   while IsRuning_ do
     if Current_Thread_ID_ = FThreadID then
-        Progress(Current_Thread_ID_)
+      Progress(Current_Thread_ID_)
     else if Current_Thread_ID_ = Main_Thread_ID then
-        CheckThread(1)
+      CheckThread(1)
     else
-        TCompute.Sleep(1);
+      TCompute.Sleep(1);
 end;
 
 procedure TThreadPost.Sync_Wait_PostM1(OnSync: TThreadPost_M1);
 var
   Current_Thread_ID_: TThreadID;
-  IsRuning_, IsExit_: Boolean;
+  IsRuning_, IsExit_: boolean;
 begin
   Current_Thread_ID_ := TCore_Thread.CurrentThread.ThreadID;
   PostM1(OnSync, @IsRuning_, @IsExit_);
   while IsRuning_ do
     if Current_Thread_ID_ = FThreadID then
-        Progress(Current_Thread_ID_)
+      Progress(Current_Thread_ID_)
     else if Current_Thread_ID_ = Main_Thread_ID then
-        CheckThread(1)
+      CheckThread(1)
     else
-        TCompute.Sleep(1);
+      TCompute.Sleep(1);
 end;
 
 procedure TThreadPost.Sync_Wait_PostM2(Data1: Pointer; OnSync: TThreadPost_M2);
 var
   Current_Thread_ID_: TThreadID;
-  IsRuning_, IsExit_: Boolean;
+  IsRuning_, IsExit_: boolean;
 begin
   Current_Thread_ID_ := TCore_Thread.CurrentThread.ThreadID;
   PostM2(Data1, OnSync, @IsRuning_, @IsExit_);
   while IsRuning_ do
     if Current_Thread_ID_ = FThreadID then
-        Progress(Current_Thread_ID_)
+      Progress(Current_Thread_ID_)
     else if Current_Thread_ID_ = Main_Thread_ID then
-        CheckThread(1)
+      CheckThread(1)
     else
-        TCompute.Sleep(1);
+      TCompute.Sleep(1);
 end;
 
-procedure TThreadPost.Sync_Wait_PostM3(Data1: Pointer; Data2: TCore_Object; Data3: Variant; OnSync: TThreadPost_M3);
+procedure TThreadPost.Sync_Wait_PostM3(Data1: Pointer; Data2: TCore_Object; Data3: variant; OnSync: TThreadPost_M3);
 var
   Current_Thread_ID_: TThreadID;
-  IsRuning_, IsExit_: Boolean;
+  IsRuning_, IsExit_: boolean;
 begin
   Current_Thread_ID_ := TCore_Thread.CurrentThread.ThreadID;
   PostM3(Data1, Data2, Data3, OnSync, @IsRuning_, @IsExit_);
   while IsRuning_ do
     if Current_Thread_ID_ = FThreadID then
-        Progress(Current_Thread_ID_)
+      Progress(Current_Thread_ID_)
     else if Current_Thread_ID_ = Main_Thread_ID then
-        CheckThread(1)
+      CheckThread(1)
     else
-        TCompute.Sleep(1);
+      TCompute.Sleep(1);
 end;
 
 procedure TThreadPost.Sync_Wait_PostM4(Data1: Pointer; Data2: TCore_Object; OnSync: TThreadPost_M4);
 var
   Current_Thread_ID_: TThreadID;
-  IsRuning_, IsExit_: Boolean;
+  IsRuning_, IsExit_: boolean;
 begin
   Current_Thread_ID_ := TCore_Thread.CurrentThread.ThreadID;
   PostM4(Data1, Data2, OnSync, @IsRuning_, @IsExit_);
   while IsRuning_ do
     if Current_Thread_ID_ = FThreadID then
-        Progress(Current_Thread_ID_)
+      Progress(Current_Thread_ID_)
     else if Current_Thread_ID_ = Main_Thread_ID then
-        CheckThread(1)
+      CheckThread(1)
     else
-        TCompute.Sleep(1);
+      TCompute.Sleep(1);
 end;
 
 procedure TThreadPost.Sync_Wait_PostP1(OnSync: TThreadPost_P1);
 var
   Current_Thread_ID_: TThreadID;
-  IsRuning_, IsExit_: Boolean;
+  IsRuning_, IsExit_: boolean;
 begin
   Current_Thread_ID_ := TCore_Thread.CurrentThread.ThreadID;
   PostP1(OnSync, @IsRuning_, @IsExit_);
   while IsRuning_ do
     if Current_Thread_ID_ = FThreadID then
-        Progress(Current_Thread_ID_)
+      Progress(Current_Thread_ID_)
     else if Current_Thread_ID_ = Main_Thread_ID then
-        CheckThread(1)
+      CheckThread(1)
     else
-        TCompute.Sleep(1);
+      TCompute.Sleep(1);
 end;
 
 procedure TThreadPost.Sync_Wait_PostP2(Data1: Pointer; OnSync: TThreadPost_P2);
 var
   Current_Thread_ID_: TThreadID;
-  IsRuning_, IsExit_: Boolean;
+  IsRuning_, IsExit_: boolean;
 begin
   Current_Thread_ID_ := TCore_Thread.CurrentThread.ThreadID;
   PostP2(Data1, OnSync, @IsRuning_, @IsExit_);
   while IsRuning_ do
     if Current_Thread_ID_ = FThreadID then
-        Progress(Current_Thread_ID_)
+      Progress(Current_Thread_ID_)
     else if Current_Thread_ID_ = Main_Thread_ID then
-        CheckThread(1)
+      CheckThread(1)
     else
-        TCompute.Sleep(1);
+      TCompute.Sleep(1);
 end;
 
-procedure TThreadPost.Sync_Wait_PostP3(Data1: Pointer; Data2: TCore_Object; Data3: Variant; OnSync: TThreadPost_P3);
+procedure TThreadPost.Sync_Wait_PostP3(Data1: Pointer; Data2: TCore_Object; Data3: variant; OnSync: TThreadPost_P3);
 var
   Current_Thread_ID_: TThreadID;
-  IsRuning_, IsExit_: Boolean;
+  IsRuning_, IsExit_: boolean;
 begin
   Current_Thread_ID_ := TCore_Thread.CurrentThread.ThreadID;
   PostP3(Data1, Data2, Data3, OnSync, @IsRuning_, @IsExit_);
   while IsRuning_ do
     if Current_Thread_ID_ = FThreadID then
-        Progress(Current_Thread_ID_)
+      Progress(Current_Thread_ID_)
     else if Current_Thread_ID_ = Main_Thread_ID then
-        CheckThread(1)
+      CheckThread(1)
     else
-        TCompute.Sleep(1);
+      TCompute.Sleep(1);
 end;
 
 procedure TThreadPost.Sync_Wait_PostP4(Data1: Pointer; Data2: TCore_Object; OnSync: TThreadPost_P4);
 var
   Current_Thread_ID_: TThreadID;
-  IsRuning_, IsExit_: Boolean;
+  IsRuning_, IsExit_: boolean;
 begin
   Current_Thread_ID_ := TCore_Thread.CurrentThread.ThreadID;
   PostP4(Data1, Data2, OnSync, @IsRuning_, @IsExit_);
   while IsRuning_ do
     if Current_Thread_ID_ = FThreadID then
-        Progress(Current_Thread_ID_)
+      Progress(Current_Thread_ID_)
     else if Current_Thread_ID_ = Main_Thread_ID then
-        CheckThread(1)
+      CheckThread(1)
     else
-        TCompute.Sleep(1);
+      TCompute.Sleep(1);
 end;

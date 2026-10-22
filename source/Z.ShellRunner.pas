@@ -30,7 +30,8 @@ unit Z.ShellRunner;
 interface
 
 uses
-  Classes, SysUtils,
+  Classes, SysUtils, Z.ListEngine,
+{$IFDEF MSWINDOWS} Windows, {$ENDIF}
 {$IFDEF UNIX}{$IFNDEF ANDROID}{$IFNDEF IOS}
   BaseUnix, Unix, ctypes,
 {$ENDIF}{$ENDIF}{$ENDIF}
@@ -41,13 +42,10 @@ type
 
   TShellRunner = class;
 
-  TShellLineEvent = procedure(Sender: TShellRunner;
-    const Line: TPascalString; const IsError: Boolean) of object;
+  TShellLineEvent = procedure(Sender: TShellRunner; const Line: TPascalString; const IsError: Boolean) of object;
+  TShellExitEvent = procedure(Sender: TShellRunner; const ExitCode: Cardinal) of object;
 
-  TShellExitEvent = procedure(Sender: TShellRunner;
-    const ExitCode: Cardinal) of object;
-
-  TShellReaderThread = class(TThread)
+  TShellReaderThread = class(TCore_Thread)
   private
     FOwner: TShellRunner;
     FIsStdErr: Boolean;
@@ -79,6 +77,8 @@ type
     FRunning: Boolean;
     FExitCode: Cardinal;
     FLastError: string;
+    FLog: TPascalStringList;
+    FLogLock: TCritical;
     FOnStdOutLine: TShellLineEvent;
     FOnStdErrLine: TShellLineEvent;
     FOnExit: TShellExitEvent;
@@ -108,6 +108,8 @@ type
     constructor Create(const Cmd, WorkPath: TPascalString);
     destructor Destroy; override;
 
+    procedure SRLog(const S: string);
+
     function Start: Boolean;
     function WaitForExit(const TimeoutMs: Cardinal = Cardinal($FFFFFFFF)): Boolean;
     function Terminate: Boolean;
@@ -119,6 +121,7 @@ type
     property Running: Boolean read FRunning;
     property ExitCode: Cardinal read FExitCode;
     property LastError: string read FLastError;
+    property Log: TPascalStringList read FLog;
     property Command: TPascalString read FCommand write FCommand;
     property WorkPath: TPascalString read FWorkPath write FWorkPath;
     property HideWindow: Boolean read FHideWindow write FHideWindow;
@@ -134,7 +137,8 @@ function IsShellRunnerSupported: Boolean;
 function RunShellRunnerSelfTest: Boolean;
 
 var
-  ShellRunnerLog: Boolean = True;
+  Enabled_ShellRunnerLog: Boolean = True;
+  DoStatus_ShellRunnerLog: Boolean = True;
 
 implementation
 
@@ -143,8 +147,6 @@ implementation
 {$IFDEF UNIX}{$IFNDEF ANDROID}{$IFNDEF IOS}
 {$UNDEF Z_SHELL_UNSUPPORTED}
 {$ENDIF}{$ENDIF}{$ENDIF}
-
-{$IFDEF MSWINDOWS} uses Windows; {$ENDIF}
 
 
 const
@@ -155,16 +157,6 @@ const
   C_JoinPollMs: Integer = 10;
   C_IdleExitThreshold: Integer = 5;
   C_ScheduleYieldMs: Integer = 1;
-
-procedure SRLog(const S: string);
-begin
-  if not ShellRunnerLog then
-      Exit;
-  try
-      DoStatus('[ShellRunner] ' + S);
-  except
-  end;
-end;
 
 function IsShellRunnerSupported: Boolean;
 begin
@@ -279,6 +271,7 @@ begin
 end;
 
 {$IFDEF MSWINDOWS}
+
 
 function WinDecodeMultiByte(const B: RawByteString; CodePage: UINT;
   Flags: DWORD): UnicodeString;
@@ -563,9 +556,10 @@ begin
   except
     on E: Exception do
       begin
-        if ShellRunnerLog then
+        if Enabled_ShellRunnerLog then
           begin
-            SRLog('DeliverLine EXCEPTION: ' + E.Message);
+            if FOwner <> nil then
+                FOwner.SRLog('DeliverLine EXCEPTION: ' + E.Message);
           end;
       end;
   end;
@@ -592,9 +586,11 @@ begin
   else
       StreamName := 'OUT';
 
-  if ShellRunnerLog then
+  if Enabled_ShellRunnerLog then
     begin
-      SRLog(Format('Reader[%s] enter Execute, Terminated=%s', [StreamName, BoolToStr(Terminated, True)]));
+      if FOwner <> nil then
+          FOwner.SRLog(Format('Reader[%s] enter Execute, Terminated=%s',
+            [StreamName, BoolToStr(Terminated, True)]));
     end;
 
   try
@@ -607,16 +603,20 @@ begin
           if Terminated and (DrainDeadline = 0) then
             begin
               DrainDeadline := GetTimeTick + C_DrainGraceMs;
-              if ShellRunnerLog then
+              if Enabled_ShellRunnerLog then
                 begin
-                  SRLog(Format('Reader[%s] drain mode, %d ms grace', [StreamName, C_DrainGraceMs]));
+                  if FOwner <> nil then
+                      FOwner.SRLog(Format('Reader[%s] drain mode, %d ms grace',
+                        [StreamName, C_DrainGraceMs]));
                 end;
             end;
           if (DrainDeadline > 0) and (GetTimeTick > DrainDeadline) then
             begin
-              if ShellRunnerLog then
+              if Enabled_ShellRunnerLog then
                 begin
-                  SRLog(Format('Reader[%s] drain timeout, exiting', [StreamName]));
+                  if FOwner <> nil then
+                      FOwner.SRLog(Format('Reader[%s] drain timeout, exiting',
+                        [StreamName]));
                 end;
               Break;
             end;
@@ -624,9 +624,11 @@ begin
           Avail := 0;
           if not PeekNamedPipe(FHandle, nil, 0, nil, @Avail, nil) then
             begin
-              if ShellRunnerLog then
+              if Enabled_ShellRunnerLog then
                 begin
-                  SRLog(Format('Reader[%s] PeekNamedPipe failed (err=%d), exiting', [StreamName, GetLastError]));
+                  if FOwner <> nil then
+                      FOwner.SRLog(Format('Reader[%s] PeekNamedPipe failed (err=%d), exiting',
+                        [StreamName, GetLastError]));
                 end;
               Break;
             end;
@@ -639,23 +641,29 @@ begin
                   ReadN := SizeOf(Buf);
               if not ReadFile(FHandle, Buf, ReadN, BytesRead, nil) then
                 begin
-                  if ShellRunnerLog then
+                  if Enabled_ShellRunnerLog then
                     begin
-                      SRLog(Format('Reader[%s] ReadFile failed (err=%d), exiting', [StreamName, GetLastError]));
+                      if FOwner <> nil then
+                          FOwner.SRLog(Format('Reader[%s] ReadFile failed (err=%d), exiting',
+                            [StreamName, GetLastError]));
                     end;
                   Break;
                 end;
               if BytesRead = 0 then
                 begin
-                  if ShellRunnerLog then
+                  if Enabled_ShellRunnerLog then
                     begin
-                      SRLog(Format('Reader[%s] ReadFile 0 bytes, exiting', [StreamName]));
+                      if FOwner <> nil then
+                          FOwner.SRLog(Format('Reader[%s] ReadFile 0 bytes, exiting',
+                            [StreamName]));
                     end;
                   Break;
                 end;
-              if ShellRunnerLog then
+              if Enabled_ShellRunnerLog then
                 begin
-                  SRLog(Format('Reader[%s] read %d bytes (avail was %d)', [StreamName, BytesRead, Avail]));
+                  if FOwner <> nil then
+                      FOwner.SRLog(Format('Reader[%s] read %d bytes (avail was %d)',
+                        [StreamName, BytesRead, Avail]));
                 end;
               ProcessChunk(Buf, BytesRead);
             end
@@ -665,9 +673,11 @@ begin
                   Inc(IdleCount);
               if IdleCount >= C_IdleExitThreshold then
                 begin
-                  if ShellRunnerLog then
+                  if Enabled_ShellRunnerLog then
                     begin
-                      SRLog(Format('Reader[%s] process exited + %d idle polls, exiting', [StreamName, IdleCount]));
+                      if FOwner <> nil then
+                          FOwner.SRLog(Format('Reader[%s] process exited + %d idle polls, exiting',
+                            [StreamName, IdleCount]));
                     end;
                   Break;
                 end;
@@ -676,9 +686,11 @@ begin
         end;
       if Length(FLineBuf) > 0 then
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
-              SRLog(Format('Reader[%s] flush final line (%d bytes)', [StreamName, Length(FLineBuf)]));
+              if FOwner <> nil then
+                  FOwner.SRLog(Format('Reader[%s] flush final line (%d bytes)',
+                    [StreamName, Length(FLineBuf)]));
             end;
           DeliverLine(FLineBuf);
           FLineBuf := '';
@@ -690,16 +702,20 @@ begin
           if Terminated and (DrainDeadline = 0) then
             begin
               DrainDeadline := GetTimeTick + C_DrainGraceMs;
-              if ShellRunnerLog then
+              if Enabled_ShellRunnerLog then
                 begin
-                  SRLog(Format('Reader[%s] drain mode, %d ms grace', [StreamName, C_DrainGraceMs]));
+                  if FOwner <> nil then
+                      FOwner.SRLog(Format('Reader[%s] drain mode, %d ms grace',
+                        [StreamName, C_DrainGraceMs]));
                 end;
             end;
           if (DrainDeadline > 0) and (GetTimeTick > DrainDeadline) then
             begin
-              if ShellRunnerLog then
+              if Enabled_ShellRunnerLog then
                 begin
-                  SRLog(Format('Reader[%s] drain timeout, exiting', [StreamName]));
+                  if FOwner <> nil then
+                      FOwner.SRLog(Format('Reader[%s] drain timeout, exiting',
+                        [StreamName]));
                 end;
               Break;
             end;
@@ -715,9 +731,11 @@ begin
                   Inc(IdleCount);
               if IdleCount >= C_IdleExitThreshold then
                 begin
-                  if ShellRunnerLog then
+                  if Enabled_ShellRunnerLog then
                     begin
-                      SRLog(Format('Reader[%s] process exited + %d idle polls, exiting', [StreamName, IdleCount]));
+                      if FOwner <> nil then
+                          FOwner.SRLog(Format('Reader[%s] process exited + %d idle polls, exiting',
+                            [StreamName, IdleCount]));
                     end;
                   Break;
                 end;
@@ -725,9 +743,11 @@ begin
             end;
           if R < 0 then
             begin
-              if ShellRunnerLog then
+              if Enabled_ShellRunnerLog then
                 begin
-                  SRLog(Format('Reader[%s] select failed, exiting', [StreamName]));
+                  if FOwner <> nil then
+                      FOwner.SRLog(Format('Reader[%s] select failed, exiting',
+                        [StreamName]));
                 end;
               Break;
             end;
@@ -735,31 +755,37 @@ begin
           N := FpRead(FFd, Buf, SizeOf(Buf));
           if N = 0 then
             begin
-              if ShellRunnerLog then
+              if Enabled_ShellRunnerLog then
                 begin
-                  SRLog(Format('Reader[%s] EOF, exiting', [StreamName]));
+                  if FOwner <> nil then
+                      FOwner.SRLog(Format('Reader[%s] EOF, exiting', [StreamName]));
                 end;
               Break;
             end;
           if N < 0 then
             begin
-              if ShellRunnerLog then
+              if Enabled_ShellRunnerLog then
                 begin
-                  SRLog(Format('Reader[%s] read error, exiting', [StreamName]));
+                  if FOwner <> nil then
+                      FOwner.SRLog(Format('Reader[%s] read error, exiting',
+                        [StreamName]));
                 end;
               Break;
             end;
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
-              SRLog(Format('Reader[%s] read %d bytes', [StreamName, N]));
+              if FOwner <> nil then
+                  FOwner.SRLog(Format('Reader[%s] read %d bytes', [StreamName, N]));
             end;
           ProcessChunk(Buf, N);
         end;
       if Length(FLineBuf) > 0 then
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
-              SRLog(Format('Reader[%s] flush final line (%d bytes)', [StreamName, Length(FLineBuf)]));
+              if FOwner <> nil then
+                  FOwner.SRLog(Format('Reader[%s] flush final line (%d bytes)',
+                    [StreamName, Length(FLineBuf)]));
             end;
           DeliverLine(FLineBuf);
           FLineBuf := '';
@@ -768,16 +794,19 @@ begin
     except
       on E: Exception do
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
-              SRLog(Format('Reader[%s] EXCEPTION: %s', [StreamName, E.Message]));
+              if FOwner <> nil then
+                  FOwner.SRLog(Format('Reader[%s] EXCEPTION: %s',
+                    [StreamName, E.Message]));
             end;
         end;
     end;
   finally
-    if ShellRunnerLog then
+    if Enabled_ShellRunnerLog then
       begin
-        SRLog(Format('Reader[%s] exit, set finished', [StreamName]));
+        if FOwner <> nil then
+            FOwner.SRLog(Format('Reader[%s] exit, set finished', [StreamName]));
       end;
     if FFinished <> nil then
         FFinished.V := True;
@@ -787,6 +816,10 @@ end;
 constructor TShellRunner.Create(const Cmd, WorkPath: TPascalString);
 begin
   inherited Create;
+
+  FLogLock := TCritical.Create('TShellRunner.Log');
+  FLog := TPascalStringList.Create;
+
   FCommand := Cmd;
   FWorkPath := WorkPath;
   FHideWindow := True;
@@ -814,7 +847,7 @@ begin
   FStderrFd := -1;
   FChildPID := 0;
 {$ENDIF}{$ENDIF}{$ENDIF}
-  if ShellRunnerLog then
+  if Enabled_ShellRunnerLog then
     begin
       SRLog(Format('Create cmd="%s"', [Cmd.Text]));
     end;
@@ -824,7 +857,7 @@ destructor TShellRunner.Destroy;
 var
   Leak: Boolean;
 begin
-  if ShellRunnerLog then
+  if Enabled_ShellRunnerLog then
     begin
       SRLog('Destroy begin');
     end;
@@ -839,7 +872,7 @@ begin
 {$IFDEF UNIX}{$IFNDEF ANDROID}{$IFNDEF IOS}
           if FChildPID <> 0 then
             begin
-              if ShellRunnerLog then
+              if Enabled_ShellRunnerLog then
                 begin
                   SRLog('Destroy: force SIGKILL');
                 end;
@@ -852,14 +885,14 @@ begin
 
   if FStdOutThread <> nil then
     begin
-      if ShellRunnerLog then
+      if Enabled_ShellRunnerLog then
         begin
           SRLog('Destroy: terminating stdout reader');
         end;
       FStdOutThread.Terminate;
       if FStdOutThread.WaitJoin(C_ReaderJoinMs) then
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
               SRLog('Destroy: stdout reader joined OK');
             end;
@@ -879,7 +912,7 @@ begin
         end
       else
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
               SRLog('Destroy: stdout reader STILL RUNNING - LEAK');
             end;
@@ -889,14 +922,14 @@ begin
 
   if FStdErrThread <> nil then
     begin
-      if ShellRunnerLog then
+      if Enabled_ShellRunnerLog then
         begin
           SRLog('Destroy: terminating stderr reader');
         end;
       FStdErrThread.Terminate;
       if FStdErrThread.WaitJoin(C_ReaderJoinMs) then
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
               SRLog('Destroy: stderr reader joined OK');
             end;
@@ -916,7 +949,7 @@ begin
         end
       else
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
               SRLog('Destroy: stderr reader STILL RUNNING - LEAK');
             end;
@@ -926,7 +959,10 @@ begin
 
   if Leak then
     begin
-      DoStatus('[WARN] TShellRunner leaked: reader thread did not exit. Leaking object to prevent use-after-free.');
+      if Enabled_ShellRunnerLog then
+        begin
+          SRLog('[WARN] TShellRunner leaked: reader thread did not exit. Leaking object to prevent use-after-free.');
+        end;
       Exit;
     end;
 
@@ -950,15 +986,48 @@ begin
       FpClose(FStdinFd); FStdinFd := -1;
     end;
 {$ENDIF}{$ENDIF}{$ENDIF}
-  if ShellRunnerLog then
+  if Enabled_ShellRunnerLog then
     begin
       SRLog('Destroy end');
     end;
+
+  DisposeObjectAndNil(FLogLock);
+  FLog.Free;
+  FLog := nil;
+
   inherited Destroy;
 end;
 
-procedure TShellRunner.DeliverLine(const Line: TPascalString;
-  const IsError: Boolean);
+procedure TShellRunner.SRLog(const S: string);
+var
+  Line: string;
+begin
+  if not Enabled_ShellRunnerLog then
+      Exit;
+
+  Line := '[ShellRunner] ' + S;
+
+  if FLogLock <> nil then
+    begin
+      FLogLock.Acquire;
+      try
+        if FLog <> nil then
+            FLog.Add(Line);
+      finally
+          FLogLock.Release;
+      end;
+    end;
+
+  if DoStatus_ShellRunnerLog then
+    begin
+      try
+          DoStatus(Line);
+      except
+      end;
+    end;
+end;
+
+procedure TShellRunner.DeliverLine(const Line: TPascalString; const IsError: Boolean);
 begin
   if IsError then
     begin
@@ -967,16 +1036,17 @@ begin
       except
         on E: Exception do
           begin
-            if ShellRunnerLog then
+            if Enabled_ShellRunnerLog then
               begin
                 SRLog('OnStdErrLine EXCEPTION: ' + E.Message);
               end;
           end;
       end;
       if FAutoShowStdErr then
-        try DoStatus(Line);
-        except
-        end;
+        if Enabled_ShellRunnerLog then
+          begin
+            SRLog(Line.Text);
+          end;
     end
   else
     begin
@@ -985,20 +1055,22 @@ begin
       except
         on E: Exception do
           begin
-            if ShellRunnerLog then
+            if Enabled_ShellRunnerLog then
               begin
                 SRLog('OnStdOutLine EXCEPTION: ' + E.Message);
               end;
           end;
       end;
       if FAutoShowStdOut then
-        try DoStatus(Line);
-        except
-        end;
+        if Enabled_ShellRunnerLog then
+          begin
+            SRLog(Line.Text);
+          end;
     end;
 end;
 
 {$IFDEF MSWINDOWS}
+
 
 procedure TShellRunner.CloseAllHandles;
 begin
@@ -1071,7 +1143,7 @@ begin
     begin
       FLastError := 'CreatePipe(stderr) failed: ' + umlIntToStr(GetLastError); CloseAllHandles; Exit;
     end;
-  if ShellRunnerLog then
+  if Enabled_ShellRunnerLog then
     begin
       SRLog(Format('Start pipes: stdinR=%d stdinW=%d stdoutR=%d stdoutW=%d stderrR=%d stderrW=%d',
           [FStdinRead, FStdinWrite, FStdoutRead, FStdoutWrite, FStderrRead, FStderrWrite]));
@@ -1107,7 +1179,7 @@ begin
       Flags, nil, Path, SI, PI) then
       begin
         FLastError := 'CreateProcess failed: ' + umlIntToStr(GetLastError);
-        if ShellRunnerLog then
+        if Enabled_ShellRunnerLog then
           begin
             SRLog(FLastError);
           end;
@@ -1118,7 +1190,7 @@ begin
     if PathP <> nil then TPascalString.FreeWideChar(PathP);
     TPascalString.FreeWideChar(CmdLineP);
   end;
-  if ShellRunnerLog then
+  if Enabled_ShellRunnerLog then
     begin
       SRLog(Format('Start: process created PID=%d', [PI.dwProcessId]));
     end;
@@ -1137,7 +1209,7 @@ begin
   FStdOutThread.FHandle := FStdoutRead;
   try
     FStdOutThread.Start;
-    if ShellRunnerLog then
+    if Enabled_ShellRunnerLog then
       begin
         SRLog(Format('Start: stdout reader started (handle=%d)', [FStdoutRead]));
       end;
@@ -1145,7 +1217,7 @@ begin
     on E: Exception do
       begin
         FLastError := 'reader thread start failed: ' + E.Message;
-        if ShellRunnerLog then
+        if Enabled_ShellRunnerLog then
           begin
             SRLog(FLastError);
           end;
@@ -1163,7 +1235,7 @@ begin
   FStdErrThread.FHandle := FStderrRead;
   try
     FStdErrThread.Start;
-    if ShellRunnerLog then
+    if Enabled_ShellRunnerLog then
       begin
         SRLog(Format('Start: stderr reader started (handle=%d)', [FStderrRead]));
       end;
@@ -1171,7 +1243,7 @@ begin
     on E: Exception do
       begin
         FLastError := 'reader thread start failed: ' + E.Message;
-        if ShellRunnerLog then
+        if Enabled_ShellRunnerLog then
           begin
             SRLog(FLastError);
           end;
@@ -1199,7 +1271,7 @@ begin
     begin
       Result := True; Exit;
     end;
-  if ShellRunnerLog then
+  if Enabled_ShellRunnerLog then
     begin
       SRLog(Format('WaitForExit: waiting %d ms', [TimeoutMs]));
     end;
@@ -1207,7 +1279,7 @@ begin
   if R = WAIT_TIMEOUT then
     begin
       FLastError := 'wait timeout';
-      if ShellRunnerLog then
+      if Enabled_ShellRunnerLog then
         begin
           SRLog('WaitForExit: TIMEOUT');
         end;
@@ -1217,7 +1289,7 @@ begin
   if R <> WAIT_OBJECT_0 then
     begin
       FLastError := 'WaitForSingleObject failed: ' + IntToStr(GetLastError);
-      if ShellRunnerLog then
+      if Enabled_ShellRunnerLog then
         begin
           SRLog(FLastError);
         end;
@@ -1225,7 +1297,7 @@ begin
       Exit;
     end;
   GetExitCodeProcess(FProcessHandle, FExitCode);
-  if ShellRunnerLog then
+  if Enabled_ShellRunnerLog then
     begin
       SRLog(Format('WaitForExit: process exited, code=%d', [FExitCode]));
     end;
@@ -1233,14 +1305,14 @@ begin
 
   if FStdOutThread <> nil then
     begin
-      if ShellRunnerLog then
+      if Enabled_ShellRunnerLog then
         begin
           SRLog('WaitForExit: joining stdout reader');
         end;
       FStdOutThread.Terminate;
       if FStdOutThread.WaitJoin(C_ReaderJoinMs) then
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
               SRLog('WaitForExit: stdout reader joined OK');
             end;
@@ -1252,25 +1324,24 @@ begin
         end
       else
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
-              SRLog('WaitForExit: stdout reader STILL RUNNING after ' +
-                  IntToStr(C_ReaderJoinMs) + ' ms');
+              SRLog(Format('[WARN] stdout reader did not exit in %d ms; retry in Destroy',
+                  [C_ReaderJoinMs]));
             end;
-          DoStatus('[WARN] stdout reader did not exit in %d ms; retry in Destroy', [C_ReaderJoinMs]);
         end;
     end;
 
   if FStdErrThread <> nil then
     begin
-      if ShellRunnerLog then
+      if Enabled_ShellRunnerLog then
         begin
           SRLog('WaitForExit: joining stderr reader');
         end;
       FStdErrThread.Terminate;
       if FStdErrThread.WaitJoin(C_ReaderJoinMs) then
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
               SRLog('WaitForExit: stderr reader joined OK');
             end;
@@ -1282,12 +1353,11 @@ begin
         end
       else
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
-              SRLog('WaitForExit: stderr reader STILL RUNNING after ' +
-                  IntToStr(C_ReaderJoinMs) + ' ms');
+              SRLog(Format('[WARN] stderr reader did not exit in %d ms; retry in Destroy',
+                  [C_ReaderJoinMs]));
             end;
-          DoStatus('[WARN] stderr reader did not exit in %d ms; retry in Destroy', [C_ReaderJoinMs]);
         end;
     end;
 
@@ -1297,7 +1367,7 @@ begin
     except
       on E: Exception do
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
               SRLog('OnExit EXCEPTION: ' + E.Message);
             end;
@@ -1313,14 +1383,14 @@ begin
     begin
       FLastError := 'process not running'; Exit;
     end;
-  if ShellRunnerLog then
+  if Enabled_ShellRunnerLog then
     begin
       SRLog('Terminate: calling TerminateProcess');
     end;
   if not TerminateProcess(FProcessHandle, $FFFFFFFF) then
     begin
       FLastError := 'TerminateProcess failed: ' + IntToStr(GetLastError);
-      if ShellRunnerLog then
+      if Enabled_ShellRunnerLog then
         begin
           SRLog(FLastError);
         end;
@@ -1351,7 +1421,7 @@ begin
   if not WriteFile(FStdinWrite, Data[1], N, Written, nil) then
     begin
       FLastError := 'WriteFile(stdin) failed: ' + IntToStr(GetLastError);
-      if ShellRunnerLog then
+      if Enabled_ShellRunnerLog then
         begin
           SRLog(FLastError);
         end;
@@ -1410,6 +1480,7 @@ end;
 
 {$IFDEF UNIX}{$IFNDEF ANDROID}{$IFNDEF IOS}
 
+
 procedure TShellRunner.CloseAllFds;
 begin
   if FStdinFd >= 0 then
@@ -1454,7 +1525,7 @@ begin
       FpClose(StdoutP[0]); FpClose(StdoutP[1]);
       FLastError := 'pipe(stderr) failed: ' + IntToStr(fpgeterrno); Exit;
     end;
-  if ShellRunnerLog then
+  if Enabled_ShellRunnerLog then
     begin
       SRLog(Format('Start pipes: stdin=[%d,%d] stdout=[%d,%d] stderr=[%d,%d]',
           [StdinP[0], StdinP[1], StdoutP[0], StdoutP[1], StderrP[0], StderrP[1]]));
@@ -1493,7 +1564,7 @@ begin
       FpExecv(PAnsiChar(shellA), PPAnsiChar(@Argv));
       FpExit(127);
     end;
-  if ShellRunnerLog then
+  if Enabled_ShellRunnerLog then
     begin
       SRLog(Format('Start: forked PID=%d', [PID]));
     end;
@@ -1511,7 +1582,7 @@ begin
   FStdOutThread.FFd := FStdoutFd;
   try
     FStdOutThread.Start;
-    if ShellRunnerLog then
+    if Enabled_ShellRunnerLog then
       begin
         SRLog(Format('Start: stdout reader started (fd=%d)', [FStdoutFd]));
       end;
@@ -1519,7 +1590,7 @@ begin
     on E: Exception do
       begin
         FLastError := 'reader thread start failed: ' + E.Message;
-        if ShellRunnerLog then
+        if Enabled_ShellRunnerLog then
           begin
             SRLog(FLastError);
           end;
@@ -1537,7 +1608,7 @@ begin
   FStdErrThread.FFd := FStderrFd;
   try
     FStdErrThread.Start;
-    if ShellRunnerLog then
+    if Enabled_ShellRunnerLog then
       begin
         SRLog(Format('Start: stderr reader started (fd=%d)', [FStderrFd]));
       end;
@@ -1545,7 +1616,7 @@ begin
     on E: Exception do
       begin
         FLastError := 'reader thread start failed: ' + E.Message;
-        if ShellRunnerLog then
+        if Enabled_ShellRunnerLog then
           begin
             SRLog(FLastError);
           end;
@@ -1575,7 +1646,7 @@ begin
     begin
       Result := True; Exit;
     end;
-  if ShellRunnerLog then
+  if Enabled_ShellRunnerLog then
     begin
       SRLog(Format('WaitForExit: waiting %d ms', [TimeoutMs]));
     end;
@@ -1588,7 +1659,7 @@ begin
           if WIFEXITED(Status) then FExitCode := Cardinal(WEXITSTATUS(Status))
           else if WIFSIGNALED(Status) then FExitCode := Cardinal(128 + WTERMSIG(Status))
           else FExitCode := 0;
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
               SRLog(Format('WaitForExit: child exited, code=%d', [FExitCode]));
             end;
@@ -1597,7 +1668,7 @@ begin
       else if R < 0 then
         begin
           FLastError := 'waitpid failed: ' + IntToStr(fpgeterrno);
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
               SRLog(FLastError);
             end;
@@ -1608,7 +1679,7 @@ begin
         if (GetTimeTick - StartTick) >= TTimeTick(TimeoutMs) then
           begin
             FLastError := 'wait timeout';
-            if ShellRunnerLog then
+            if Enabled_ShellRunnerLog then
               begin
                 SRLog('WaitForExit: TIMEOUT');
               end;
@@ -1621,14 +1692,14 @@ begin
 
   if FStdOutThread <> nil then
     begin
-      if ShellRunnerLog then
+      if Enabled_ShellRunnerLog then
         begin
           SRLog('WaitForExit: joining stdout reader');
         end;
       FStdOutThread.Terminate;
       if FStdOutThread.WaitJoin(C_ReaderJoinMs) then
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
               SRLog('WaitForExit: stdout reader joined OK');
             end;
@@ -1640,25 +1711,24 @@ begin
         end
       else
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
-              SRLog('WaitForExit: stdout reader STILL RUNNING after ' +
-                  IntToStr(C_ReaderJoinMs) + ' ms');
+              SRLog(Format('[WARN] stdout reader did not exit in %d ms; retry in Destroy',
+                  [C_ReaderJoinMs]));
             end;
-          DoStatus('[WARN] stdout reader did not exit in %d ms; retry in Destroy', [C_ReaderJoinMs]);
         end;
     end;
 
   if FStdErrThread <> nil then
     begin
-      if ShellRunnerLog then
+      if Enabled_ShellRunnerLog then
         begin
           SRLog('WaitForExit: joining stderr reader');
         end;
       FStdErrThread.Terminate;
       if FStdErrThread.WaitJoin(C_ReaderJoinMs) then
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
               SRLog('WaitForExit: stderr reader joined OK');
             end;
@@ -1670,12 +1740,11 @@ begin
         end
       else
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
-              SRLog('WaitForExit: stderr reader STILL RUNNING after ' +
-                  IntToStr(C_ReaderJoinMs) + ' ms');
+              SRLog(Format('[WARN] stderr reader did not exit in %d ms; retry in Destroy',
+                  [C_ReaderJoinMs]));
             end;
-          DoStatus('[WARN] stderr reader did not exit in %d ms; retry in Destroy', [C_ReaderJoinMs]);
         end;
     end;
 
@@ -1685,7 +1754,7 @@ begin
     except
       on E: Exception do
         begin
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
               SRLog('OnExit EXCEPTION: ' + E.Message);
             end;
@@ -1701,14 +1770,14 @@ begin
     begin
       FLastError := 'process not running'; Exit;
     end;
-  if ShellRunnerLog then
+  if Enabled_ShellRunnerLog then
     begin
       SRLog('Terminate: sending SIGTERM');
     end;
   if FpKill(FChildPID, SIGTERM) <> 0 then
     begin
       FLastError := 'kill(SIGTERM) failed: ' + IntToStr(fpgeterrno);
-      if ShellRunnerLog then
+      if Enabled_ShellRunnerLog then
         begin
           SRLog(FLastError);
         end;
@@ -1743,7 +1812,7 @@ begin
       if W <= 0 then
         begin
           FLastError := 'write(stdin) failed: ' + IntToStr(fpgeterrno);
-          if ShellRunnerLog then
+          if Enabled_ShellRunnerLog then
             begin
               SRLog(FLastError);
             end;
@@ -1773,6 +1842,7 @@ end;
 {$ENDIF}{$ENDIF}{$ENDIF}
 
 {$IFDEF Z_SHELL_UNSUPPORTED}
+
 
 function TShellRunner.Start: Boolean;
 begin
@@ -1805,6 +1875,7 @@ begin
 end;
 
 {$ENDIF Z_SHELL_UNSUPPORTED}
+
 
 function TShellRunner.WriteStdinLine(const Line: RawByteString): Boolean;
 begin
@@ -1851,9 +1922,11 @@ end;
 procedure TShellTestCollector.OnStdOut(Sender: TShellRunner;
   const Line: TPascalString; const IsError: Boolean);
 begin
-  if ShellRunnerLog then
+  if Enabled_ShellRunnerLog then
     begin
-      SRLog(Format('Collector.OnStdOut line="%s" len=%d', [Line.Text, Line.L]));
+      if Sender <> nil then
+          Sender.SRLog(Format('Collector.OnStdOut line="%s" len=%d',
+            [Line.Text, Line.L]));
     end;
   Lock.Acquire;
   try StdOut.Add(Line.Text);
@@ -1864,9 +1937,11 @@ end;
 procedure TShellTestCollector.OnStdErr(Sender: TShellRunner;
   const Line: TPascalString; const IsError: Boolean);
 begin
-  if ShellRunnerLog then
+  if Enabled_ShellRunnerLog then
     begin
-      SRLog(Format('Collector.OnStdErr line="%s" len=%d', [Line.Text, Line.L]));
+      if Sender <> nil then
+          Sender.SRLog(Format('Collector.OnStdErr line="%s" len=%d',
+            [Line.Text, Line.L]));
     end;
   Lock.Acquire;
   try StdErr.Add(Line.Text);
@@ -1877,9 +1952,10 @@ end;
 procedure TShellTestCollector.OnExitEvent(Sender: TShellRunner;
   const ExitCode: Cardinal);
 begin
-  if ShellRunnerLog then
+  if Enabled_ShellRunnerLog then
     begin
-      SRLog(Format('Collector.OnExit code=%d', [ExitCode]));
+      if Sender <> nil then
+          Sender.SRLog(Format('Collector.OnExit code=%d', [ExitCode]));
     end;
   Self.ExitCode := ExitCode;
   Self.GotExit := True;
@@ -1921,17 +1997,26 @@ var
   G_TestPassCount: Integer = 0;
   G_TestFailCount: Integer = 0;
 
-procedure ShellTestCheck(const Name: string; const Ok: Boolean);
+procedure ShellTestCheck(Logger: TShellRunner;
+  const Name: string; const Ok: Boolean);
 begin
   if Ok then
     begin
       Inc(G_TestPassCount);
-      DoStatus('[TEST %s] PASS', [Name]);
+      if Enabled_ShellRunnerLog then
+        begin
+          if Logger <> nil then
+              Logger.SRLog(Format('[TEST %s] PASS', [Name]));
+        end;
     end
   else
     begin
       Inc(G_TestFailCount);
-      DoStatus('[TEST %s] FAIL', [Name]);
+      if Enabled_ShellRunnerLog then
+        begin
+          if Logger <> nil then
+              Logger.SRLog(Format('[TEST %s] FAIL', [Name]));
+        end;
     end;
 end;
 
@@ -2014,15 +2099,16 @@ var
   ReleaseOnExit: Boolean;
 begin
   Result := nil;
-  if ShellRunnerLog then
-    begin
-      SRLog(Format('===== BEGIN test "%s" cmd="%s" timeout=%d =====',
-          [Name.Text, Cmd.Text, TimeoutMs]));
-    end;
   LocalResult := TShellTestCollector.Create;
   Runner := TShellRunner.Create(Cmd, '');
   ReleaseOnExit := False;
   try
+    if Enabled_ShellRunnerLog then
+      begin
+        Runner.SRLog(Format('===== BEGIN test "%s" cmd="%s" timeout=%d =====',
+            [Name.Text, Cmd.Text, TimeoutMs]));
+      end;
+
     Runner.AutoShowStdOut := False;
     Runner.AutoShowStdErr := False;
     Runner.OnStdOutLine := LocalResult.OnStdOut;
@@ -2030,38 +2116,46 @@ begin
     Runner.OnExit := LocalResult.OnExitEvent;
     if not Runner.Start then
       begin
-        DoStatus('[TEST %s] start failed: %s', [Name.Text, Runner.LastError]);
-        if ShellRunnerLog then
+        if Enabled_ShellRunnerLog then
           begin
-            SRLog(Format('===== END test "%s" (start failed) =====', [Name.Text]));
+            Runner.SRLog(Format('[TEST %s] start failed: %s',
+                [Name.Text, Runner.LastError]));
+            Runner.SRLog(Format('===== END test "%s" (start failed) =====',
+                [Name.Text]));
           end;
         ReleaseOnExit := True;
         Exit;
       end;
     if not Runner.WaitForExit(TimeoutMs) then
       begin
-        DoStatus('[TEST %s] wait failed: %s', [Name.Text, Runner.LastError]);
+        if Enabled_ShellRunnerLog then
+          begin
+            Runner.SRLog(Format('[TEST %s] wait failed: %s',
+                [Name.Text, Runner.LastError]));
+          end;
         Runner.Terminate;
         if not Runner.WaitForExit(2000) then
           begin
-            if ShellRunnerLog then
+            if Enabled_ShellRunnerLog then
               begin
-                SRLog(Format('===== END test "%s" (wait failed, leaked) =====', [Name.Text]));
+                Runner.SRLog(Format('===== END test "%s" (wait failed, leaked) =====',
+                    [Name.Text]));
               end;
             Exit;
           end;
         ReleaseOnExit := True;
-        if ShellRunnerLog then
+        if Enabled_ShellRunnerLog then
           begin
-            SRLog(Format('===== END test "%s" (wait failed after terminate) =====', [Name.Text]));
+            Runner.SRLog(Format('===== END test "%s" (wait failed after terminate) =====',
+                [Name.Text]));
           end;
         Exit;
       end;
     Result := LocalResult;
     LocalResult := nil;
-    if ShellRunnerLog then
+    if Enabled_ShellRunnerLog then
       begin
-        SRLog(Format('===== END test "%s" (success, exit=%d) =====',
+        Runner.SRLog(Format('===== END test "%s" (success, exit=%d) =====',
             [Name.Text, Result.ExitCode]));
       end;
   finally
@@ -2075,9 +2169,12 @@ function RunShellRunnerSelfTest: Boolean;
 var
   c: TShellTestCollector;
   R: TShellRunner;
+  TestLogger: TShellRunner;
   Ok: Boolean;
   encTest: Boolean;
 begin
+  TestLogger := TShellRunner.Create('', '');
+
   G_TestPassCount := 0;
   G_TestFailCount := 0;
 
@@ -2086,51 +2183,56 @@ begin
     (DetectTextEncoding(#$C4#$E3#$BA#$C3) = teGBK) and
     (DetectTextEncoding(#$E4#$BD#$A0#$E5#$A5#$BD) = teUTF8) and
     (DetectTextEncoding(#$FF#$FF#$FF) = teLatin1);
-  ShellTestCheck('detect_encoding', encTest);
+
+  ShellTestCheck(TestLogger, 'detect_encoding', encTest);
 
   if not IsShellRunnerSupported then
     begin
-      DoStatus('[TEST] ShellRunner not supported on this platform; skipping shell tests');
+      if Enabled_ShellRunnerLog then
+        begin
+          TestLogger.SRLog('[TEST] ShellRunner not supported on this platform; skipping shell tests');
+        end;
       Result := encTest;
+      DisposeObjectAndNil(TestLogger);
       Exit;
     end;
 
   c := ShellTestRunOnce('basic_echo', Cmd_EchoHello, 5000);
   if c <> nil then
     begin
-      ShellTestCheck('basic_echo.stdout', c.HasStdOut('hello_runner'));
-      ShellTestCheck('basic_echo.exit0', (c.ExitCode = 0) and c.GotExit);
+      ShellTestCheck(TestLogger, 'basic_echo.stdout', c.HasStdOut('hello_runner'));
+      ShellTestCheck(TestLogger, 'basic_echo.exit0', (c.ExitCode = 0) and c.GotExit);
       DisposeObjectAndNil(c);
     end
   else
-      ShellTestCheck('basic_echo', False);
+      ShellTestCheck(TestLogger, 'basic_echo', False);
 
   c := ShellTestRunOnce('exit_code', Cmd_Exit42, 5000);
   if c <> nil then
     begin
-      ShellTestCheck('exit_code.exit42', c.ExitCode = 42);
+      ShellTestCheck(TestLogger, 'exit_code.exit42', c.ExitCode = 42);
       DisposeObjectAndNil(c);
     end
   else
-      ShellTestCheck('exit_code', False);
+      ShellTestCheck(TestLogger, 'exit_code', False);
 
   c := ShellTestRunOnce('stderr', Cmd_ErrOutput, 5000);
   if c <> nil then
     begin
-      ShellTestCheck('stderr.captured', c.HasStdErr('error_output'));
+      ShellTestCheck(TestLogger, 'stderr.captured', c.HasStdErr('error_output'));
       DisposeObjectAndNil(c);
     end
   else
-      ShellTestCheck('stderr', False);
+      ShellTestCheck(TestLogger, 'stderr', False);
 
   c := ShellTestRunOnce('chinese_echo', Cmd_ChineseEcho, 5000);
   if c <> nil then
     begin
-      ShellTestCheck('chinese_echo.captured', c.StdOut.Count > 0);
+      ShellTestCheck(TestLogger, 'chinese_echo.captured', c.StdOut.Count > 0);
       DisposeObjectAndNil(c);
     end
   else
-      ShellTestCheck('chinese_echo', False);
+      ShellTestCheck(TestLogger, 'chinese_echo', False);
 
   c := TShellTestCollector.Create;
   R := TShellRunner.Create(Cmd_StdinSink, '');
@@ -2145,17 +2247,17 @@ begin
         R.WriteStdinLine('piped_input');
         R.CloseStdin;
         if R.WaitForExit(5000) then
-            ShellTestCheck('stdin.echo', c.HasStdOut('piped_input'))
+            ShellTestCheck(TestLogger, 'stdin.echo', c.HasStdOut('piped_input'))
         else
           begin
-            ShellTestCheck('stdin.wait', False);
+            ShellTestCheck(TestLogger, 'stdin.wait', False);
             R.Terminate;
             if not R.WaitForExit(3000) then
                 c := nil;
           end;
       end
     else
-        ShellTestCheck('stdin.start', False);
+        ShellTestCheck(TestLogger, 'stdin.start', False);
   finally
     R.Free;
     if c <> nil then
@@ -2168,12 +2270,12 @@ begin
     R.AutoShowStdErr := False;
     if R.Start then
       begin
-        ShellTestCheck('timeout.short', not R.WaitForExit(300));
+        ShellTestCheck(TestLogger, 'timeout.short', not R.WaitForExit(300));
         R.Terminate;
         R.WaitForExit(3000);
       end
     else
-        ShellTestCheck('timeout.start', False);
+        ShellTestCheck(TestLogger, 'timeout.start', False);
   finally
       R.Free;
   end;
@@ -2185,11 +2287,11 @@ begin
     if R.Start then
       begin
         TThread.Sleep(200);
-        ShellTestCheck('terminate.called', R.Terminate);
-        ShellTestCheck('terminate.exited', R.WaitForExit(3000));
+        ShellTestCheck(TestLogger, 'terminate.called', R.Terminate);
+        ShellTestCheck(TestLogger, 'terminate.exited', R.WaitForExit(3000));
       end
     else
-        ShellTestCheck('terminate.start', False);
+        ShellTestCheck(TestLogger, 'terminate.start', False);
   finally
       R.Free;
   end;
@@ -2210,10 +2312,16 @@ begin
       R.Free;
   end;
 {$ENDIF}
-  ShellTestCheck('setvisible.unsupported', Ok);
+  ShellTestCheck(TestLogger, 'setvisible.unsupported', Ok);
 
-  DoStatus('[TEST SUMMARY] pass=%d fail=%d', [G_TestPassCount, G_TestFailCount]);
+  if Enabled_ShellRunnerLog then
+    begin
+      TestLogger.SRLog(Format('[TEST SUMMARY] pass=%d fail=%d',
+          [G_TestPassCount, G_TestFailCount]));
+    end;
+
   Result := G_TestFailCount = 0;
+  DisposeObjectAndNil(TestLogger);
 end;
 
 initialization

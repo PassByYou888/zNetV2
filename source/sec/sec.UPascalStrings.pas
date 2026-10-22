@@ -366,11 +366,13 @@ type
       * @return lower‑case USystemString.
     }
     function LowerText: USystemString;
+    property ToLower: USystemString read LowerText;
 
     { * Returns an upper‑case copy (using SysUtils).
       * @return upper‑case USystemString.
     }
     function UpperText: USystemString;
+    property ToUpper: USystemString read UpperText;
 
     { * ShortText
       * Returns a shortened representation of the string.

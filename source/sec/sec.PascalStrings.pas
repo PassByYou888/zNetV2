@@ -425,11 +425,13 @@ type
       * @return lower‑case SystemString.
     }
     function LowerText: SystemString;
+    property ToLower: SystemString read LowerText;
 
     { * Returns an upper‑case copy of the string (using SysUtils.UpperCase).
       * @return upper‑case SystemString.
     }
     function UpperText: SystemString;
+    property ToUpper: SystemString read UpperText;
 
     { * ShortText
       * Returns a shortened representation of the string.

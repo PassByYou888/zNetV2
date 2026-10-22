@@ -25,47 +25,81 @@ SOFTWARE.
   * =============================================================
   *
   * This unit replaces the default memory manager (Delphi or FPC) with
-  * Microsoft’s mimalloc – a fast, scalable, thread‑safe allocator.
+  * Microsoft's mimalloc – a fast, scalable, thread-safe allocator.
   *
-  * Key features:
-  *   - 16‑byte aligned header stores the exact user‑requested size.
-  *   - Thread‑safe hooks for FPC (non‑nil InitThread/DoneThread).
-  *   - Safe ReallocMem: on failure, the original pointer remains valid.
-  *   - Optional full heap statistics via mi_stats_merge (not enabled here).
+  * --------------------------------------------------------------------------
+  * How to obtain the native mimalloc library
+  * --------------------------------------------------------------------------
+  * Prebuilt binaries for all supported platforms are published here:
   *
-  * The native mimalloc library is loaded dynamically. Supported platforms:
-  *   - Windows 32‑bit : mimalloc32.dll
-  *   - Windows 64‑bit : mimalloc64.dll
-  *   - Linux          : libmimalloc.so
-  *   - macOS          : libmimalloc.dylib
+  *     https://github.com/microsoft/mimalloc/releases
   *
-  * @Example (basic usage – automatic):
-  *   // Simply add Z.mimalloc4p to your uses clause.
-  *   // All memory allocations (GetMem, FreeMem, ReallocMem, New, Dispose, etc.)
-  *   // will now use mimalloc instead of the default manager.
-  *   var
-  *     P: Pointer;
+  * Pick the asset that matches your target OS / CPU / ABI, then deploy the
+  * native library so that the OS loader can find it at runtime.
+  *
+  * --- Windows (prebuilt, recommended) --------------------------------------
+  *   Assets:
+  *     mimalloc-vX.Y.Z-win-x64.zip   -> contains mimalloc.dll
+  *     mimalloc-vX.Y.Z-win-x86.zip   -> contains mimalloc.dll
+  *
+  *   This unit loads the library by these names:
+  *     WIN32 -> 'mimalloc32.dll'
+  *     WIN64 -> 'mimalloc64.dll'
+  *
+  *   Rename the DLL and drop it next to the EXE:
+  *     :: 32-bit EXE
+  *     ren mimalloc.dll mimalloc32.dll
+  *     copy mimalloc32.dll  C:\path\to\myapp\
+  *
+  *     :: 64-bit EXE
+  *     ren mimalloc.dll mimalloc64.dll
+  *     copy mimalloc64.dll  C:\path\to\myapp\
+  *
+  *   Windows searches the EXE directory first, so no PATH change is needed.
+  *   Do NOT copy the DLL into System32 – it would pollute other processes.
+  *
+  * --- Linux (prebuilt) ----------------------------------------------------
+  *   Asset:
+  *     mimalloc-vX.Y.Z-linux-x64.tar.gz
+  *
+  *   This unit loads the library by the name 'libmimalloc.so'.
+  *
+  *   Install system-wide:
+  *     tar -xzf mimalloc-vX.Y.Z-linux-x64.tar.gz
+  *     cd mimalloc-vX.Y.Z-linux-x64
+  *     sudo cp -a lib/libmimalloc.so* /usr/local/lib/
+  *     sudo ldconfig
+  *   Or keep it local and export LD_LIBRARY_PATH at runtime instead.
+  *
+  * --- macOS (prebuilt) ----------------------------------------------------
+  *   Asset:
+  *     mimalloc-vX.Y.Z-macos-arm64.tar.gz / -x64.tar.gz
+  *
+  *   This unit loads the library by the name 'libmimalloc.dylib'.
+  *   sudo cp -a lib/libmimalloc.dylib /usr/local/lib/
+  *
+  * --------------------------------------------------------------------------
+  * Design notes
+  * --------------------------------------------------------------------------
+  *   - Each user allocation reserves HEADER_SIZE (16) bytes in front of the
+  *     user pointer. The first PtrUInt field of that header stores the exact
+  *     user-requested size, so MemSize does not depend on allocator internals.
+  *   - ReallocMem is safe on failure: the original pointer stays valid.
+  *   - FPC requires non-nil InitThread/DoneThread callbacks for TLS; stubs
+  *     are provided so multi-threaded code does not crash.
+  *
+  * --------------------------------------------------------------------------
+  * Usage (automatic – just add this unit to the uses clause)
+  * --------------------------------------------------------------------------
+  *   uses mimalloc4p;
+  *
+  *   var P: Pointer;
   *   begin
-  *     GetMem(P, 1024);   // allocated by mi_malloc with 16‑byte header
-  *     FillChar(P^, 1024, 0);
+  *     GetMem(P, 1024);   // allocated by mi_malloc with a 16-byte header
   *     FreeMem(P);        // mi_free is called
   *   end;
   *
-  * @Example (manual use of low‑level functions):
-  *   var
-  *     Raw, P: Pointer;
-  *   begin
-  *     Raw := mi_malloc(100 + HEADER_SIZE); // allocate raw with header
-  *     if Raw <> nil then
-  *     begin
-  *       SetStoredSize(Raw, 100);           // store user size
-  *       P := Raw + HEADER_SIZE;            // user pointer
-  *       // ... use P ...
-  *       mi_free(Raw);                      // free raw pointer
-  *     end;
-  *   end;
-  *
-  * This unit is part of the Z‑framework and is maintained at:
+  * This unit is part of the Z-framework and is maintained at:
   *   https://github.com/PassByYou888/mimalloc4p
 }
 unit mimalloc4p;
@@ -79,161 +113,80 @@ interface
 implementation
 
 const
-  { * Name of the native mimalloc library, selected by platform.
-    * These constants are used in the external declarations below.
-  }
+  // Native mimalloc library name, chosen per platform.
+  // Must match the deployed file name exactly.
 {$IF Defined(WIN32)}
-  mimalloc_Lib = 'mimalloc32.dll'; // 32‑bit Windows
+  mimalloc_Lib = 'mimalloc32.dll';
 {$ELSEIF Defined(WIN64)}
-  mimalloc_Lib = 'mimalloc64.dll'; // 64‑bit Windows
+  mimalloc_Lib = 'mimalloc64.dll';
 {$ELSEIF Defined(LINUX)}
-  mimalloc_Lib = 'libmimalloc.so'; // Linux shared object
+  mimalloc_Lib = 'libmimalloc.so';
 {$ELSEIF Defined(DARWIN)}
-  mimalloc_Lib = 'libmimalloc.dylib'; // macOS dynamic library
+  mimalloc_Lib = 'libmimalloc.dylib';
 {$ELSE}
 {$MESSAGE FATAL 'Unsupported platform'}
 {$IFEND}
-  { * HEADER_SIZE: bytes reserved before each user pointer.
-    * mimalloc internally uses 16‑byte alignment; we store the exact
-    * user‑requested size in the first PtrUInt field of this header.
-    * This allows MemSize to return the correct size without relying on
-    * internal allocator metadata.
-  }
+
+  // Bytes reserved in front of every user pointer.
+  // The first PtrUInt of this header stores the exact user-requested size,
+  // so MemSize does not rely on mimalloc's internal usable-size metadata.
   HEADER_SIZE = 16;
 
-  { --- Core mimalloc functions (cdecl calling convention) --- }
+  // --- Core mimalloc functions (cdecl) -------------------------------------
 
-  { * mi_malloc: Allocates a block of memory of given size from the mimalloc heap.
-    * @param Size  Number of bytes to allocate.
-    * @return      Pointer to the allocated memory, or nil on failure.
-  }
+  // mi_malloc: allocates Size bytes; returns nil on failure.
 function mi_malloc(Size: NativeUInt): Pointer; cdecl; external mimalloc_Lib name 'mi_malloc';
 
-{ * mi_free: Frees a block previously allocated by mi_malloc, mi_calloc, or mi_realloc.
-  * @param P  Pointer to the block to free. If nil, does nothing.
-}
+// mi_free: releases a block obtained from mi_malloc / mi_calloc / mi_realloc.
+// Passing nil is a no-op.
 procedure mi_free(P: Pointer); cdecl; external mimalloc_Lib name 'mi_free';
 
-{ * mi_realloc: Resizes a previously allocated block to a new size.
-  * If P is nil, behaves like mi_malloc. If Size is 0, frees the block and returns nil.
-  * @param P     Original pointer (may be nil).
-  * @param Size  New requested size in bytes.
-  * @return      New pointer to the resized block, or nil on failure.
-  *              On failure, the original block remains valid.
-}
+// mi_realloc: resizes a block. If P is nil it behaves like mi_malloc;
+// if Size is 0 it frees and returns nil.
+// On failure it returns nil and the original block stays valid.
 function mi_realloc(P: Pointer; Size: NativeUInt): Pointer; cdecl; external mimalloc_Lib name 'mi_realloc';
 
-{ * mi_calloc: Allocates memory for an array of Count elements, each of Size bytes,
-  * and initialises all bytes to zero.
-  * @param Count  Number of elements.
-  * @param Size   Size of each element.
-  * @return       Pointer to the zero‑initialised block, or nil on failure.
-}
+// mi_calloc: allocates Count * Size zero-initialised bytes; nil on failure.
 function mi_calloc(Count: NativeUInt; Size: NativeUInt): Pointer; cdecl; external mimalloc_Lib name 'mi_calloc';
 
-{ ---------------------------------------------------------------------------- }
-{ Header helpers: store / retrieve the exact user‑requested size }
-{ ---------------------------------------------------------------------------- }
+// --- Header helpers -------------------------------------------------------
 
 type
-  { * TSize__: The type used to store the user size in the header.
-    * On FPC, PtrUInt is an alias for NativeUInt; on Delphi we use NativeUInt directly.
-    * We define it to keep the code consistent.
-  }
+  // Type stored in the header: a pointer-sized unsigned integer.
 {$IFDEF FPC}
   TSize__ = PtrUInt;
 {$ELSE FPC}
   TSize__ = NativeUInt;
 {$ENDIF FPC}
-  PSize__ = ^TSize__; // Pointer to the stored size
+  PSize__ = ^TSize__;
 
-  { * GetStoredSize: Reads the user‑requested size from the 16‑byte header.
-    * @param RawPtr  Pointer to the raw block (the start of the header).
-    * @return        The stored size in bytes.
-  }
+// Reads the user-requested size from the 16-byte header.
 function GetStoredSize(RawPtr: Pointer): TSize__; inline;
 begin
-  Result := PSize__(RawPtr)^; // cast to PSize__ and dereference
+  Result := PSize__(RawPtr)^;
 end;
 
-{ * SetStoredSize: Writes the user‑requested size into the 16‑byte header.
-  * @param RawPtr  Pointer to the raw block (the start of the header).
-  * @param Size    The size to store.
-}
+// Writes the user-requested size into the 16-byte header.
 procedure SetStoredSize(RawPtr: Pointer; Size: TSize__); inline;
 begin
   PSize__(RawPtr)^ := Size;
 end;
 
-{ ---------------------------------------------------------------------------- }
-{ Memory manager hooks }
-{ ---------------------------------------------------------------------------- }
+// --- Memory manager hooks -------------------------------------------------
 
 {$IFDEF FPC}
 
-{ * For FPC, we must implement the TMemoryManager record.
-  * It requires several callback functions; we provide all of them.
-  * The manager is installed via SetMemoryManager.
-}
 var
-  OriginMM: TMemoryManager; // original manager, saved to restore later
-  HookMM: TMemoryManager; // our custom manager
+  OriginMM: TMemoryManager; // original manager, restored on finalization
+  HookMM: TMemoryManager;   // manager installed by this unit
 
-  { * do_GetMem: Allocates memory using mimalloc with a 16‑byte header.
-    * @param Size  User‑requested size.
-    * @return      User pointer (raw + HEADER_SIZE), or nil on failure.
-  }
+// do_GetMem: allocates Size bytes via mi_malloc with a 16-byte header.
+// Returns user pointer (raw + HEADER_SIZE), or nil on failure.
 function do_GetMem(Size: PtrUInt): Pointer;
 var
   RawPtr: Pointer;
 begin
-  RawPtr := mi_malloc(Size + HEADER_SIZE); // allocate raw block with extra space
-  if RawPtr <> nil then
-    begin
-      SetStoredSize(RawPtr, Size); // store exact user size in header
-      Result := RawPtr + HEADER_SIZE; // return user pointer (past header)
-    end
-  else
-      Result := nil;
-end;
-
-{ * do_FreeMem: Frees memory previously allocated by do_GetMem or do_AllocMem.
-  * @param P  User pointer (must not be nil).
-  * @return   0 (always success, as FreeMem is expected to return 0).
-}
-function do_FreeMem(P: Pointer): PtrUInt;
-var
-  RawPtr: Pointer;
-begin
-  if P <> nil then
-    begin
-      RawPtr := P - HEADER_SIZE; // get raw block pointer
-      mi_free(RawPtr); // free raw block
-    end;
-  Result := 0; // standard return code
-end;
-
-{ * do_FreememSize: Frees a block with known size (size is ignored here).
-  * In FPC, this is a separate callback. We simply call do_FreeMem.
-  * @param P     User pointer.
-  * @param Size  Ignored (mimalloc knows the block size internally).
-  * @return      0.
-}
-function do_FreememSize(P: Pointer; Size: PtrUInt): PtrUInt;
-begin
-  Result := do_FreeMem(P);
-end;
-
-{ * do_AllocMem: Allocates zero‑initialised memory.
-  * Uses mi_calloc to get zeroed memory.
-  * @param Size  User‑requested size.
-  * @return      User pointer, or nil on failure.
-}
-function do_AllocMem(Size: PtrUInt): Pointer;
-var
-  RawPtr: Pointer;
-begin
-  RawPtr := mi_calloc(1, Size + HEADER_SIZE); // allocate and zero
+  RawPtr := mi_malloc(Size + HEADER_SIZE);
   if RawPtr <> nil then
     begin
       SetStoredSize(RawPtr, Size);
@@ -243,14 +196,46 @@ begin
       Result := nil;
 end;
 
-{ * do_ReallocMem: Resizes a block, preserving existing data.
-  * If Size = 0, it frees the block and sets P to nil.
-  * If P = nil, it allocates a new block.
-  * On failure, P remains unchanged (safe behaviour).
-  * @param P     Pointer to the block (may be nil).
-  * @param Size  New size in bytes.
-  * @return      New user pointer, or nil on failure.
-}
+// do_FreeMem: releases a block previously returned by do_GetMem.
+// FPC expects a PtrUInt return code; 0 means success.
+function do_FreeMem(P: Pointer): PtrUInt;
+var
+  RawPtr: Pointer;
+begin
+  if P <> nil then
+    begin
+      RawPtr := P - HEADER_SIZE;
+      mi_free(RawPtr);
+    end;
+  Result := 0;
+end;
+
+// do_FreememSize: same as do_FreeMem; mimalloc knows the block size
+// internally so the Size argument is ignored.
+function do_FreememSize(P: Pointer; Size: PtrUInt): PtrUInt;
+begin
+  Result := do_FreeMem(P);
+end;
+
+// do_AllocMem: zero-initialised allocation via mi_calloc.
+function do_AllocMem(Size: PtrUInt): Pointer;
+var
+  RawPtr: Pointer;
+begin
+  RawPtr := mi_calloc(1, Size + HEADER_SIZE);
+  if RawPtr <> nil then
+    begin
+      SetStoredSize(RawPtr, Size);
+      Result := RawPtr + HEADER_SIZE;
+    end
+  else
+      Result := nil;
+end;
+
+// do_ReallocMem: resizes a block.
+// Size = 0  -> frees and sets P := nil.
+// P = nil   -> allocates a fresh block.
+// On failure, P is left unchanged (safe behaviour).
 function do_ReallocMem(var P: Pointer; Size: PtrUInt): Pointer;
 var
   RawPtr, NewRawPtr: Pointer;
@@ -284,15 +269,10 @@ begin
       SetStoredSize(NewRawPtr, Size);
       P := NewRawPtr + HEADER_SIZE;
     end;
-  // On failure, P is unchanged (mi_realloc guarantees old block is still valid).
   Result := P;
 end;
 
-{ * do_MemSize: Returns the exact user‑requested size stored in the header.
-  * This avoids relying on internal allocator metadata.
-  * @param P  User pointer.
-  * @return   The size originally requested when the block was allocated.
-}
+// do_MemSize: returns the exact user-requested size stored in the header.
 function do_MemSize(P: Pointer): PtrUInt;
 begin
   if P = nil then
@@ -300,25 +280,19 @@ begin
   Result := GetStoredSize(P - HEADER_SIZE);
 end;
 
-{ * do_GetHeapStatus: Returns a THeapStatus record (not used by mimalloc).
-  * We fill it with zeros to satisfy the interface.
-}
+// do_GetHeapStatus / do_GetFPCHeapStatus: mimalloc exposes its own stats API,
+// which is not wired into these FPC hooks. Return zeroed records.
 function do_GetHeapStatus: THeapStatus;
 begin
   FillChar(Result, SizeOf(Result), 0);
 end;
 
-{ * do_GetFPCHeapStatus: Returns TFPCHeapStatus (not used). Filled with zeros.
-}
 function do_GetFPCHeapStatus: TFPCHeapStatus;
 begin
   FillChar(Result, SizeOf(Result), 0);
 end;
 
-{ * DummyInitThread / DummyDoneThread: FPC requires non‑nil thread callbacks
-  * for TLS (thread‑local storage) initialisation, otherwise multi‑threading
-  * crashes. These do nothing but must exist and be non‑nil.
-}
+// FPC requires non-nil InitThread/DoneThread for TLS setup; stubs suffice.
 procedure DummyInitThread;
 begin
 end;
@@ -327,9 +301,7 @@ procedure DummyDoneThread;
 begin
 end;
 
-{ * InstallMemoryHook: Replaces the default memory manager with our hooks.
-  * Saves the original manager in OriginMM, then sets HookMM.
-}
+// InstallMemoryHook: replaces the default memory manager with our hooks.
 procedure InstallMemoryHook;
 const
   C_: TMemoryManager = (
@@ -340,20 +312,19 @@ const
     AllocMem: @do_AllocMem;
     ReallocMem: @do_ReallocMem;
     MemSize: @do_MemSize;
-    InitThread: @DummyInitThread; // non‑nil to satisfy FPC
-    DoneThread: @DummyDoneThread; // non‑nil to satisfy FPC
+    InitThread: @DummyInitThread;
+    DoneThread: @DummyDoneThread;
     RelocateHeap: nil;
     GetHeapStatus: @do_GetHeapStatus;
     GetFPCHeapStatus: @do_GetFPCHeapStatus;
   );
 begin
-  GetMemoryManager(OriginMM); // save current manager
+  GetMemoryManager(OriginMM);
   HookMM := C_;
-  SetMemoryManager(HookMM); // install ours
+  SetMemoryManager(HookMM);
 end;
 
-{ * UnInstallMemoryHook: Restores the original memory manager.
-}
+// UnInstallMemoryHook: restores the original memory manager.
 procedure UnInstallMemoryHook;
 begin
   SetMemoryManager(OriginMM);
@@ -361,17 +332,11 @@ end;
 
 {$ELSE}  // Delphi
 
-{ * For Delphi, we implement the TMemoryManagerEx record.
-  * It has fewer callbacks and uses NativeInt for sizes.
-}
 var
   OriginMM: TMemoryManagerEx;
   HookMM: TMemoryManagerEx;
 
-  { * do_GetMem: Allocates memory with a header.
-    * @param Size  User‑requested size (NativeInt).
-    * @return      User pointer or nil.
-  }
+// do_GetMem: allocates Size bytes via mi_malloc with a 16-byte header.
 function do_GetMem(Size: NativeInt): Pointer;
 var
   RawPtr: Pointer;
@@ -386,10 +351,7 @@ begin
       Result := nil;
 end;
 
-{ * do_FreeMem: Frees a block.
-  * @param P  User pointer.
-  * @return   0 on success.
-}
+// do_FreeMem: releases a block previously returned by do_GetMem.
 function do_FreeMem(P: Pointer): Integer;
 var
   RawPtr: Pointer;
@@ -402,11 +364,8 @@ begin
   Result := 0;
 end;
 
-{ * do_ReallocMem: Resizes a block.
-  * @param P     Pointer (may be nil).
-  * @param Size  New size.
-  * @return      New pointer, or nil on failure (old block remains valid).
-}
+// do_ReallocMem: resizes a block.
+// On failure, the original block stays valid; returns nil.
 function do_ReallocMem(P: Pointer; Size: NativeInt): Pointer;
 var
   RawPtr, NewRawPtr: Pointer;
@@ -442,13 +401,10 @@ begin
       Result := Pointer(NativeUInt(NewRawPtr) + HEADER_SIZE);
     end
   else
-      Result := nil; // old block is still valid, but we signal failure
+      Result := nil;
 end;
 
-{ * do_AllocMem: Allocates zero‑initialised memory.
-  * @param Size  Size in bytes.
-  * @return      User pointer or nil.
-}
+// do_AllocMem: zero-initialised allocation via mi_calloc.
 function do_AllocMem(Size: NativeInt): Pointer;
 var
   RawPtr: Pointer;
@@ -463,10 +419,7 @@ begin
       Result := nil;
 end;
 
-{ * do_RegisterExpectedMemoryLeak / do_UnregisterExpectedMemoryLeak:
-  * These are used by Delphi's memory leak detection. We don't implement them,
-  * so we simply return False.
-}
+// Delphi's memory-leak tracking hooks are not implemented; return False.
 function do_RegisterExpectedMemoryLeak(P: Pointer): Boolean;
 begin
   Result := False;
@@ -477,8 +430,7 @@ begin
   Result := False;
 end;
 
-{ * InstallMemoryHook: Replaces the default memory manager with our hooks.
-}
+// InstallMemoryHook: replaces the default memory manager with our hooks.
 procedure InstallMemoryHook;
 const
   C_: TMemoryManagerEx = (
@@ -495,8 +447,7 @@ begin
   SetMemoryManager(HookMM);
 end;
 
-{ * UnInstallMemoryHook: Restores the original manager.
-}
+// UnInstallMemoryHook: restores the original memory manager.
 procedure UnInstallMemoryHook;
 begin
   SetMemoryManager(OriginMM);

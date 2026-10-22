@@ -7316,7 +7316,7 @@ end;
 initialization
 
 C40_UID := TAtomUID___.Create(Null_UID());
-C40_QuietMode := False;
+C40_QuietMode := True;
 C40_SafeCheckTime := C_Tick_Second * 45;
 C40_PhysicsReconnectionDelayTime := 5.0;
 C40_UpdateServiceInfoDelayTime := C_Tick_Second * 1;

@@ -1628,7 +1628,7 @@ type
     FCritical: TCritical;
     FThreadID: TThreadID;
     FSyncPool: TThread_Post_Data_Order_Struct__;
-    FProgressing: TAtomBool;
+    FProgressing: TAtomInteger;
     FOneStep: Boolean;
     FResetRandomSeed: Boolean;
     procedure FreeThreadProgressPostData(p: TThread_Post_Data_Order_Struct__.PT_);
@@ -2882,11 +2882,9 @@ end;
 function Get_Compiler_Version: string;
 begin
   {$IFDEF FPC}
-    // 使用 FPC 内置的版本常量，避免依赖不稳定的版本宏
     Result := 'FPC ' + IntToStr(FPC_VERSION) + '.' + IntToStr(FPC_RELEASE) + '.' + IntToStr(FPC_PATCH);
   {$ELSE}
-    // Delphi / Kylix 分支
-    {$IFDEF CONDITIONALEXPRESSIONS}  // Delphi 6 及以上支持条件编译
+    {$IFDEF CONDITIONALEXPRESSIONS}
       {$IF defined(KYLIX3)} Result := 'Kylix 3';
       {$ELSEIF defined(VER140)} Result := 'Delphi 6';
       {$ELSEIF defined(VER150)} Result := 'Delphi 7';
