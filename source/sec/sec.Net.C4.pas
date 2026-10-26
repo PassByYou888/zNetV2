@@ -4099,13 +4099,20 @@ end;
 
 destructor TC40_Custom_Service.Destroy;
 begin
-  Free_Cycle_Anchor();
-  DisposeObject(ConsoleCommand);
-  C40PhysicsService.DependNetworkServicePool.Remove(Self);
-  C40_ServicePool.Remove(Self);
-  DisposeObject(ServiceInfo);
-  DisposeObject(ParamList);
-  inherited Destroy;
+  try
+    Free_Cycle_Anchor();
+    DisposeObject(ConsoleCommand);
+    C40PhysicsService.DependNetworkServicePool.Remove(Self);
+    C40_ServicePool.Remove(Self);
+    DisposeObject(ServiceInfo);
+    DisposeObject(ParamList);
+  except
+  end;
+
+  try
+      inherited Destroy;
+  except
+  end;
 end;
 
 procedure TC40_Custom_Service.SafeCheck;
@@ -4630,13 +4637,20 @@ end;
 
 destructor TC40_Custom_Client.Destroy;
 begin
-  Free_Cycle_Anchor();
-  DisposeObject(ConsoleCommand);
-  C40_ClientPool.Remove(Self);
-  C40PhysicsTunnel.DependNetworkClientPool.Remove(Self);
-  DisposeObject(ClientInfo);
-  DisposeObject(ParamList);
-  inherited Destroy;
+  try
+    Free_Cycle_Anchor();
+    DisposeObject(ConsoleCommand);
+    C40_ClientPool.Remove(Self);
+    C40PhysicsTunnel.DependNetworkClientPool.Remove(Self);
+    DisposeObject(ClientInfo);
+    DisposeObject(ParamList);
+  except
+  end;
+
+  try
+      inherited Destroy;
+  except
+  end;
 end;
 
 procedure TC40_Custom_Client.SafeCheck;
